@@ -157,6 +157,28 @@ describe('Board', () => {
     expect(store.files['projects/flow-app.md']).toContain('(edited)')
   })
 
+  it('edits a Parking lot item inline', async () => {
+    const { store, user } = setup()
+    await user.click(await screen.findByRole('button', { name: 'Look into podcasts' }))
+    await user.clear(screen.getByRole('textbox', { name: 'Text' }))
+    await user.type(screen.getByRole('textbox', { name: 'Text' }), 'Look into Spanish podcasts')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(col('Parking lot').getByText('Look into Spanish podcasts')).toBeInTheDocument()
+    await waitFor(() => expect(store.files['inbox.md']).toContain('Look into Spanish podcasts'))
+  })
+
+  it('saving a card with a new title and project writes both in one change', async () => {
+    const { store, user } = setup()
+    await user.click(await screen.findByRole('button', { name: 'Set up Tauri' }))
+    await user.clear(screen.getByRole('textbox', { name: 'Title' }))
+    await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Set up Rust')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Project' }), 'learn-spanish')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(col('To do').getByText('Set up Rust')).toBeInTheDocument()
+    await waitFor(() => expect(store.files['projects/learn-spanish.md']).toContain('Set up Rust'))
+    expect(store.files['projects/flow-app.md']).not.toContain('Set up')
+  })
+
   it('offers no project select in the Parking lot add form', async () => {
     const { user } = setup()
     await screen.findByText('Buy a book')

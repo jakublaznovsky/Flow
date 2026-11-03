@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { boardColumns, type Card as CardData, type ColumnId } from '../model/board'
-import { addInboxItem, deleteInboxItem, promoteInboxItem } from '../model/inbox'
+import { addInboxItem, deleteInboxItem, editInboxItem, promoteInboxItem } from '../model/inbox'
 import { createProject, updateProject } from '../model/projects'
 import { addTask, changeTaskProject, deleteTask, editTask, moveTask } from '../model/tasks'
 import type { FileStore } from '../storage/fileStore'
@@ -132,11 +132,17 @@ export default function Board({ store, settings, now, onReady }: Props) {
     return slug
   }
   const saveCard = (card: CardData, patch: { title: string; firstStep: string; project: string }) => {
-    if (card.kind === 'inbox') return
-    apply((d) => editTask(d, card.key, { title: patch.title, firstStep: patch.firstStep }, today))
-    if (patch.project && patch.project !== card.projectSlug) {
-      apply((d) => changeTaskProject(d, card.key, patch.project))
+    if (card.kind === 'inbox') {
+      apply((d) => editInboxItem(d, card.key.slice('inbox/'.length), patch.title))
+      return
     }
+    // One apply (one save) for the edit and the optional project change.
+    apply((d) => {
+      const edited = editTask(d, card.key, { title: patch.title, firstStep: patch.firstStep }, today)
+      if (!patch.project || patch.project === card.projectSlug) return edited
+      const moved = changeTaskProject(edited.data, card.key, patch.project)
+      return { data: moved.data, changed: [...new Set([...edited.changed, ...moved.changed])] }
+    })
   }
   const deleteCard = (card: CardData) => {
     if (card.kind === 'inbox') apply((d) => deleteInboxItem(d, card.key.slice('inbox/'.length)))

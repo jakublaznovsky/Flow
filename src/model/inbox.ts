@@ -12,6 +12,15 @@ export function addInboxItem(d: FlowData, text: string, today: ISODate): Change 
   return { data: { ...d, inbox }, changed: [INBOX_PATH] }
 }
 
+export function editInboxItem(d: FlowData, id: string, text: string): Change {
+  const clean = text.trim()
+  const item = d.inbox.items.find((i) => i.id === id)
+  if (!item || !clean || item.text === clean) return noChange(d)
+  const inbox = structuredClone(d.inbox)
+  inbox.items.find((i) => i.id === id)!.text = clean
+  return { data: { ...d, inbox }, changed: [INBOX_PATH] }
+}
+
 export function deleteInboxItem(d: FlowData, id: string): Change {
   if (!d.inbox.items.some((i) => i.id === id)) return noChange(d)
   const inbox = structuredClone(d.inbox)

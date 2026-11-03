@@ -58,16 +58,23 @@ describe('saveFlow', () => {
     expect(s.files['projects/good.md']).toContain('status: done')
     expect(s.files['flow-issues.log']).toContain('not saved')
   })
+  it('returns only the paths whose write failed (skipped files are not failures)', async () => {
+    const s = new MemoryFileStore({ 'projects/good.md': GOOD, 'days/2026-11-04.md': BAD })
+    const d = await loadFlow(s, T)
+    const c = moveTask(d, 'good/t1', 'done', T)
+    s.write = async () => { throw new Error('disk full') }
+    await expect(saveFlow(s, c.data, c.changed)).resolves.toEqual(['projects/good.md'])
+  })
   it('retries a failing write once and never throws', async () => {
     const s = new MemoryFileStore({ 'projects/good.md': GOOD })
     const d = await loadFlow(s, T)
     const orig = s.write.bind(s)
     let calls = 0
     s.write = async (p, t) => { calls++; if (calls === 1) throw new Error('boom'); return orig(p, t) }
-    await saveFlow(s, d, ['projects/good.md'])
+    await expect(saveFlow(s, d, ['projects/good.md'])).resolves.toEqual([])
     expect(calls).toBe(2)
     s.write = async () => { throw new Error('always') }
-    await expect(saveFlow(s, d, ['projects/good.md'])).resolves.toBeUndefined()
+    await expect(saveFlow(s, d, ['projects/good.md'])).resolves.toEqual(['projects/good.md'])
     expect(s.files['flow-issues.log']).toContain('always')
   })
 })

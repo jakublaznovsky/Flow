@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { addInboxItem, deleteInboxItem, promoteInboxItem } from './inbox'
+import { addInboxItem, deleteInboxItem, editInboxItem, promoteInboxItem } from './inbox'
 import { emptyFlow, type FlowData } from './types'
 
 function deepFreeze<T>(o: T): T {
@@ -68,5 +68,19 @@ describe('promoteInboxItem', () => {
     const d = sample()
     expect(promoteInboxItem(d, 'zz', 'flow-app', 'todo', T)).toEqual({ data: d, changed: [] })
     expect(promoteInboxItem(d, 'i1', 'nope', 'todo', T)).toEqual({ data: d, changed: [] })
+  })
+})
+
+describe('editInboxItem', () => {
+  it('changes the trimmed text and writes inbox.md', () => {
+    const r = editInboxItem(sample(), 'i1', '  Call the dentist  ')
+    expect(r.data.inbox.items.find((i) => i.id === 'i1')?.text).toBe('Call the dentist')
+    expect(r.changed).toEqual(['inbox.md'])
+  })
+  it('blank text, same text and unknown id are no-ops', () => {
+    const d = sample()
+    expect(editInboxItem(d, 'i1', '   ')).toEqual({ data: d, changed: [] })
+    expect(editInboxItem(d, 'i1', 'Call dentist')).toEqual({ data: d, changed: [] })
+    expect(editInboxItem(d, 'i9', 'x')).toEqual({ data: d, changed: [] })
   })
 })

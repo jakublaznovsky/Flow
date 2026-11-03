@@ -202,7 +202,9 @@ function serializePath(d: FlowData, path: string): string | null {
   return d.days[c.date] ? serializeDay(d.days[c.date]) : null
 }
 
-export async function saveFlow(store: FileStore, d: FlowData, changed: string[]): Promise<void> {
+/** Writes the changed paths; returns the ones whose write failed (after one retry) so the caller can retry later. */
+export async function saveFlow(store: FileStore, d: FlowData, changed: string[]): Promise<string[]> {
+  const failed: string[] = []
   for (const path of [...new Set(changed)]) {
     try {
       if (d.skipped.includes(path)) {
@@ -217,7 +219,9 @@ export async function saveFlow(store: FileStore, d: FlowData, changed: string[])
         await store.write(path, text)
       }
     } catch (e) {
+      failed.push(path)
       await logIssue(store, path, `not saved: ${reasonOf(e)}`)
     }
   }
+  return failed
 }

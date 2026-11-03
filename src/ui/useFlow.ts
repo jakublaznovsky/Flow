@@ -25,6 +25,10 @@ export function useFlow(store: FileStore, settings: Settings, now: () => Date = 
   const applyLog = useRef<{ n: number; paths: string[] }[]>([])
   const applyCount = useRef(0)
   const todayRef = useRef<ISODate>(localDate(now()))
+  // Paths still to be written (failed writes stay here until a later save succeeds).
+  const pending = useRef(new Set<string>())
+  // All saves run one after another so two writes to the same file never overlap.
+  const saving = useRef<Promise<void>>(Promise.resolve())
   const [data, setData] = useState<FlowData | null>(null)
   const [today, setToday] = useState<ISODate>(todayRef.current)
   const [filter, setFilter] = useState<string | null>(null)
@@ -96,7 +100,15 @@ export function useFlow(store: FileStore, settings: Settings, now: () => Date = 
     if (applyLog.current.length > 50) applyLog.current.shift()
     dataRef.current = change.data
     setData(change.data)
-    void saveFlow(store, change.data, change.changed)
+    for (const path of change.changed) pending.current.add(path)
+    saving.current = saving.current.then(async () => {
+      const latest = dataRef.current
+      if (!latest || pending.current.size === 0) return
+      const paths = [...pending.current]
+      pending.current.clear()
+      const failed = await saveFlow(store, latest, paths).catch(() => paths)
+      for (const path of failed) pending.current.add(path)
+    })
   }, [store])
 
   return { data, today, filter, setFilter, order, setOrder, lastProject, remember, apply }
