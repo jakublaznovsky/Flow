@@ -7,7 +7,21 @@ files in a folder you choose, so you (or an AI assistant) can read and edit them
 
 ![Flow board](docs/screenshot.png)
 
-## Run it on your computer
+## Install on Windows (no setup needed)
+
+1. Open the [Releases page](https://github.com/jakublaznovsky/Flow/releases/latest).
+2. Download `Flow_<version>_x64-setup.exe` and run it.
+3. The installer is not code-signed, so Windows SmartScreen may say "Windows protected your PC".
+   Click **More info → Run anyway**.
+
+To update, install the newer `.exe` over the old one. Your tasks stay in your Flow folder.
+
+**Making a new release (for the maintainer):** bump `version` in `package.json` and
+`src-tauri/tauri.conf.json`, commit, then push a tag such as `v0.2.0`
+(`git tag v0.2.0 && git push origin v0.2.0`). The GitHub Actions workflow
+`.github/workflows/release.yml` builds the installer and attaches it to the release.
+
+## Run it from source
 
 You only need to do the setup once.
 
