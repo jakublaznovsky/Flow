@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { boardColumns, type Card as CardData, type ColumnId } from '../model/board'
 import { addInboxItem, deleteInboxItem, promoteInboxItem } from '../model/inbox'
@@ -14,7 +14,9 @@ import type { Settings } from './settings'
 import { useFlow } from './useFlow'
 import './board.css'
 
-interface Props { store: FileStore; settings: Settings; now?: () => Date }
+/** Handle for host shells (Tauri) to push changes into the board. Returns an optional cleanup. */
+export interface BoardApi { apply: ReturnType<typeof useFlow>['apply']; today: () => string }
+interface Props { store: FileStore; settings: Settings; now?: () => Date; onReady?: (api: BoardApi) => void | (() => void) }
 
 const COLUMNS: { id: ColumnId; title: string }[] = [
   { id: 'inbox', title: 'Parking lot' },
@@ -84,9 +86,12 @@ export function usePromotion(flow: ReturnType<typeof useFlow>) {
   return { openPicker, picker, pendingTo: pending?.to ?? null }
 }
 
-export default function Board({ store, settings, now }: Props) {
+export default function Board({ store, settings, now, onReady }: Props) {
   const flow = useFlow(store, settings, now)
   const { data, today, filter, setFilter, order, lastProject, remember, apply } = flow
+  const todayRef = useRef(today)
+  todayRef.current = today
+  useEffect(() => onReady?.({ apply, today: () => todayRef.current }), [onReady, apply])
   const promotion = usePromotion(flow)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   if (!data) return <div className="app"><h1>Flow</h1></div>
