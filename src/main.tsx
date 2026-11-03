@@ -4,8 +4,9 @@ import App from './App.tsx'
 import { addInboxItem } from './model/inbox'
 import FolderSetup from './ui/FolderSetup'
 import QuickCapture from './ui/QuickCapture'
+import { logIssue } from './storage/flowRepo'
 import type { BoardApi } from './ui/Board'
-import { MemoryFileStore } from './storage/fileStore'
+import { MemoryFileStore, type FileStore } from './storage/fileStore'
 import { MemorySettings } from './ui/settings'
 
 // Browser dev: in-memory store seeded with the spec's example files.
@@ -79,7 +80,7 @@ async function renderTauri() {
   const SHORTCUT = 'CommandOrControl+Shift+Space'
 
   // Registered by App once it is ready: global shortcut shows the capture window, captured text lands in the inbox.
-  const onReady = (board: BoardApi) => {
+  const makeOnReady = (store: FileStore) => (board: BoardApi) => {
     let un: (() => void) | undefined
     let cancelled = false
     void register(SHORTCUT, async (ev) => {
@@ -87,7 +88,7 @@ async function renderTauri() {
       const cap = await Window.getByLabel('capture')
       await cap?.show()
       await cap?.setFocus()
-    }).catch(() => {})
+    }).catch((e) => { void logIssue(store, 'shortcut', `could not register ${SHORTCUT}: ${e instanceof Error ? e.message : String(e)}`) })
     void listen<string>('flow:capture', (ev) => board.apply((d) => addInboxItem(d, ev.payload, board.today()))).then((f) => {
       if (cancelled) f()
       else un = f
@@ -100,29 +101,38 @@ async function renderTauri() {
   }
 
   const folder = await settings.get<string>('folder')
-  const showApp = (dir: string) =>
+  const showApp = (dir: string) => {
+    const store = new TauriFileStore(dir)
+    // Closing the main window must also close the hidden capture window, or the process lingers.
+    void getCurrentWindow().onCloseRequested(async () => {
+      await (await Window.getByLabel('capture'))?.destroy()
+    })
     createRoot(rootEl).render(
       <StrictMode>
-        <App store={new TauriFileStore(dir)} settings={settings} onReady={onReady} />
+        <App store={store} settings={settings} onReady={makeOnReady(store)} />
       </StrictMode>,
     )
+  }
 
-  if (folder && (await exists(folder))) return showApp(folder)
+  // An out-of-$HOME folder loses its runtime scope grant on restart; fall back to setup then.
+  let valid = false
+  try { valid = !!folder && (await exists(folder)) } catch { valid = false }
+  if (folder && valid) return showApp(folder)
 
   const root = createRoot(rootEl)
   root.render(
     <FolderSetup
       onChoose={() => {
-        void open({ directory: true }).then(async (picked) => {
+        void open({ directory: true, recursive: true }).then(async (picked) => {
           if (typeof picked !== 'string') return
           await settings.set('folder', picked)
           root.unmount()
           showApp(picked)
-        })
+        }).catch(() => {})
       }}
     />,
   )
 }
 
-if ('__TAURI_INTERNALS__' in window) void renderTauri()
+if ('__TAURI_INTERNALS__' in window) renderTauri().catch(() => {})
 else renderBrowser()
