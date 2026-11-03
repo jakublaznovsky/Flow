@@ -17,8 +17,8 @@ const seed = (): Record<string, string> => ({
   'projects/learn-spanish.md': project('Learn Spanish', t('t1', 'Buy a book', 'todo')),
 })
 
-async function harness() {
-  const store = new MemoryFileStore(seed())
+async function harness(files: Record<string, string> = seed()) {
+  const store = new MemoryFileStore(files)
   const settings = new MemorySettings()
   const hook = renderHook(() => {
     const flow = useFlow(store, settings, () => NOW)
@@ -59,6 +59,29 @@ describe('handleDrop', () => {
       expect((await settings.get<Record<string, string[]>>('columnOrder'))?.todo?.[0]).toBe('flow-app/t3'))
     const order = await settings.get<Record<string, string[]>>('columnOrder')
     expect(order?.todo).toEqual(['flow-app/t3', 'flow-app/t1', 'learn-spanish/t1'])
+  })
+
+  it('reordering with a project filter keeps hidden cards in place', async () => {
+    const { settings, ctx, hook } = await harness()
+    act(() => hook.result.current.flow.setFilter('flow-app'))
+    act(() => handleDrop({ cardKey: 'flow-app/t1', from: 'todo', to: 'todo', index: 1 }, ctx()))
+    expect(hook.result.current.flow.order.todo).toEqual(['flow-app/t3', 'flow-app/t1', 'learn-spanish/t1'])
+    act(() => handleDrop({ cardKey: 'flow-app/t1', from: 'todo', to: 'todo', index: 0 }, ctx()))
+    expect(hook.result.current.flow.order.todo).toEqual(['flow-app/t1', 'flow-app/t3', 'learn-spanish/t1'])
+    act(() => handleDrop({ cardKey: 'flow-app/t1', from: 'todo', to: 'today', index: 0 }, ctx()))
+    expect(hook.result.current.flow.order.todo).toEqual(['flow-app/t3', 'learn-spanish/t1'])
+    expect(hook.result.current.flow.order.today).toEqual(['flow-app/t1', 'flow-app/t2'])
+    await waitFor(async () =>
+      expect((await settings.get<Record<string, string[]>>('columnOrder'))?.todo).toEqual(['flow-app/t3', 'learn-spanish/t1']))
+  })
+
+  it('rejects an inbox drop on To do when there is no active project', async () => {
+    const files = seed()
+    files['projects/flow-app.md'] = files['projects/flow-app.md'].replace('status: active', 'status: paused')
+    files['projects/learn-spanish.md'] = files['projects/learn-spanish.md'].replace('status: active', 'status: archived')
+    const { ctx, hook } = await harness(files)
+    act(() => handleDrop({ cardKey: 'inbox/i1', from: 'inbox', to: 'today', index: 0 }, ctx()))
+    expect(hook.result.current.promotion.picker).toBeFalsy()
   })
 
   async function dragInbox() {

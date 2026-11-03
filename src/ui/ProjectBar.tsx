@@ -4,18 +4,20 @@ import { PROJECT_COLORS } from '../model/ids'
 
 interface Props {
   projects: Project[]
+  hidden: Project[]          // paused, done or archived projects
   filter: string | null
   onFilter: (slug: string | null) => void
   onCreate: (title: string) => void
   onUpdate: (slug: string, patch: { title?: string; color?: string; status?: ProjectStatus }) => void
 }
 
-export default function ProjectBar({ projects, filter, onFilter, onCreate, onUpdate }: Props) {
+export default function ProjectBar({ projects, hidden, filter, onFilter, onCreate, onUpdate }: Props) {
   const [menu, setMenu] = useState<string | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [renameText, setRenameText] = useState('')
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  const [showHidden, setShowHidden] = useState(false)
 
   const closeMenu = () => { setMenu(null); setRenaming(false) }
   const setStatus = (slug: string, status: ProjectStatus) => {
@@ -70,6 +72,23 @@ export default function ProjectBar({ projects, filter, onFilter, onCreate, onUpd
         </form>
       ) : (
         <button className="chip add-project" onClick={() => setAdding(true)}>+ Project</button>
+      )}
+      {hidden.length > 0 && (
+        <>
+          <button className="chip hidden-chip" aria-expanded={showHidden} onClick={() => setShowHidden(!showHidden)}>
+            Hidden ({hidden.length})
+          </button>
+          {showHidden && (
+            <ul className="hidden-list" aria-label="Hidden projects">
+              {hidden.map((p) => (
+                <li key={p.slug}>
+                  <span>{p.title}</span>
+                  <button onClick={() => onUpdate(p.slug, { status: 'active' })}>Make active</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </div>
   )

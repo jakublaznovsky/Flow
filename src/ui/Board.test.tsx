@@ -79,6 +79,21 @@ describe('Board', () => {
     await waitFor(() => expect(store.files['projects/learn-spanish.md']).toContain('archived'))
   })
 
+  it('a hidden project can be made active again from the Hidden chip', async () => {
+    const { store, user } = setup()
+    await screen.findByText('Buy a book')
+    expect(screen.queryByRole('button', { name: /^Hidden/ })).not.toBeInTheDocument()
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Learn Spanish' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Pause' }))
+    await user.click(screen.getByRole('button', { name: 'Hidden (1)' }))
+    const list = within(screen.getByRole('list', { name: 'Hidden projects' }))
+    expect(list.getByText('Learn Spanish')).toBeInTheDocument()
+    await user.click(list.getByRole('button', { name: 'Make active' }))
+    expect(await screen.findByText('Buy a book')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Hidden/ })).not.toBeInTheDocument()
+    await waitFor(() => expect(store.files['projects/learn-spanish.md']).toContain('status: active'))
+  })
+
   it('edits a card inline and deletes it', async () => {
     const { user } = setup()
     await user.click(await screen.findByRole('button', { name: 'Set up Tauri' }))

@@ -100,13 +100,15 @@ async function renderTauri() {
     }
   }
 
+  // Closing the main window must also close the hidden capture window, or the process lingers.
+  // Registered before the folder setup screen so quitting from setup also exits.
+  void getCurrentWindow().onCloseRequested(async () => {
+    await (await Window.getByLabel('capture'))?.destroy()
+  })
+
   const folder = await settings.get<string>('folder')
   const showApp = (dir: string) => {
     const store = new TauriFileStore(dir)
-    // Closing the main window must also close the hidden capture window, or the process lingers.
-    void getCurrentWindow().onCloseRequested(async () => {
-      await (await Window.getByLabel('capture'))?.destroy()
-    })
     createRoot(rootEl).render(
       <StrictMode>
         <App store={store} settings={settings} onReady={makeOnReady(store)} />

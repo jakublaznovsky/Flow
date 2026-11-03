@@ -30,13 +30,23 @@ export interface DropContext {
   openPicker(itemId: string, to: 'todo' | 'today', index?: number): void
 }
 
+/**
+ * Store the column order after a drop. `index` is a position among the visible (filtered) cards;
+ * the order is built from all cards so cards hidden by the project filter keep their place.
+ */
 function reorder(flow: ReturnType<typeof useFlow>, cardKey: string, from: ColumnId, to: ColumnId, index: number, insertKey = cardKey) {
   if (!flow.data) return
-  const cols = boardColumns(flow.data, flow.today, flow.filter, flow.order)
-  const keys = cols[to].map((c) => c.key).filter((k) => k !== cardKey && k !== insertKey)
-  keys.splice(Math.max(0, Math.min(index, keys.length)), 0, insertKey)
+  const all = boardColumns(flow.data, flow.today, null, flow.order)
+  const visible = boardColumns(flow.data, flow.today, flow.filter, flow.order)
+  const others = (cards: CardData[]) => cards.map((c) => c.key).filter((k) => k !== cardKey && k !== insertKey)
+  const keys = others(all[to])
+  const shown = others(visible[to])
+  const at = index < shown.length
+    ? keys.indexOf(shown[Math.max(0, index)])
+    : shown.length > 0 ? keys.indexOf(shown[shown.length - 1]) + 1 : keys.length
+  keys.splice(at, 0, insertKey)
   const next = { ...flow.order, [to]: keys }
-  if (from !== to) next[from] = cols[from].map((c) => c.key).filter((k) => k !== cardKey)
+  if (from !== to) next[from] = all[from].map((c) => c.key).filter((k) => k !== cardKey)
   flow.setOrder(next)
 }
 
@@ -47,8 +57,10 @@ export function handleDrop(
   const { flow } = ctx
   if (!flow.data) return
   if (from === 'inbox') {
+    const hasProject = Object.values(flow.data.projects).some((p) => p.status === 'active')
     if (to === 'inbox') reorder(flow, cardKey, from, to, index)
-    else if (to === 'todo' || to === 'today') ctx.openPicker(cardKey.slice('inbox/'.length), to, index)
+    // With no active project there is nothing to pick, so the drop is rejected.
+    else if ((to === 'todo' || to === 'today') && hasProject) ctx.openPicker(cardKey.slice('inbox/'.length), to, index)
     return
   }
   if (to === 'inbox') return
@@ -155,6 +167,7 @@ export default function Board({ store, settings, now, onReady }: Props) {
         <h1>Flow</h1>
         <ProjectBar
           projects={active}
+          hidden={Object.values(data.projects).filter((p) => p.status !== 'active')}
           filter={filter}
           onFilter={setFilter}
           onCreate={(t) => { const s = createProjectNamed(t); if (s) setFilter(null) }}
