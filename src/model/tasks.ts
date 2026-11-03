@@ -1,7 +1,7 @@
 import {
   dayPath, projectPath, type Change, type Day, type FlowData, type ISODate, type Project, type Task, type TaskStatus,
 } from './types'
-import { nextTaskId } from './ids'
+import { nextTaskIdFor } from './ids'
 
 const noChange = (d: FlowData): Change => ({ data: d, changed: [] })
 
@@ -39,7 +39,7 @@ export function addTask(d: FlowData, slug: string, title: string, status: 'todo'
   const clean = title.trim()
   if (!src || !clean) return noChange(d)
   const project = structuredClone(src)
-  const id = nextTaskId(project.tasks)
+  const id = nextTaskIdFor(d, slug)
   const task: Task = { id, title: clean, status, created: today, extra: {} }
   project.tasks.push(task)
   const days: Record<ISODate, Day> = {}
@@ -102,7 +102,7 @@ export function moveTask(d: FlowData, ref: string, to: TaskStatus, today: ISODat
   } else if (to === 'done') {
     task.done = today
     const day = touch(today)
-    if (!day.done.some((e) => e.ref === ref)) day.done.push({ ref, title: task.title, project: project.title })
+    if (!day.done.some((e) => e.ref === ref)) day.done.push({ ref, title: task.title, project: project.title, extra: {} })
   }
   return { data: withParts(d, project, days), changed }
 }
@@ -123,7 +123,7 @@ export function changeTaskProject(d: FlowData, ref: string, toSlug: string): Cha
   const to = structuredClone(target)
   const moved = from.tasks.find((t) => t.id === found.task.id)!
   from.tasks = from.tasks.filter((t) => t !== moved)
-  moved.id = nextTaskId(to.tasks)
+  moved.id = nextTaskIdFor(d, toSlug)
   to.tasks.push(moved)
   const data: FlowData = { ...d, projects: { ...d.projects, [from.slug]: from, [to.slug]: to } }
   return { data, changed: [projectPath(from.slug), projectPath(to.slug)], ref: `${to.slug}/${moved.id}` }

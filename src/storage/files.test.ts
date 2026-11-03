@@ -149,3 +149,38 @@ describe('leading BOM and blank lines', () => {
     expect(d.body).toBe('Optional free-text note (edited outside Flow in this version).\n')
   })
 })
+
+describe('non-scalar values where a scalar is expected', () => {
+  it('throws instead of writing "[object Object]"', () => {
+    expect(() => parseProject('x', '---\ntitle: {a: 1}\n---\n', today)).toThrow()
+    expect(() => parseProject('x', '---\ntitle: X\ntasks:\n  - id: t1\n    title: [a, b]\n---\n', today)).toThrow()
+    expect(() => parseProject('x', '---\ntitle: X\ngoal: {deep: true}\n---\n', today)).toThrow()
+    expect(() => parseInbox('---\nitems:\n  - text: {a: 1}\n---\n', today)).toThrow()
+    expect(() => parseDay('2026-11-04', '---\nplanned: [{a: 1}]\n---\n')).toThrow()
+    expect(() => parseDay('2026-11-04', '---\ndone:\n  - ref: a/t1\n    title: [x]\n---\n')).toThrow()
+  })
+  it('still accepts numbers and booleans as text', () => {
+    const p = parseProject('x', '---\ntitle: 2026\ntasks:\n  - id: t1\n    title: true\n---\n', today)
+    expect(p.title).toBe('2026')
+    expect(p.tasks[0].title).toBe('true')
+  })
+})
+
+describe('done entry extra fields', () => {
+  it('are preserved on round trip', () => {
+    const text = '---\ndate: 2026-11-04\nplanned: []\ndone:\n  - ref: a/t1\n    title: A\n    project: P\n    minutes: 30\n---\n'
+    const d = parseDay('2026-11-04', text)
+    expect(d.done[0].extra).toEqual({ minutes: 30 })
+    const out = serializeDay(d)
+    expect(out).toContain('minutes: 30')
+    expect(parseDay('2026-11-04', out)).toEqual(d)
+  })
+})
+
+describe('status parsing', () => {
+  it('trims and lowercases statuses', () => {
+    const p = parseProject('x', '---\ntitle: X\nstatus: " Archived"\ntasks:\n  - id: t1\n    title: A\n    status: Done\n---\n', today)
+    expect(p.status).toBe('archived')
+    expect(p.tasks[0].status).toBe('done')
+  })
+})

@@ -9,7 +9,15 @@ const TASK_STATUSES: TaskStatus[] = ['todo', 'today', 'done']
 
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
 const present = (v: unknown) => v !== undefined && v !== null && v !== ''
-const str = (v: unknown): string => String(v)
+const str = (v: unknown): string => {
+  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint') return String(v)
+  throw new Error(`expected text, got ${Array.isArray(v) ? 'a list' : typeof v === 'object' && v !== null ? 'a mapping' : String(v)}`)
+}
+/** Status values are matched case-insensitively and ignoring surrounding spaces. */
+const status = <S extends string>(v: unknown, allowed: S[], fallback: S): S => {
+  const s = typeof v === 'string' ? v.trim().toLowerCase() : ''
+  return allowed.includes(s as S) ? (s as S) : fallback
+}
 const optStr = (v: unknown): string | undefined => (present(v) ? str(v) : undefined)
 
 function pickExtra(o: Obj, known: string[]): Extra {
@@ -50,11 +58,10 @@ const TASK_KNOWN = ['id', 'title', 'status', 'first_step', 'created', 'planned',
 function parseTask(raw: unknown, today: ISODate): Omit<Task, 'id'> & { id?: string } {
   if (!isObj(raw)) throw new Error('task must be a mapping')
   if (!present(raw.title)) throw new Error('task is missing title')
-  const status = TASK_STATUSES.includes(raw.status as TaskStatus) ? (raw.status as TaskStatus) : 'todo'
   return {
     id: optStr(raw.id),
     title: str(raw.title),
-    status,
+    status: status(raw.status, TASK_STATUSES, 'todo'),
     firstStep: optStr(raw.first_step),
     created: present(raw.created) ? str(raw.created) : today,
     planned: optStr(raw.planned),
@@ -77,12 +84,11 @@ const PROJECT_KNOWN = ['title', 'status', 'color', 'goal', 'created', 'tasks']
 export function parseProject(slug: string, text: string, today: ISODate): Project {
   const { data, body } = splitFrontmatter(text)
   if (!present(data.title)) throw new Error('project is missing title')
-  const status = PROJECT_STATUSES.includes(data.status as ProjectStatus) ? (data.status as ProjectStatus) : 'active'
-  const rawTasks = list(data.tasks, 'tasks').map((t) => parseTask(t, today))
+    const rawTasks = list(data.tasks, 'tasks').map((t) => parseTask(t, today))
   return {
     slug,
     title: str(data.title),
-    status,
+    status: status(data.status, PROJECT_STATUSES, 'active'),
     color: present(data.color) ? str(data.color) : pickColor(0),
     goal: optStr(data.goal),
     created: present(data.created) ? str(data.created) : today,
@@ -132,12 +138,15 @@ export function parseDay(date: ISODate, text: string): Day {
   const done = list(data.done, 'done').map((raw): DoneEntry => {
     if (!isObj(raw)) throw new Error('done entry must be a mapping')
     if (!present(raw.ref)) throw new Error('done entry is missing ref')
-    return { ref: str(raw.ref), title: str(raw.title ?? ''), project: str(raw.project ?? '') }
+    return {
+      ref: str(raw.ref), title: str(raw.title ?? ''), project: str(raw.project ?? ''),
+      extra: pickExtra(raw, ['ref', 'title', 'project']),
+    }
   })
   return { date, planned, done, body, extra: pickExtra(data, ['date', 'planned', 'done']) }
 }
 
 export function serializeDay(d: Day): string {
-  const done = d.done.map((e) => ({ ref: e.ref, title: e.title, project: e.project }))
+  const done = d.done.map((e) => ({ ref: e.ref, title: e.title, project: e.project, ...e.extra }))
   return joinFrontmatter({ date: d.date, planned: d.planned, done, ...d.extra }, d.body)
 }

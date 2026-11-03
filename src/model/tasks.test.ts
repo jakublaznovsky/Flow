@@ -91,7 +91,7 @@ describe('moveTask', () => {
   it('complete logs a done entry', () => {
     const r = moveTask(sample(), 'flow-app/t2', 'done', T)
     expect(r.data.projects['flow-app'].tasks[1]).toMatchObject({ status: 'done', done: T })
-    expect(r.data.days[T].done).toEqual([{ ref: 'flow-app/t2', title: 'Set up Tauri project', project: 'Flow app' }])
+    expect(r.data.days[T].done).toEqual([{ ref: 'flow-app/t2', title: 'Set up Tauri project', project: 'Flow app', extra: {} }])
     expect(r.changed).toEqual(['projects/flow-app.md', 'days/2026-11-04.md'])
   })
   it('undo on a later date removes the entry from the completion day', () => {
@@ -145,6 +145,92 @@ describe('deleteTask', () => {
   it('unknown ref is a no-op', () => {
     const d = sample()
     expect(deleteTask(d, 'x/t1')).toEqual({ data: d, changed: [] })
+  })
+})
+
+describe('task id reuse', () => {
+  it('delete -> add -> complete -> undo keeps the old snapshot and logs the new one', () => {
+    let d: FlowData = moveTask(sample(), 'flow-app/t2', 'done', T).data
+    d = deleteTask(d, 'flow-app/t2').data
+    const added = addTask(d, 'flow-app', 'New thing', 'today', T)
+    const newTask = added.data.projects['flow-app'].tasks.find((t) => t.title === 'New thing')!
+    expect(newTask.id).toBe('t3')
+    d = moveTask(added.data, `flow-app/${newTask.id}`, 'done', T).data
+    expect(d.days[T].done.map((e) => e.title)).toEqual(['Set up Tauri project', 'New thing'])
+    d = moveTask(d, `flow-app/${newTask.id}`, 'today', T).data
+    expect(d.days[T].done.map((e) => e.title)).toEqual(['Set up Tauri project'])
+  })
+  it('changeTaskProject never takes an id referenced by a day', () => {
+    let d: FlowData = moveTask(sample(), 'learn-spanish/t5', 'done', T).data
+    d = deleteTask(d, 'learn-spanish/t5').data
+    expect(changeTaskProject(d, 'flow-app/t2', 'learn-spanish').ref).toBe('learn-spanish/t6')
+  })
+})
+
+describe('invariant: no action removes or blocks another task\'s done snapshot', () => {
+  it('holds over random action sequences', () => {
+    let seed = 42
+    const rand = (n: number) => { seed = (seed * 48271) % 2147483647; return seed % n }
+    const DATES = ['2026-11-04', '2026-11-05']
+    for (let run = 0; run < 150; run++) {
+      let d: FlowData = sample()
+      let uid = 0
+      const uidOf = new Map<string, number>()            // current ref -> task identity
+      for (const p of Object.values(d.projects)) for (const t of p.tasks) uidOf.set(`${p.slug}/${t.id}`, ++uid)
+      let expected: { date: string; ref: string; uid: number }[] = []
+      for (let step = 0; step < 30; step++) {
+        const today = DATES[rand(2)]
+        const refs = [...uidOf.keys()]
+        const ref = refs.length ? refs[rand(refs.length)] : ''
+        const slugs = Object.keys(d.projects)
+        const found = ref ? findTask(d, ref) : undefined
+        switch (rand(6)) {
+          case 0: {
+            const slug = slugs[rand(slugs.length)]
+            const before = new Set(d.projects[slug].tasks.map((t) => t.id))
+            d = addTask(d, slug, `New ${step}`, rand(2) ? 'today' : 'todo', today).data
+            const t = d.projects[slug].tasks.find((x) => !before.has(x.id))!
+            uidOf.set(`${slug}/${t.id}`, ++uid)
+            break
+          }
+          case 1:
+            if (!found) break
+            d = deleteTask(d, ref).data
+            uidOf.delete(ref)
+            break
+          case 2:
+            if (!found || found.task.status === 'done') break
+            d = moveTask(d, ref, 'done', today).data
+            expected.push({ date: today, ref, uid: uidOf.get(ref)! })
+            expect(d.days[today].done.some((e) => e.ref === ref && e.title === found.task.title)).toBe(true)
+            break
+          case 3: {
+            if (!found || found.task.status !== 'done') break
+            const on = found.task.done
+            const u = uidOf.get(ref)!
+            d = moveTask(d, ref, rand(2) ? 'today' : 'todo', today).data
+            expected = expected.filter((e) => !(e.date === on && e.ref === ref && e.uid === u))
+            break
+          }
+          case 4:
+            if (!found || found.task.status === 'done') break
+            d = moveTask(d, ref, found.task.status === 'todo' ? 'today' : 'todo', today).data
+            break
+          case 5: {
+            if (!found) break
+            const to = slugs[rand(slugs.length)]
+            const r = changeTaskProject(d, ref, to)
+            if (r.changed.length === 0) break
+            d = r.data
+            uidOf.set(r.ref, uidOf.get(ref)!)
+            uidOf.delete(ref)
+            break
+          }
+        }
+        const actual = Object.values(d.days).flatMap((day) => day.done.map((e) => `${day.date} ${e.ref}`)).sort()
+        expect(actual).toEqual(expected.map((e) => `${e.date} ${e.ref}`).sort())
+      }
+    }
   })
 })
 

@@ -8,7 +8,7 @@ export interface Project { slug: string; title: string; status: ProjectStatus; c
   goal?: string; created: ISODate; tasks: Task[]; body: string; extra: Extra }
 export interface InboxItem { id: string; text: string; created: ISODate; extra: Extra }
 export interface Inbox { items: InboxItem[]; body: string; extra: Extra }
-export interface DoneEntry { ref: string; title: string; project: string }
+export interface DoneEntry { ref: string; title: string; project: string; extra: Extra }
 export interface Day { date: ISODate; planned: string[]; done: DoneEntry[]; body: string; extra: Extra }
 export interface FlowData { projects: Record<string, Project>; inbox: Inbox;
   days: Record<ISODate, Day>; skipped: string[] }              // skipped = relative paths that failed to parse

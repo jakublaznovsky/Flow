@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { slugify, uniqueSlug, nextTaskId, nextInboxId, PROJECT_COLORS, pickColor } from './ids'
+import { slugify, uniqueSlug, nextTaskId, nextTaskIdFor, nextInboxId, PROJECT_COLORS, pickColor } from './ids'
+import { emptyFlow } from './types'
 
 describe('slugify', () => {
   it('lowercases and hyphenates words', () => {
@@ -36,6 +37,20 @@ describe('nextTaskId', () => {
 
   it('uses max numeric suffix + 1, ignoring non-numeric ids', () => {
     expect(nextTaskId([{ id: 't1' }, { id: 't7' }, { id: 'x' }])).toBe('t8')
+  })
+})
+
+describe('nextTaskIdFor', () => {
+  it('counts ids referenced from days so deleted ids are never reused', () => {
+    const d = emptyFlow()
+    d.projects.a = { slug: 'a', title: 'A', status: 'active', color: '#000', created: '2026-11-01',
+      tasks: [{ id: 't2', title: 'x', status: 'todo', created: '2026-11-01', extra: {} }], body: '', extra: {} }
+    d.days['2026-11-01'] = { date: '2026-11-01', planned: ['a/t4', 'b/t9'], done: [], body: '', extra: {} }
+    d.days['2026-11-02'] = { date: '2026-11-02', planned: [], body: '', extra: {},
+      done: [{ ref: 'a/t6', title: 'gone', project: 'A', extra: {} }, { ref: 'ab/t20', title: 'other', project: 'AB', extra: {} }] }
+    expect(nextTaskIdFor(d, 'a')).toBe('t7')
+    expect(nextTaskIdFor(d, 'b')).toBe('t10')
+    expect(nextTaskIdFor(d, 'none')).toBe('t1')
   })
 })
 

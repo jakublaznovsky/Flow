@@ -1,3 +1,5 @@
+import type { FlowData } from './types'
+
 /** URL-safe slug: diacritics stripped, lowercase, non-alphanumerics collapsed to '-'. */
 export function slugify(title: string): string {
   const slug = title
@@ -31,6 +33,21 @@ function nextNumericId(prefix: string, items: { id: string }[]): string {
 
 export function nextTaskId(tasks: { id: string }[]): string {
   return nextNumericId('t', tasks)
+}
+
+/**
+ * Next task id for a project, past every id it has ever used: current tasks plus any
+ * `<slug>/tN` ref in the days' planned and done lists (so a deleted task's id is never reused).
+ */
+export function nextTaskIdFor(d: FlowData, slug: string): string {
+  const used: { id: string }[] = [...(d.projects[slug]?.tasks ?? [])]
+  const prefix = `${slug}/`
+  for (const day of Object.values(d.days)) {
+    for (const ref of [...day.planned, ...day.done.map((e) => e.ref)]) {
+      if (ref.startsWith(prefix)) used.push({ id: ref.slice(prefix.length) })
+    }
+  }
+  return nextTaskId(used)
 }
 
 export function nextInboxId(items: { id: string }[]): string {
