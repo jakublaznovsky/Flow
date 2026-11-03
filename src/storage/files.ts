@@ -1,0 +1,143 @@
+import type { Day, DoneEntry, Extra, ISODate, Inbox, InboxItem, Project, ProjectStatus, Task, TaskStatus } from '../model/types'
+import { nextInboxId, nextTaskId, pickColor } from '../model/ids'
+import { joinFrontmatter, splitFrontmatter } from './frontmatter'
+
+type Obj = Record<string, unknown>
+
+const PROJECT_STATUSES: ProjectStatus[] = ['active', 'paused', 'done', 'archived']
+const TASK_STATUSES: TaskStatus[] = ['todo', 'today', 'done']
+
+const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
+const present = (v: unknown) => v !== undefined && v !== null && v !== ''
+const str = (v: unknown): string => String(v)
+const optStr = (v: unknown): string | undefined => (present(v) ? str(v) : undefined)
+
+function pickExtra(o: Obj, known: string[]): Extra {
+  const extra: Extra = {}
+  for (const k of Object.keys(o)) if (!known.includes(k)) extra[k] = o[k]
+  return extra
+}
+
+function list(v: unknown, what: string): unknown[] {
+  if (v === undefined || v === null) return []
+  if (!Array.isArray(v)) throw new Error(`${what} must be a list`)
+  return v
+}
+
+/** Keep first occurrence of each valid id; give missing/duplicate ids a fresh one. */
+function assignIds<T extends { id: string }>(items: (Omit<T, 'id'> & { id?: string })[], next: (kept: { id: string }[]) => string): T[] {
+  const kept: { id: string }[] = []
+  const seen = new Set<string>()
+  for (const it of items) {
+    if (it.id && !seen.has(it.id)) {
+      seen.add(it.id)
+      kept.push({ id: it.id })
+    } else {
+      it.id = undefined
+    }
+  }
+  for (const it of items) {
+    if (!it.id) {
+      it.id = next(kept)
+      kept.push({ id: it.id })
+    }
+  }
+  return items as T[]
+}
+
+const TASK_KNOWN = ['id', 'title', 'status', 'first_step', 'created', 'planned', 'done']
+
+function parseTask(raw: unknown, today: ISODate): Omit<Task, 'id'> & { id?: string } {
+  if (!isObj(raw)) throw new Error('task must be a mapping')
+  if (!present(raw.title)) throw new Error('task is missing title')
+  const status = TASK_STATUSES.includes(raw.status as TaskStatus) ? (raw.status as TaskStatus) : 'todo'
+  return {
+    id: optStr(raw.id),
+    title: str(raw.title),
+    status,
+    firstStep: optStr(raw.first_step),
+    created: present(raw.created) ? str(raw.created) : today,
+    planned: optStr(raw.planned),
+    done: optStr(raw.done),
+    extra: pickExtra(raw, TASK_KNOWN),
+  }
+}
+
+function taskToObj(t: Task): Obj {
+  const o: Obj = { id: t.id, title: t.title, status: t.status }
+  if (t.firstStep !== undefined) o.first_step = t.firstStep
+  o.created = t.created
+  if (t.planned !== undefined) o.planned = t.planned
+  if (t.done !== undefined) o.done = t.done
+  return { ...o, ...t.extra }
+}
+
+const PROJECT_KNOWN = ['title', 'status', 'color', 'goal', 'created', 'tasks']
+
+export function parseProject(slug: string, text: string, today: ISODate): Project {
+  const { data, body } = splitFrontmatter(text)
+  if (!present(data.title)) throw new Error('project is missing title')
+  const status = PROJECT_STATUSES.includes(data.status as ProjectStatus) ? (data.status as ProjectStatus) : 'active'
+  const rawTasks = list(data.tasks, 'tasks').map((t) => parseTask(t, today))
+  return {
+    slug,
+    title: str(data.title),
+    status,
+    color: present(data.color) ? str(data.color) : pickColor(0),
+    goal: optStr(data.goal),
+    created: present(data.created) ? str(data.created) : today,
+    tasks: assignIds<Task>(rawTasks, nextTaskId),
+    body,
+    extra: pickExtra(data, PROJECT_KNOWN),
+  }
+}
+
+export function serializeProject(p: Project): string {
+  const o: Obj = { title: p.title, status: p.status, color: p.color }
+  if (p.goal !== undefined) o.goal = p.goal
+  o.created = p.created
+  o.tasks = p.tasks.map(taskToObj)
+  return joinFrontmatter({ ...o, ...p.extra }, p.body)
+}
+
+const ITEM_KNOWN = ['id', 'text', 'created']
+
+export function parseInbox(text: string, today: ISODate): Inbox {
+  const { data, body } = splitFrontmatter(text)
+  const rawItems = list(data.items, 'items').map((raw) => {
+    if (!isObj(raw)) throw new Error('inbox item must be a mapping')
+    if (!present(raw.text)) throw new Error('inbox item is missing text')
+    return {
+      id: optStr(raw.id),
+      text: str(raw.text),
+      created: present(raw.created) ? str(raw.created) : today,
+      extra: pickExtra(raw, ITEM_KNOWN),
+    }
+  })
+  return {
+    items: assignIds<InboxItem>(rawItems, nextInboxId),
+    body,
+    extra: pickExtra(data, ['items']),
+  }
+}
+
+export function serializeInbox(i: Inbox): string {
+  const items = i.items.map((it) => ({ id: it.id, text: it.text, created: it.created, ...it.extra }))
+  return joinFrontmatter({ items, ...i.extra }, i.body)
+}
+
+export function parseDay(date: ISODate, text: string): Day {
+  const { data, body } = splitFrontmatter(text)
+  const planned = list(data.planned, 'planned').map(str)
+  const done = list(data.done, 'done').map((raw): DoneEntry => {
+    if (!isObj(raw)) throw new Error('done entry must be a mapping')
+    if (!present(raw.ref)) throw new Error('done entry is missing ref')
+    return { ref: str(raw.ref), title: str(raw.title ?? ''), project: str(raw.project ?? '') }
+  })
+  return { date, planned, done, body, extra: pickExtra(data, ['date', 'planned', 'done']) }
+}
+
+export function serializeDay(d: Day): string {
+  const done = d.done.map((e) => ({ ref: e.ref, title: e.title, project: e.project }))
+  return joinFrontmatter({ date: d.date, planned: d.planned, done, ...d.extra }, d.body)
+}
