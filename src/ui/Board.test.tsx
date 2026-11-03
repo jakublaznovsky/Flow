@@ -136,4 +136,33 @@ describe('Board', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
     expect(col('Done').queryByText('Write spec')).not.toBeInTheDocument()
   })
+
+  it('keeps a local change made while an external reload is in flight', async () => {
+    const { store, user } = setup()
+    await screen.findByText('Buy a book')
+    const realRead = store.read.bind(store)
+    let release!: () => void
+    const gate = new Promise<void>((r) => { release = r })
+    store.read = async (path: string) => { await gate; return realRead(path) }
+    const external = seed()['projects/flow-app.md'].replace('Set up Tauri', 'Set up Tauri (edited)')
+    act(() => store.externalWrite('projects/flow-app.md', external))
+    store.read = async (path: string) => { await gate; return realRead(path) }
+    await user.click(screen.getByRole('button', { name: 'Add to To do' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Project for new task' }), 'learn-spanish')
+    await user.type(screen.getByRole('textbox', { name: 'New task' }), 'Local task{Enter}')
+    await act(async () => { release(); await gate })
+    expect(await screen.findByText('Set up Tauri (edited)')).toBeInTheDocument()
+    expect(screen.getByText('Local task')).toBeInTheDocument()
+    await waitFor(() => expect(store.files['projects/learn-spanish.md']).toContain('Local task'))
+    expect(store.files['projects/flow-app.md']).toContain('(edited)')
+  })
+
+  it('offers no project select in the Parking lot add form', async () => {
+    const { user } = setup()
+    await screen.findByText('Buy a book')
+    await user.click(screen.getByRole('button', { name: 'Add to Parking lot' }))
+    expect(screen.queryByRole('combobox', { name: 'Project for new task' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add to To do' }))
+    expect(screen.getByRole('combobox', { name: 'Project for new task' })).toBeInTheDocument()
+  })
 })

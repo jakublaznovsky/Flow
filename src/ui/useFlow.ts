@@ -6,10 +6,24 @@ import type { FileStore } from '../storage/fileStore'
 import { ensureFolder, loadFlow, reloadPaths, saveFlow } from '../storage/flowRepo'
 import type { Settings } from './settings'
 
+/** Copy one reloaded path from `from` into `into` (a fresh copy of the current data). */
+function mergePath(into: FlowData, from: FlowData, path: string): FlowData {
+  const out: FlowData = { ...into, projects: { ...into.projects }, days: { ...into.days }, skipped: into.skipped.filter((s) => s !== path) }
+  if (from.skipped.includes(path)) out.skipped.push(path)
+  const proj = /^projects\/(.+)\.md$/.exec(path)?.[1]
+  const day = /^days\/(.+)\.md$/.exec(path)?.[1]
+  if (path === 'inbox.md') out.inbox = from.inbox
+  else if (proj) { if (from.projects[proj]) out.projects[proj] = from.projects[proj]; else delete out.projects[proj] }
+  else if (day) { if (from.days[day]) out.days[day] = from.days[day]; else delete out.days[day] }
+  return out
+}
+
 export function useFlow(store: FileStore, settings: Settings, now: () => Date = () => new Date()) {
   const nowRef = useRef(now)
   nowRef.current = now
   const dataRef = useRef<FlowData | null>(null)
+  const applyLog = useRef<{ n: number; paths: string[] }[]>([])
+  const applyCount = useRef(0)
   const todayRef = useRef<ISODate>(localDate(now()))
   const [data, setData] = useState<FlowData | null>(null)
   const [today, setToday] = useState<ISODate>(todayRef.current)
@@ -33,10 +47,16 @@ export function useFlow(store: FileStore, settings: Settings, now: () => Date = 
       const un = await store.watch((paths) => {
         const cur = dataRef.current
         if (!cur) return
+        const start = applyCount.current
         void reloadPaths(store, cur, paths, todayRef.current).then((next) => {
           if (cancelled) return
-          dataRef.current = next
-          setData(next)
+          // Keep local changes made while the reload was in flight: merge only the
+          // reloaded paths, skipping those a local apply touched since (they are newer).
+          const dirty = new Set(applyLog.current.filter((e) => e.n > start).flatMap((e) => e.paths))
+          let merged = dataRef.current ?? next
+          for (const path of paths) if (!dirty.has(path)) merged = mergePath(merged, next, path)
+          dataRef.current = merged
+          setData(merged)
         })
       })
       if (cancelled) un()
@@ -72,6 +92,8 @@ export function useFlow(store: FileStore, settings: Settings, now: () => Date = 
     if (!cur) return
     const change = fn(cur)
     if (change.changed.length === 0) return
+    applyLog.current.push({ n: ++applyCount.current, paths: change.changed })
+    if (applyLog.current.length > 50) applyLog.current.shift()
     dataRef.current = change.data
     setData(change.data)
     void saveFlow(store, change.data, change.changed)

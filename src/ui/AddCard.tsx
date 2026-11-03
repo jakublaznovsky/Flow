@@ -4,6 +4,7 @@ interface Props {
   label: string
   placeholder: string
   needProject: boolean
+  pickProject: boolean
   projects: { slug: string; title: string }[]
   defaultProject: string | null
   onAdd: (title: string, slug: string | null) => void
@@ -11,13 +12,13 @@ interface Props {
 }
 
 /** "+" button that expands into an inline input. */
-export default function AddCard({ label, placeholder, needProject, projects, defaultProject, onAdd, onCreateProject }: Props) {
+export default function AddCard({ label, placeholder, needProject, pickProject, projects, defaultProject, onAdd, onCreateProject }: Props) {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [created, setCreated] = useState<string | null>(null)
   const [slug, setSlug] = useState<string | null>(null)
   const askProject = needProject && created === null
-  const showSelect = !needProject && projects.length > 1
+  const showSelect = pickProject && !needProject && projects.length > 1
 
   const close = () => { setOpen(false); setText(''); setCreated(null); setSlug(null) }
 

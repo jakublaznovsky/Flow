@@ -80,6 +80,7 @@ export default function Board({ store, settings, now }: Props) {
                 label={`Add to ${title}`}
                 placeholder={id === 'inbox' ? 'Capture a thought' : 'New task'}
                 needProject={id !== 'inbox' && active.length === 0}
+                pickProject={id !== 'inbox'}
                 projects={projects}
                 defaultProject={defaultProject}
                 onAdd={id === 'inbox'
