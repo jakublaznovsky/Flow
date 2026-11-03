@@ -2,7 +2,9 @@ import { parse, stringify } from 'yaml'
 
 /** Split `---\nyaml\n---\nbody`. No leading `---` means no frontmatter: data is {} and body is the whole text. */
 export function splitFrontmatter(text: string): { data: Record<string, unknown>; body: string } {
-  const lines = text.split('\n')
+  // Tolerate a leading BOM and blank lines before the opening delimiter.
+  const lead = /^(?:\uFEFF)?(?:[ \t\r]*\n)*/.exec(text)?.[0].length ?? 0
+  const lines = text.slice(lead).split('\n')
   if (lines[0].trimEnd() !== '---') return { data: {}, body: text }
   const end = lines.findIndex((line, i) => i > 0 && line.trimEnd() === '---')
   if (end === -1) throw new Error('frontmatter is not closed')

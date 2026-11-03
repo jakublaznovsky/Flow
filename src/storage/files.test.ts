@@ -135,3 +135,17 @@ describe('inbox without frontmatter', () => {
     expect(i.body).toBe('- buy milk\n')
   })
 })
+
+describe('leading BOM and blank lines', () => {
+  it('parses a BOM-prefixed inbox', () => {
+    const i = parseInbox('\uFEFF' + INBOX, today)
+    expect(i.items).toHaveLength(1)
+    expect(i.items[0].text).toBe('Look into Spanish podcasts')
+  })
+  it('parses a blank-line-prefixed day', () => {
+    const d = parseDay('2026-11-04', '\n\n' + DAY)
+    expect(d.planned).toEqual(['flow-app/t2', 'learn-spanish/t5'])
+    expect(d.done).toHaveLength(1)
+    expect(d.body).toBe('Optional free-text note (edited outside Flow in this version).\n')
+  })
+})
