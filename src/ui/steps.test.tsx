@@ -130,6 +130,7 @@ describe('reordering steps', () => {
   it('gives each step a drag handle; the handle is the only drag start', async () => {
     const { card, user } = await setup()
     await user.click(within(card('Set up Tauri')).getByRole('button', { name: 'Show steps' }))
+    await within(card('Set up Tauri')).findByRole('button', { name: 'Reorder step Install Rust' })
     expect(texts(card('Set up Tauri'))).toEqual(['Reorder step Install Rust', 'Reorder step Run init', 'Reorder step Commit'])
     // The step text still opens the inline editor; the checkbox still toggles.
     await user.click(within(card('Set up Tauri')).getByText('Run init'))
@@ -145,13 +146,17 @@ describe('reordering steps', () => {
     expect(card('Set up Tauri')).not.toHaveClass('is-dragging')
     fireEvent.pointerUp(document)
     await act(async () => {})
+    // dnd-kit swallows clicks for 50 ms after a drag (setTimeout in its pointer sensor); let that
+    // guard expire so it cannot eat the first click of the next test on a slow machine.
+    await act(() => new Promise((r) => setTimeout(r, 80)))
     expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
   })
 
   it('Alt+ArrowDown / Alt+ArrowUp move the step, persist, and keep focus on its handle', async () => {
     const { card, file, user } = await setup()
     await user.click(within(card('Set up Tauri')).getByRole('button', { name: 'Show steps' }))
-    within(card('Set up Tauri')).getByRole('button', { name: 'Reorder step Install Rust' }).focus()
+    // Wait for the expanded checklist to render (slower machines, e.g. the CI Windows runner).
+    ;(await within(card('Set up Tauri')).findByRole('button', { name: 'Reorder step Install Rust' })).focus()
     await user.keyboard('{Alt>}{ArrowDown}{/Alt}')
     expect(texts(card('Set up Tauri'))).toEqual(['Reorder step Run init', 'Reorder step Install Rust', 'Reorder step Commit'])
     await vi.waitFor(() => expect(file()).toMatch(/text: Run init\n\s+done: false\n\s+- text: Install Rust\n\s+done: true/))
