@@ -193,12 +193,22 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
   background: none; border: 0; padding: 0; text-align: left; font-weight: 500; line-height: 1.4;
   color: var(--text); overflow-wrap: anywhere; border-radius: 3px; cursor: inherit;
 }
+/* Title row: the steps pill + chevron sit top-right; an invisible float of the same size
+   inside the title keeps only the first line clear of them, so the title wraps under. */
+.card-head { position: relative; align-self: stretch; min-width: 0; }
+.card-head .card-title { display: block; width: 100%; }
+.title-gap { float: right; display: flex; gap: 4px; height: 1em; margin: 0 -4px 0 6px; visibility: hidden; }
+.title-gap[data-pill]::before {
+  content: attr(data-pill); padding: 0 8px; font-size: 11.5px; font-weight: 400; font-variant-numeric: tabular-nums;
+}
+.title-gap::after { content: ''; width: 22px; }
 .step { font-size: 12.5px; color: var(--text-muted); overflow-wrap: anywhere; }
 .tag {
   display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 1px 8px 1px 6px;
   font-size: 11.5px; color: var(--text-muted); background: var(--surface-2); border-radius: 999px; max-width: 100%;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0; box-sizing: border-box;
 }
+.tag-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tag::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--project); flex: none; }
 
 .card input[type='checkbox'] {
@@ -385,8 +395,8 @@ input.quick-capture, input.quick-capture:focus {
 .card.in-focus { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 
 /* ---------- Checklist inside a task ---------- */
-.next-step { color: var(--text-faint); }
-.steps-ctl { display: flex; align-items: center; gap: 4px; flex: none; margin-left: auto; cursor: default; }
+.next-step { color: var(--text-muted); }
+.steps-ctl { position: absolute; top: -1px; right: -4px; display: flex; align-items: center; gap: 4px; cursor: default; }
 .steps-pill {
   font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--text-muted);
   background: var(--surface-2); border-radius: 999px; padding: 1px 8px;

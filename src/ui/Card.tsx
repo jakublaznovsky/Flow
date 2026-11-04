@@ -140,12 +140,30 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
         />
       )}
       <div className="card-body">
-        <button className="card-title" onClick={open}>{card.title}</button>
+        <div className="card-head">
+          <button className="card-title" onClick={open}>
+            {steps && <span className="title-gap" aria-hidden="true" data-pill={list.length > 0 ? `${doneCount}/${list.length}` : undefined} />}
+            {card.title}
+          </button>
+          {steps && (
+            <div className="steps-ctl" onPointerDown={(e) => e.stopPropagation()}>
+              {list.length > 0 && (
+                <span className="steps-pill" aria-label={`${doneCount} of ${list.length} steps done`}>{doneCount}/{list.length}</span>
+              )}
+              <button
+                type="button" className="steps-toggle" aria-expanded={showSteps}
+                aria-label={showSteps ? 'Hide steps' : 'Show steps'} onClick={() => setShowSteps((v) => !v)}
+              >
+                <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4.5l3 3 3-3" /></svg>
+              </button>
+            </div>
+          )}
+        </div>
         {card.firstStep && <div className="step">{card.firstStep}</div>}
         {next && !showSteps && <div className="step next-step">Next: {next}</div>}
         {(card.projectTitle || chip) && (
           <div className="card-meta">
-            {card.projectTitle && <span className="tag">{card.projectTitle}</span>}
+            {card.projectTitle && <span className="tag"><span className="tag-text">{card.projectTitle}</span></span>}
             {chip && <span className="day-chip" aria-label={`Planned for ${chip.weekday} ${chip.day} ${chip.month}`}>{chip.weekday} {chip.day}</span>}
           </div>
         )}
@@ -158,19 +176,6 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
           </div>
         )}
       </div>
-      {steps && (
-        <div className="steps-ctl" onPointerDown={(e) => e.stopPropagation()}>
-          {list.length > 0 && (
-            <span className="steps-pill" aria-label={`${doneCount} of ${list.length} steps done`}>{doneCount}/{list.length}</span>
-          )}
-          <button
-            type="button" className="steps-toggle" aria-expanded={showSteps}
-            aria-label={showSteps ? 'Hide steps' : 'Show steps'} onClick={() => setShowSteps((v) => !v)}
-          >
-            <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4.5l3 3 3-3" /></svg>
-          </button>
-        </div>
-      )}
       {steps && showSteps && <Checklist steps={list} api={steps} />}
     </li>
   )

@@ -35,6 +35,18 @@ describe('card checklist', () => {
     expect(c.getByRole('button', { name: 'Show steps' })).toHaveAttribute('aria-expanded', 'false')
   })
 
+  it('puts the pill and chevron in the title row so text below uses the full card width', async () => {
+    const { card } = await setup()
+    const li = card('Set up Tauri')
+    const head = li.querySelector('.card-body > .card-head') as HTMLElement
+    expect(head).not.toBeNull()
+    expect(within(head).getByRole('button', { name: 'Set up Tauri' })).toBeInTheDocument()
+    expect(within(head).getByLabelText('1 of 3 steps done')).toBeInTheDocument()
+    expect(within(head).getByRole('button', { name: 'Show steps' })).toBeInTheDocument()
+    expect(li.querySelector(':scope > .steps-ctl')).toBeNull()
+    expect(within(li).getByText('Flow app')).toHaveClass('tag-text')
+  })
+
   it('shows no pill on a task without steps but offers the chevron', async () => {
     const { card } = await setup()
     const c = within(card('Write spec'))
