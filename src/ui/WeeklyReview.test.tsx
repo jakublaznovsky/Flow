@@ -123,6 +123,7 @@ describe('WeeklyReview', () => {
     await open(user); await next(user); await next(user)
     expect(screen.getAllByRole('radio').map((r) => (r as HTMLInputElement).labels?.[0].textContent)).toEqual(['No focus', 'Flow app', 'Learn Spanish'])
     expect(screen.getByRole('radio', { name: 'No focus' })).toBeChecked()
+    expect(screen.getByText(/shown with a ★ next week/)).toBeInTheDocument()
     await user.click(screen.getByRole('radio', { name: 'Learn Spanish' }))
     await user.type(screen.getByRole('textbox', { name: 'Intention' }), 'Speak a little')
     await user.tab()

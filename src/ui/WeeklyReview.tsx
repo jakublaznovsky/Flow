@@ -112,6 +112,7 @@ function NextWeek({ data, week, apply }: { data: FlowData; week: string; apply: 
   return (
     <>
       <h2>Next week's focus</h2>
+      <p className="review-hint">Saved with this review — shown with a ★ next week.</p>
       <fieldset className="review-focus">
         <legend>Focus project</legend>
         <label className="review-option"><input type="radio" name="focus-project" checked={focus === ''} onChange={() => pick('')} /><span>No focus</span></label>

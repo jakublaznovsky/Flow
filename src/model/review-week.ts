@@ -1,5 +1,5 @@
 import { taskCard, sortCards, type Card } from './board'
-import { isoWeek } from './dates'
+import { addDays, isoWeek } from './dates'
 import { weekDates } from './stats'
 import { reviewPath, type Change, type FlowData, type ISODate, type Review } from './types'
 
@@ -40,8 +40,14 @@ export function saveReview(d: FlowData, week: string, patch: ReviewPatch): Chang
   return { data: { ...d, reviews: { ...d.reviews, [week]: next } }, changed: [reviewPath(week)] }
 }
 
-/** The focus project named by this ISO week's review, if that project still exists. */
+/**
+ * The focus project to star this week: the one chosen in last week's review ("next week's focus"),
+ * else the one in this week's review (a review done early in the week). Only if the project exists.
+ */
 export function focusProjectThisWeek(d: FlowData, today: ISODate): string | undefined {
-  const slug = d.reviews[isoWeek(today)]?.focusProject
-  return slug !== undefined && d.projects[slug] ? slug : undefined
+  for (const week of [isoWeek(addDays(today, -7)), isoWeek(today)]) {
+    const slug = d.reviews[week]?.focusProject
+    if (slug !== undefined && d.projects[slug]) return slug
+  }
+  return undefined
 }

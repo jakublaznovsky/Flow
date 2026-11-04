@@ -334,6 +334,8 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, s
 .progress-fallback { margin-top: var(--space-3); min-height: 90px; font-size: 12px; }
 .btn { padding: 6px 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-sm); }
 .btn:hover { background: var(--surface-hover); }
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn.primary:hover { background: var(--accent-hover); }
 .progress-hint { margin: 0 0 var(--space-3); color: var(--text-muted); }
 
 /* ---------- Quick capture window ---------- */
@@ -473,7 +475,7 @@ input.quick-capture, input.quick-capture:focus {
 
 /* ---------- Weekly review ---------- */
 .review-view { flex: 1; min-height: 0; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: var(--space-4) 2px; }
-.review-card { width: 100%; max-width: 720px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: var(--space-5) var(--space-6, 28px); }
+.review-card { width: 100%; max-width: 720px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: var(--space-5) var(--space-6); }
 .review-steps { list-style: none; margin: 0 0 var(--space-5); padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: 12px; color: var(--text-faint); }
 .review-steps li { display: flex; align-items: center; gap: 6px; }
 .review-step-no { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border-strong); font-size: 11px; }
@@ -507,6 +509,5 @@ input.quick-capture, input.quick-capture:focus {
 .review-reflection { width: 100%; min-height: 180px; resize: vertical; font: inherit; line-height: 1.5; padding: var(--space-3); }
 .review-ai { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
 .review-nav { display: flex; justify-content: space-between; margin-top: var(--space-5); }
-.review-nav .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-.review-nav .btn.primary:hover { background: var(--accent-hover); }
 .focus-star { margin-left: 4px; color: var(--accent); font-size: 12px; }
+.review-hint { margin: 0 0 var(--space-3); font-size: 12px; color: var(--text-muted); }

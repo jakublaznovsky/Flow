@@ -73,13 +73,28 @@ describe('saveReview', () => {
 })
 
 describe('focusProjectThisWeek', () => {
-  it('returns the focus project of this ISO week when that project exists', () => {
+  const NEXT = '2026-11-09' // Monday, 2026-W46
+  const withB = (d: FlowData): FlowData => ({ ...d, projects: { ...d.projects, b: { ...d.projects.a, slug: 'b', title: 'Beta' } } })
+  it("shows last week's review focus (next week's focus) in the following week", () => {
+    const d = saveReview(sample(), WEEK, { focusProject: 'a' }).data
+    expect(focusProjectThisWeek(d, NEXT)).toBe('a')
+    expect(focusProjectThisWeek(d, '2026-11-16')).toBeUndefined()
+  })
+  it("falls back to this week's review when last week has none", () => {
+    const d = saveReview(withB(sample()), '2026-W46', { focusProject: 'b' }).data
+    expect(focusProjectThisWeek(d, NEXT)).toBe('b')
+  })
+  it("last week's review wins over this week's", () => {
+    let d = saveReview(withB(sample()), WEEK, { focusProject: 'a' }).data
+    d = saveReview(d, '2026-W46', { focusProject: 'b' }).data
+    expect(focusProjectThisWeek(d, NEXT)).toBe('a')
+  })
+  it('a review done this week still shows this week (early-week review)', () => {
     const d = saveReview(sample(), WEEK, { focusProject: 'a' }).data
     expect(focusProjectThisWeek(d, T)).toBe('a')
-    expect(focusProjectThisWeek(d, '2026-11-09')).toBeUndefined()
   })
   it('ignores a project that does not exist', () => {
     const d = saveReview(sample(), WEEK, { focusProject: 'gone' }).data
-    expect(focusProjectThisWeek(d, T)).toBeUndefined()
+    expect(focusProjectThisWeek(d, NEXT)).toBeUndefined()
   })
 })
