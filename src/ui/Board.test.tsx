@@ -27,10 +27,10 @@ const col = (name: string) => within(screen.getByRole('region', { name }))
 afterEach(() => vi.useRealTimers())
 
 describe('Board', () => {
-  it('shows the four columns', async () => {
+  it('shows the five columns', async () => {
     setup()
     await screen.findByText('Set up Tauri')
-    for (const n of ['Parking lot', 'To do', 'Today', 'Done']) {
+    for (const n of ['Parking lot', 'To do', 'Tomorrow', 'Today', 'Done']) {
       expect(screen.getByRole('heading', { name: n })).toBeInTheDocument()
     }
   })

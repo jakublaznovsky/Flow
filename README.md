@@ -9,8 +9,12 @@ of the Claude buttons (see below).
 
 ## What you can do
 
-- **Board.** Four columns: **Parking lot** (loose thoughts), **To do**, **Today** and **Done**.
-  Drag cards between columns and tick them off.
+- **Board.** Five columns: **Parking lot** (loose thoughts), **To do**, **Tomorrow**, **Today**
+  and **Done**. Drag cards between columns and tick them off. Drop a task on the Parking lot to
+  park it (its first step, steps and planned day are kept in the note). Tasks in Tomorrow move to
+  Today by themselves the next morning.
+- **Plan a task in two clicks.** The small calendar button on a card offers Today, Tomorrow, the
+  next few days, next week or any date. A new task can get a "Plan for" date right away.
 - **Focus on one project.** Click a project in the sidebar to see only its cards, with its goal,
   a progress bar and how much you finished this week. Edit the goal and the project notes in
   place, and add short dated decisions.

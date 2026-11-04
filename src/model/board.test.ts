@@ -92,3 +92,31 @@ describe('searchCards', () => {
     expect(keys(searchCards(c, 'e').todo)).toEqual(['learn-spanish/t1', 'flow-app/t1'])
   })
 })
+
+describe('boardColumns: Tomorrow', () => {
+  const withScheduled = () => {
+    const d = sample()
+    d.projects['flow-app'].tasks.push(
+      task('t5', 'For tomorrow', { scheduled: '2026-11-05' }),
+      task('t6', 'Later', { scheduled: '2026-11-07' }),
+    )
+    d.projects['learn-spanish'].tasks.push(task('t2', 'Spanish tomorrow', { scheduled: '2026-11-05' }))
+    d.projects.paused.tasks.push(task('t4', 'Paused tomorrow', { scheduled: '2026-11-05' }))
+    return d
+  }
+  it('holds To do tasks of active projects scheduled for tomorrow; To do keeps the rest', () => {
+    const c = boardColumns(withScheduled(), T, null, {})
+    expect(keys(c.tomorrow)).toEqual(['flow-app/t5', 'learn-spanish/t2'])
+    expect(keys(c.todo)).toEqual(['flow-app/t1', 'flow-app/t6', 'learn-spanish/t1'])
+    expect(c.todo[1].scheduled).toBe('2026-11-07')
+  })
+  it('respects the filter, the search and the column order', () => {
+    expect(keys(boardColumns(withScheduled(), T, 'learn-spanish', {}).tomorrow)).toEqual(['learn-spanish/t2'])
+    expect(keys(searchCards(boardColumns(withScheduled(), T, null, {}), 'spanish').tomorrow)).toEqual(['learn-spanish/t2'])
+    expect(keys(boardColumns(withScheduled(), T, null, { tomorrow: ['learn-spanish/t2'] }).tomorrow))
+      .toEqual(['learn-spanish/t2', 'flow-app/t5'])
+  })
+  it('is empty when nothing is planned for tomorrow', () => {
+    expect(boardColumns(sample(), T, null, {}).tomorrow).toEqual([])
+  })
+})

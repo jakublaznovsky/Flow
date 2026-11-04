@@ -113,7 +113,8 @@ describe('promotion of scheduled tasks', () => {
     render(<App store={store} settings={new MemorySettings()} now={() => t} />)
     const flush = () => act(async () => { await vi.advanceTimersByTimeAsync(0) })
     await flush(); await flush()
-    expect(within(screen.getByRole('region', { name: 'To do' })).getByText('Write spec')).toBeInTheDocument()
+    // Planned for tomorrow: it waits in the Tomorrow column until midnight.
+    expect(within(screen.getByRole('region', { name: 'Tomorrow' })).getByText('Write spec')).toBeInTheDocument()
     t = new Date(2026, 10, 6, 0, 1)
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
     expect(within(screen.getByRole('region', { name: 'Today' })).getByText('Write spec')).toBeInTheDocument()

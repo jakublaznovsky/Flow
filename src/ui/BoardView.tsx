@@ -8,6 +8,9 @@ import { addInboxItem, deleteInboxItem, editInboxItem } from '../model/inbox'
 import { addStep, deleteStep, editStep, toggleStep } from '../model/steps'
 import { scheduleTask } from '../model/schedule'
 import { addTask, changeTaskProject, deleteTask, editTask, moveTask } from '../model/tasks'
+import { addDays } from '../model/dates'
+import { nextTaskIdFor } from '../model/ids'
+import type { Change, ISODate } from '../model/types'
 import AddCard from './AddCard'
 import Card, { CardPreview } from './Card'
 import Column from './Column'
@@ -16,6 +19,7 @@ import type { useFlow } from './useFlow'
 export const COLUMNS: { id: ColumnId; title: string; empty: string }[] = [
   { id: 'inbox', title: 'Parking lot', empty: 'Nothing parked' },
   { id: 'todo', title: 'To do', empty: 'Nothing to do' },
+  { id: 'tomorrow', title: 'Tomorrow', empty: 'Plan tomorrow here' },
   { id: 'today', title: 'Today', empty: 'pick up to 3' },
   { id: 'done', title: 'Done', empty: 'Done today shows here' },
 ]
@@ -75,11 +79,20 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
   const defaultProject =
     filter ?? (lastProject && active.some((p) => p.slug === lastProject) ? lastProject : null) ?? active[0]?.slug ?? null
 
-  const addTaskTo = (status: 'todo' | 'today') => (title: string, slug: string | null) => {
+  /** "+" in a column; Tomorrow (or a "Plan for" day) plans the new task in the same save. */
+  const addTaskTo = (column: 'todo' | 'tomorrow' | 'today') => (title: string, slug: string | null, scheduled: string) => {
     if (!slug) return
     remember(slug)
-    apply((d) => addTask(d, slug, title, status, today))
+    const date = column === 'tomorrow' ? addDays(today, 1) : scheduled
+    apply((d): Change => {
+      const ref = `${slug}/${nextTaskIdFor(d, slug)}`
+      const added = addTask(d, slug, title, column === 'today' ? 'today' : 'todo', today)
+      if (!date || added.changed.length === 0) return added
+      const planned = scheduleTask(added.data, ref, date, today)
+      return { data: planned.data, changed: [...new Set([...added.changed, ...planned.changed])] }
+    })
   }
+  const planCard = (card: CardData, date: ISODate | null) => apply((d) => scheduleTask(d, card.key, date, today))
   const saveCard = (card: CardData, patch: { title: string; firstStep: string; project: string; scheduled: string }) => {
     if (card.kind === 'inbox') {
       apply((d) => editInboxItem(d, card.key.slice('inbox/'.length), patch.title))
@@ -138,6 +151,7 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
                     ? (text) => apply((d) => addInboxItem(d, text, today))
                     : addTaskTo(id)}
                   onCreateProject={createProject}
+                  planFor={id === 'todo'}
                   openRequest={id === 'todo' && addRequest}
                   onOpenHandled={id === 'todo' ? onAddHandled : undefined}
                 />
@@ -154,6 +168,8 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
                   onDelete={() => deleteCard(card)}
                   onFocus={onFocus ? () => onFocus(card.key, card.title) : undefined}
                   inFocus={card.key === focusRef}
+                  today={today}
+                  onPlan={card.kind === 'task' && id !== 'done' ? (date) => planCard(card, date) : undefined}
                   steps={card.kind === 'task' ? {
                     onAdd: (text) => apply((d) => addStep(d, card.key, text)),
                     onToggle: (i) => apply((d) => toggleStep(d, card.key, i)),

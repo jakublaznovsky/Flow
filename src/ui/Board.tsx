@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { boardColumns, searchCards, type Card as CardData, type ColumnId } from '../model/board'
-import { promoteInboxItem } from '../model/inbox'
+import { parkTask, promoteInboxItem } from '../model/inbox'
+import { addDays } from '../model/dates'
+import { scheduleTask } from '../model/schedule'
+import type { Change, FlowData } from '../model/types'
 import { addDecision, createProject, updateProject } from '../model/projects'
 import { doneOn, projectProgress, weekDates } from '../model/stats'
 import { logFocus } from '../model/focus'
@@ -43,9 +46,21 @@ interface Props {
   ai?: (apiKey: string) => AiClient
 }
 
+/** Columns an inbox item can be promoted into (Tomorrow = To do planned for tomorrow). */
+export type PromoteTo = 'todo' | 'today' | 'tomorrow'
+
+const mergeChanges = (a: Change, b: Change): Change => ({ data: b.data, changed: [...new Set([...a.changed, ...b.changed])] })
+
+/** Plan a task for tomorrow (a Done task is first reopened in To do); one Change. */
+function planTomorrow(d: FlowData, ref: string, today: string): Change {
+  const found = findTask(d, ref)
+  const reopened = found?.task.status === 'done' ? moveTask(d, ref, 'todo', today) : { data: d, changed: [] }
+  return mergeChanges(reopened, scheduleTask(reopened.data, ref, addDays(today, 1), today))
+}
+
 export interface DropContext {
   flow: ReturnType<typeof useFlow>
-  openPicker(itemId: string, to: 'todo' | 'today', index?: number): void
+  openPicker(itemId: string, to: PromoteTo, index?: number): void
   /** Active search text; drop indexes are positions among the cards it leaves visible. */
   query?: string
 }
@@ -80,27 +95,37 @@ export function handleDrop(
     const hasProject = Object.values(flow.data.projects).some((p) => p.status === 'active')
     if (to === 'inbox') reorder(flow, cardKey, from, to, index, cardKey, query)
     // With no active project there is nothing to pick, so the drop is rejected.
-    else if ((to === 'todo' || to === 'today') && hasProject) ctx.openPicker(cardKey.slice('inbox/'.length), to, index)
+    else if ((to === 'todo' || to === 'today' || to === 'tomorrow') && hasProject) ctx.openPicker(cardKey.slice('inbox/'.length), to, index)
     return
   }
-  if (to === 'inbox') return
-  if (to !== from) flow.apply((d) => moveTask(d, cardKey, to, flow.today))
+  if (to === 'inbox') {
+    // "Park it": the task becomes a Parking lot item, placed where it was dropped.
+    let itemId: string | undefined
+    flow.apply((d) => { const c = parkTask(d, cardKey, flow.today); itemId = c.itemId; return c })
+    if (itemId) reorder(flow, cardKey, from, to, index, `inbox/${itemId}`, query)
+    return
+  }
+  if (to === 'tomorrow' && from !== 'tomorrow') flow.apply((d) => planTomorrow(d, cardKey, flow.today))
+  else if (from === 'tomorrow' && to === 'todo') flow.apply((d) => scheduleTask(d, cardKey, null, flow.today))
+  else if (to !== from) flow.apply((d) => moveTask(d, cardKey, to === 'tomorrow' ? 'todo' : to, flow.today))
   reorder(flow, cardKey, from, to, index, cardKey, query)
 }
 
 /** Picker state and the promotion it performs once a project is chosen. */
 export function usePromotion(flow: ReturnType<typeof useFlow>, query = '') {
-  const [pending, setPending] = useState<{ itemId: string; to: 'todo' | 'today'; index: number } | null>(null)
-  const openPicker = (itemId: string, to: 'todo' | 'today', index = Number.MAX_SAFE_INTEGER) =>
+  const [pending, setPending] = useState<{ itemId: string; to: PromoteTo; index: number } | null>(null)
+  const openPicker = (itemId: string, to: PromoteTo, index = Number.MAX_SAFE_INTEGER) =>
     setPending({ itemId, to, index })
   const choose = (slug: string) => {
     if (!pending || !flow.data) return
     const before = new Set(flow.data.projects[slug]?.tasks.map((t) => t.id))
     let newKey: string | null = null
     flow.apply((d) => {
-      const c = promoteInboxItem(d, pending.itemId, slug, pending.to, flow.today)
+      const c = promoteInboxItem(d, pending.itemId, slug, pending.to === 'today' ? 'today' : 'todo', flow.today)
       const added = c.data.projects[slug]?.tasks.find((t) => !before.has(t.id))
       if (c.changed.length > 0 && added) newKey = `${slug}/${added.id}`
+      // Tomorrow: the new To do task is planned for the next day in the same save.
+      if (newKey && pending.to === 'tomorrow') return mergeChanges(c, scheduleTask(c.data, newKey, addDays(flow.today, 1), flow.today))
       return c
     })
     if (newKey) {

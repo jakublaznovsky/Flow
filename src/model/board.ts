@@ -1,6 +1,7 @@
+import { addDays } from './dates'
 import type { FlowData, ISODate, Project, Step, Task } from './types'
 
-export type ColumnId = 'inbox' | 'todo' | 'today' | 'done'
+export type ColumnId = 'inbox' | 'todo' | 'tomorrow' | 'today' | 'done'
 export interface Card {
   key: string; kind: 'task' | 'inbox'; title: string; firstStep?: string; steps?: Step[]
   projectSlug?: string; projectTitle?: string; color?: string; created: ISODate
@@ -36,7 +37,8 @@ export function sortCards(cards: Card[], order: string[] | undefined): Card[] {
 export function boardColumns(
   d: FlowData, today: ISODate, filter: string | null, order: ColumnOrder,
 ): Record<ColumnId, Card[]> {
-  const cols: Record<ColumnId, Card[]> = { inbox: [], todo: [], today: [], done: [] }
+  const cols: Record<ColumnId, Card[]> = { inbox: [], todo: [], tomorrow: [], today: [], done: [] }
+  const tomorrow = addDays(today, 1)
   for (const item of d.inbox.items) {
     cols.inbox.push({ key: `inbox/${item.id}`, kind: 'inbox', title: item.text, created: item.created })
   }
@@ -45,7 +47,9 @@ export function boardColumns(
     if (filter !== null && project.slug !== filter) continue
     for (const t of project.tasks) {
       if (t.status === 'done' && t.done !== today) continue
-      cols[t.status].push(taskCard(project, t))
+      // Tomorrow: To do tasks planned for the next day (they are not listed in To do).
+      const id: ColumnId = t.status === 'todo' && t.scheduled === tomorrow ? 'tomorrow' : t.status
+      cols[id].push(taskCard(project, t))
     }
   }
   for (const id of Object.keys(cols) as ColumnId[]) cols[id] = sortCards(cols[id], order[id])

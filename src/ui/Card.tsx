@@ -3,6 +3,8 @@ import type { Step } from '../model/types'
 import { useSortable } from '@dnd-kit/sortable'
 import type { Card as CardData, ColumnId } from '../model/board'
 import { dayParts } from '../model/dates'
+import type { ISODate } from '../model/types'
+import PlanMenu from './PlanMenu'
 
 interface Props {
   card: CardData
@@ -15,6 +17,9 @@ interface Props {
   /** Today cards only: start a focus session on this task. */
   onFocus?: () => void
   inFocus?: boolean
+  today?: ISODate
+  /** Task cards in To do, Tomorrow and Today: plan the task for a day (null removes the date). */
+  onPlan?: (date: ISODate | null) => void
   /** Task cards only: checklist edits. */
   steps?: {
     onAdd: (text: string) => void
@@ -74,7 +79,7 @@ function Checklist({ steps, api }: { steps: Step[]; api: NonNullable<Props['step
 /** Static look-alike of a card, shown in the drag overlay so it can float above every column. */
 export function CardPreview({ card, column }: { card: CardData; column: ColumnId }) {
   const list = card.steps ?? []
-  const chip = card.scheduled ? dayParts(card.scheduled) : undefined
+  const chip = card.scheduled && column !== 'tomorrow' ? dayParts(card.scheduled) : undefined
   return (
     <div
       className={`card is-overlay${column === 'done' ? ' is-done' : ''}${card.kind === 'inbox' ? ' is-inbox' : ''}`}
@@ -101,7 +106,7 @@ export function CardPreview({ card, column }: { card: CardData; column: ColumnId
   )
 }
 
-export default function Card({ card, column, projects, onToggle, onSave, onDelete, onFocus, inFocus, steps }: Props) {
+export default function Card({ card, column, projects, onToggle, onSave, onDelete, onFocus, inFocus, today, onPlan, steps }: Props) {
   const [editing, setEditing] = useState(false)
   const [showSteps, setShowSteps] = useState(false)
   const list = card.steps ?? []
@@ -116,7 +121,9 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
   const [step, setStep] = useState(card.firstStep ?? '')
   const [project, setProject] = useState(card.projectSlug ?? '')
   const [planFor, setPlanFor] = useState(card.scheduled ?? '')
-  const chip = card.scheduled ? dayParts(card.scheduled) : undefined
+  // In the Tomorrow column the day is the column itself; no chip.
+  const chip = card.scheduled && column !== 'tomorrow' ? dayParts(card.scheduled) : undefined
+  const plan = onPlan && today && card.kind === 'task' && column !== 'done' && column !== 'inbox'
 
   const open = () => {
     setTitle(card.title); setStep(card.firstStep ?? ''); setProject(card.projectSlug ?? ''); setPlanFor(card.scheduled ?? '')
@@ -191,10 +198,16 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
         </div>
         {card.firstStep && <div className="step">{card.firstStep}</div>}
         {next && !showSteps && <div className="step next-step">Next: {next}</div>}
-        {(card.projectTitle || chip) && (
+        {(card.projectTitle || chip || plan) && (
           <div className="card-meta">
-            {card.projectTitle && <span className="tag"><span className="tag-text">{card.projectTitle}</span></span>}
+            {card.projectTitle && <span className="tag" title={card.projectTitle}><span className="tag-text">{card.projectTitle}</span></span>}
             {chip && <span className="day-chip" aria-label={`Planned for ${chip.weekday} ${chip.day} ${chip.month}`}>{chip.weekday} {chip.day}</span>}
+            {plan && (
+              // Stop pointer-down so the calendar button never starts a drag.
+              <span className="plan-ctl" onPointerDown={(e) => e.stopPropagation()}>
+                <PlanMenu title={card.title} today={today} scheduled={card.scheduled} inToday={column === 'today'} onPlan={onPlan} />
+              </span>
+            )}
           </div>
         )}
         {(inFocus || (onFocus && column === 'today' && card.kind === 'task')) && (

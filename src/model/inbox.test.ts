@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { addInboxItem, deleteInboxItem, editInboxItem, promoteInboxItem } from './inbox'
+import { addInboxItem, deleteInboxItem, editInboxItem, parkTask, promoteInboxItem } from './inbox'
 import { emptyFlow, type FlowData } from './types'
 
 function deepFreeze<T>(o: T): T {
@@ -82,5 +82,72 @@ describe('editInboxItem', () => {
     expect(editInboxItem(d, 'i1', '   ')).toEqual({ data: d, changed: [] })
     expect(editInboxItem(d, 'i1', 'Call dentist')).toEqual({ data: d, changed: [] })
     expect(editInboxItem(d, 'i9', 'x')).toEqual({ data: d, changed: [] })
+  })
+})
+
+describe('parkTask', () => {
+  const withTasks = (): FlowData => {
+    const d = structuredClone(sample())
+    d.projects['flow-app'].tasks = [
+      { id: 't1', title: 'Plain', status: 'todo', created: '2026-11-01', extra: {} },
+      {
+        id: 't2', title: 'Rich', status: 'todo', created: '2026-11-01', firstStep: 'open doc', scheduled: '2026-11-09',
+        steps: [{ text: 'a', done: true, extra: {} }, { text: 'b', done: false, extra: {} }], extra: { keep: 1 },
+      },
+      { id: 't3', title: 'Finished', status: 'done', created: '2026-11-01', planned: '2026-11-03', done: '2026-11-04', extra: {} },
+      { id: 't4', title: 'Now', status: 'today', created: '2026-11-01', planned: '2026-11-04', extra: {} },
+    ]
+    d.days['2026-11-04'] = {
+      date: '2026-11-04', planned: ['flow-app/t4'], done: [{ ref: 'flow-app/t3', title: 'Finished', project: 'Flow app', extra: {} }],
+      focus: [], body: '', extra: {},
+    }
+    return deepFreeze(d)
+  }
+  it('moves a plain task into the Parking lot as its title', () => {
+    const r = parkTask(withTasks(), 'flow-app/t1', T)
+    expect(r.data.projects['flow-app'].tasks.map((t) => t.id)).toEqual(['t2', 't3', 't4'])
+    expect(r.data.inbox.items.at(-1)).toEqual({ id: 'i3', text: 'Plain', created: T, extra: {} })
+    expect(r.itemId).toBe('i3')
+    expect(r.changed).toEqual(['projects/flow-app.md', 'inbox.md'])
+  })
+  it('keeps first step, steps (✓ for done) and the planned day in one line', () => {
+    const r = parkTask(withTasks(), 'flow-app/t2', T)
+    expect(r.data.inbox.items.at(-1)!.text).toBe('Rich — first step: open doc; steps: a ✓, b; planned: 2026-11-09')
+  })
+  it('works for Today and Done tasks and leaves day files alone', () => {
+    const d = withTasks()
+    const today = parkTask(d, 'flow-app/t4', T)
+    expect(today.data.inbox.items.at(-1)!.text).toBe('Now — planned: 2026-11-04')
+    const done = parkTask(today.data, 'flow-app/t3', T)
+    expect(done.data.inbox.items.at(-1)!.text).toBe('Finished — planned: 2026-11-03')
+    expect(done.data.days).toEqual(d.days)
+    expect(done.changed).toEqual(['projects/flow-app.md', 'inbox.md'])
+  })
+  it('is a no-op for an unknown ref', () => {
+    const d = withTasks()
+    const r = parkTask(d, 'flow-app/t9', T)
+    expect(r.data).toBe(d)
+    expect(r.changed).toEqual([])
+    expect(r.itemId).toBeUndefined()
+  })
+})
+
+describe('parkTask safety', () => {
+  const base = (): FlowData => {
+    const d = structuredClone(sample())
+    d.projects['flow-app'].tasks = [{ id: 't1', title: 'Plain', status: 'todo', created: '2026-11-01', extra: { energy: 'low' } }]
+    return d
+  }
+  it('does nothing when inbox.md or the project file failed to parse (the task is never lost)', () => {
+    for (const path of ['inbox.md', 'projects/flow-app.md']) {
+      const d = deepFreeze({ ...base(), skipped: [path] })
+      const r = parkTask(d, 'flow-app/t1', T)
+      expect(r.data).toBe(d)
+      expect(r.changed).toEqual([])
+    }
+  })
+  it("keeps the task's unknown fields on the inbox item", () => {
+    const r = parkTask(deepFreeze(base()), 'flow-app/t1', T)
+    expect(r.data.inbox.items.at(-1)!.extra).toEqual({ energy: 'low' })
   })
 })

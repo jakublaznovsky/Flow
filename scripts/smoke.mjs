@@ -33,8 +33,18 @@ try {
   const col = (name) => page.getByRole('region', { name, exact: true })
 
   // --- Board: drag a card to Today, tick another off ---
-  for (const name of ['Parking lot', 'To do', 'Today', 'Done']) {
+  for (const name of ['Parking lot', 'To do', 'Tomorrow', 'Today', 'Done']) {
     await col(name).getByRole('heading', { name }).waitFor({ timeout: 5000 })
+  }
+  // Five columns fit 1280x800 next to the sidebar: no horizontal page scroll, cards stay readable.
+  {
+    const { scroll, widths } = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth - window.innerWidth,
+      widths: [...document.querySelectorAll('.column')].map((c) => Math.round(c.getBoundingClientRect().width)),
+    }))
+    if (scroll > 0) fail(`board scrolls horizontally by ${scroll}px`)
+    else if (widths.some((w) => w < 180)) fail(`columns too narrow: ${widths.join(', ')}`)
+    else console.log(`ok: five columns fit without horizontal scroll (${widths.join(', ')} px)`)
   }
   const card = col('To do').locator('li.card').first()
   const title = (await card.locator('.card-title').innerText()).trim()
@@ -75,6 +85,30 @@ try {
   await page.getByLabel(`Done: ${title}`).check()
   await col('Done').getByText(title).waitFor({ timeout: 3000 })
   console.log(`ok: "${title}" dragged to Today and completed`)
+
+  // --- Tomorrow: drag a To do card into Tomorrow ---
+  const todoCard = col('To do').locator('li.card').first()
+  const tomorrowTitle = (await todoCard.locator('.card-title').innerText()).trim()
+  await drag(page, todoCard, col('Tomorrow').locator('ul.cards'))
+  await col('Tomorrow').getByText(tomorrowTitle).waitFor({ timeout: 3000 })
+  console.log(`ok: "${tomorrowTitle}" dragged into Tomorrow`)
+
+  // --- Plan menu: opens next to the card, fully on screen; Escape closes it ---
+  await col('Tomorrow').getByRole('button', { name: `Plan ${tomorrowTitle}` }).click()
+  const menu = page.getByRole('menu', { name: `Plan ${tomorrowTitle}` })
+  await menu.waitFor({ timeout: 3000 })
+  const mb = await menu.boundingBox()
+  if (!mb || mb.x < 0 || mb.y < 0 || mb.x + mb.width > VIEWPORT.width || mb.y + mb.height > VIEWPORT.height) fail('plan menu is off screen')
+  await page.keyboard.press('Escape')
+  await menu.waitFor({ state: 'detached', timeout: 3000 })
+  console.log('ok: plan menu opens on screen and closes with Escape')
+
+  // --- Park it: drag a task onto the Parking lot ---
+  const parkCard = col('Tomorrow').locator('li.card', { hasText: tomorrowTitle })
+  await drag(page, parkCard, col('Parking lot').locator('ul.cards'))
+  await col('Parking lot').getByText(tomorrowTitle).waitFor({ timeout: 3000 })
+  if (await col('Tomorrow').getByText(tomorrowTitle).count()) fail(`"${tomorrowTitle}" is still in Tomorrow after parking`)
+  console.log(`ok: "${tomorrowTitle}" parked in the Parking lot`)
 
   // --- Week: drag from Unscheduled to a future day (key w) ---
   await key(page, 'w')

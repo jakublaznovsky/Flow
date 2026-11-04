@@ -148,7 +148,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 
 /* ---------- Board ---------- */
 .board-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3); }
-.columns { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); }
+.columns { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-3); }
 .column {
   display: flex; flex-direction: column; min-height: 0; padding: var(--space-3) var(--space-2) var(--space-2);
   background: var(--surface-2); border: 1px solid transparent; border-radius: var(--radius-lg);
@@ -178,7 +178,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 
 .card {
   --project: var(--border-strong);
-  position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px 10px 14px;
+  position: relative; display: flex; align-items: flex-start; gap: 8px; padding: 10px 10px 10px 12px;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
   box-shadow: inset 3px 0 0 var(--project), var(--shadow-sm);
   touch-action: none; cursor: grab;
@@ -235,7 +235,12 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 .add-btn:hover { background: var(--surface-hover); color: var(--text); }
 .add-btn span { font-size: 16px; line-height: 1; }
 .add-form { display: flex; flex-direction: column; gap: 6px; padding: 2px; }
-.add-form .primary { align-self: flex-start; }
+.add-actions { display: flex; align-items: center; gap: var(--space-2); }
+.ghost {
+  background: none; color: var(--text-muted); border: 0; border-radius: var(--radius-md); padding: 6px 10px; font-weight: 500;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.ghost:hover { background: var(--surface-hover); color: var(--text); }
 
 .picker-wrap { display: flex; align-items: flex-start; gap: var(--space-3); }
 .picker-label { padding-top: 6px; font-size: 13px; color: var(--text-muted); }
@@ -410,9 +415,30 @@ input.quick-capture, input.quick-capture:focus {
 }
 .card:hover .steps-toggle, .card:focus-within .steps-toggle, .steps-toggle[aria-expanded='true'], .steps-toggle:focus-visible { opacity: 1; }
 .steps-toggle[aria-expanded='true'] { transform: rotate(180deg); }
+.plan-ctl { position: absolute; top: 3px; right: -6px; display: flex; cursor: default; }
+.plan-toggle {
+  display: grid; place-items: center; width: 22px; height: 22px; padding: 0; background: none; border: 0;
+  border-radius: var(--radius-sm, 4px); color: var(--text-faint); cursor: pointer;
+  opacity: 0.45; transition: opacity var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.card:hover .plan-toggle, .card:focus-within .plan-toggle, .plan-toggle[aria-expanded='true'], .plan-toggle:focus-visible { opacity: 1; }
+.plan-toggle:hover, .plan-toggle[aria-expanded='true'] { color: var(--text); background: var(--surface-2); }
+/* The plan menu is fixed-positioned (placed in JS) so a column's scroll area never clips it. */
+.menu.plan-menu { position: fixed; top: 0; left: 0; right: auto; min-width: 176px; z-index: 40; cursor: default; }
+.plan-menu button[role='menuitem'] { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 5px 10px 5px 6px; }
+.plan-menu button[role='menuitem']:focus-visible { outline: none; background: var(--surface-2); }
+.plan-menu button[aria-current='true'] { color: var(--accent-text); font-weight: 500; }
+.plan-check { width: 14px; flex: none; text-align: center; font-size: 12px; }
+.plan-pick { display: flex; align-items: center; gap: 6px; padding: 4px; }
+.plan-set { flex: none; padding: 4px 10px; font-size: 13px; }
+.plan-date {
+  flex: 1; min-width: 0; border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 4px 8px;
+  background: var(--surface); color: var(--text); font: inherit; font-size: 13px; outline: none;
+}
+.plan-date:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .steps-toggle:hover { color: var(--text); background: var(--surface-2); }
 .card:has(> .checklist) { flex-wrap: wrap; }
-.checklist { flex: 0 0 100%; box-sizing: border-box; padding-left: 28px; margin-top: 2px; cursor: default; display: flex; flex-direction: column; gap: 4px; }
+.checklist { flex: 0 0 100%; box-sizing: border-box; padding-left: 26px; margin-top: 2px; cursor: default; display: flex; flex-direction: column; gap: 4px; }
 .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .steps li { display: flex; align-items: center; gap: 8px; min-height: 26px; }
 .steps li input[type='checkbox'] { margin: 0; width: 16px; height: 16px; }
@@ -433,6 +459,11 @@ input.quick-capture, input.quick-capture:focus {
 
 /* ---------- Day chip and "Plan for" on board cards ---------- */
 .card-meta { align-self: stretch; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; }
+/* Task footer: the calendar button is pinned top-right of the first row (it never wraps). Tag and
+   day chip keep their natural width; when both don't fit, the chip wraps under the tag. Only a tag
+   wider than the whole row truncates (the row is well over 80px at 1280px wide). */
+.card-meta:has(.plan-ctl) { position: relative; padding-right: 24px; }
+.card-meta:has(.plan-ctl) .day-chip { flex: none; }
 .day-chip {
   display: inline-flex; align-items: center; margin-top: 4px; padding: 1px 8px; border-radius: 999px;
   font-size: 11.5px; font-weight: 500; color: var(--accent-text); background: var(--accent-soft); white-space: nowrap;
@@ -594,3 +625,6 @@ input.quick-capture, input.quick-capture:focus {
 .settings-status { margin: 0; font-size: 12px; color: var(--text-muted); }
 .settings-privacy { margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 .ai-result { margin-top: var(--space-1); }
+/* In the narrow add form the date field drops under its label rather than truncating. */
+.add-form .plan-for { flex-wrap: wrap; gap: 4px var(--space-2); }
+.add-form .plan-for input[type='date'] { flex: 1 0 132px; }

@@ -1,6 +1,6 @@
 # Flow
 
-Tauri 2 + React + TypeScript desktop planner. One board: Parking lot / To do / Today / Done.
+Tauri 2 + React + TypeScript desktop planner. One board: Parking lot / To do / Tomorrow / Today / Done.
 Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 `docs/superpowers/specs/2026-11-03-flow-design.md` for the design.
 
@@ -21,13 +21,16 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   progress), `review` (Copy AI review prompt text), `notes` (general notes), `notes-day` (today's
   note), `steps` (task checklists), `schedule` (scheduled dates, `promoteScheduled`, `weekPlan`),
   `review-week` (weekly review files, focus project), `plan` (apply Claude's suggested tasks).
+  v0.2.1: `boardColumns` puts To do tasks scheduled for tomorrow in the Tomorrow column (not in
+  To do); `parkTask` (inbox.ts) turns a task dropped on the Parking lot into an inbox item.
 - `src/storage/` Markdown/frontmatter parsing, `FileStore` interface (`MemoryFileStore`,
   `TauriFileStore`), and `flowRepo` (load/save, README text, issue log).
 - `src/ai/` Claude client (`claude.ts`, lazy-loaded `@anthropic-ai/sdk`), prompt builders
   (`prompts.ts`) and the dev-only canned client (`fake.ts`).
 - `src/ui/` React components (Board, Column, Card, quick capture, folder setup) and `useFlow`.
   Board.tsx is the shell; views: `BoardView`, `WeekView`, `ProgressView`, `NotesView`,
-  `WeeklyReview`, `SettingsPanel`; plus `Sidebar`, `ProjectHeader`, `NotesPanel`, `FocusBar` +
+  `WeeklyReview`, `SettingsPanel`; plus `Sidebar`, `ProjectHeader`, `NotesPanel`, `PlanMenu` (calendar
+  menu on To do/Tomorrow/Today cards: scheduleTask), `FocusBar` +
   `useFocus`, `SearchBox`, `AiPanel`; tokens and themes in `theme.css`, styles in `board.css`.
 - `src/main.tsx` picks the shell: browser or Tauri (main window / capture window).
 - All app logic is TypeScript; Rust (`src-tauri`) only registers plugins.
@@ -47,6 +50,12 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 - Decisions are `- YYYY-MM-DD: <text>` lines, last in the `## Decisions` section of the project body.
 - Promotion is active-only: To do tasks with `scheduled <= today` in active projects move to Today
   on load/date change and lose `scheduled`; paused/done/archived projects keep their date.
+- Tomorrow column = no new state: it is `scheduled === today + 1`. Drops onto it schedule tomorrow
+  (Done tasks reopen first); Tomorrow → To do clears the date.
+- Parking a task: text `<title> — first step: X; steps: a ✓, b; planned: <scheduled ?? planned>`
+  (only parts present), task `extra` kept on the item; day files untouched; no change if inbox.md or
+  the project file is skipped.
+- Add forms close on Escape, Cancel, or an outside click while empty (typed text is kept).
 - Weekly reviews live in `reviews/YYYY-Www.md` (ISO week; `week`, `focus_project`, `intention`,
   body = reflection). The focus project applies to the following week (review W-1, fallback W).
 - No streaks anywhere: nothing counts consecutive days.

@@ -42,14 +42,32 @@ describe('handleDrop', () => {
     await waitFor(() => expect(store.files['days/2026-11-03.md']).toContain('flow-app/t2'))
   })
 
-  it('rejects a task dropped on Parking lot and inbox dropped on Done', async () => {
+  it('rejects an inbox item dropped on Done', async () => {
     const { store, ctx, hook } = await harness()
     const before = { ...store.files }
-    act(() => handleDrop({ cardKey: 'flow-app/t1', from: 'todo', to: 'inbox', index: 0 }, ctx()))
     act(() => handleDrop({ cardKey: 'inbox/i1', from: 'inbox', to: 'done', index: 0 }, ctx()))
     expect(store.files).toEqual(before)
     expect(hook.result.current.flow.order).toEqual({})
     expect(hook.result.current.promotion.picker).toBeFalsy()
+  })
+
+  it('a task dropped on the Parking lot is parked there at the drop index', async () => {
+    const { store, ctx, hook } = await harness()
+    act(() => handleDrop({ cardKey: 'flow-app/t1', from: 'todo', to: 'inbox', index: 0 }, ctx()))
+    await waitFor(() => expect(store.files['inbox.md']).toContain('Set up Tauri'))
+    expect(store.files['projects/flow-app.md']).not.toContain('Set up Tauri')
+    expect(hook.result.current.flow.order.inbox).toEqual(['inbox/i2', 'inbox/i1'])
+    expect(hook.result.current.flow.order.todo).toEqual(['flow-app/t3', 'learn-spanish/t1'])
+  })
+
+  it('a Today task can be parked too; its day file is left alone', async () => {
+    const files = seed()
+    files['days/2026-11-03.md'] = '---\ndate: 2026-11-03\nplanned:\n  - flow-app/t2\n---\n'
+    const { store, ctx, hook } = await harness(files)
+    act(() => handleDrop({ cardKey: 'flow-app/t2', from: 'today', to: 'inbox', index: 5 }, ctx()))
+    await waitFor(() => expect(store.files['inbox.md']).toContain('Write spec'))
+    expect(store.files['days/2026-11-03.md']).toContain('flow-app/t2')
+    expect(hook.result.current.flow.order.inbox).toEqual(['inbox/i1', 'inbox/i2'])
   })
 
   it('reordering within To do persists columnOrder', async () => {
@@ -89,6 +107,57 @@ describe('handleDrop', () => {
     const { ctx, hook } = await harness(files)
     act(() => handleDrop({ cardKey: 'inbox/i1', from: 'inbox', to: 'today', index: 0 }, ctx()))
     expect(hook.result.current.promotion.picker).toBeFalsy()
+  })
+
+  const tomorrowSeed = () => {
+    const files = seed()
+    files['projects/flow-app.md'] = project('Flow app',
+      t('t1', 'Set up Tauri', 'todo') + t('t2', 'Write spec', 'today') + t('t3', 'Third', 'todo') +
+      t('t4', 'Planned tomorrow', 'todo') + '    scheduled: 2026-11-04\n' +
+      t('t5', 'Finished', 'done') + '    done: 2026-11-03\n')
+    return files
+  }
+
+  it('To do, Today and Done tasks dropped on Tomorrow are planned for tomorrow', async () => {
+    const { store, ctx, hook } = await harness(tomorrowSeed())
+    act(() => handleDrop({ cardKey: 'flow-app/t1', from: 'todo', to: 'tomorrow', index: 0 }, ctx()))
+    act(() => handleDrop({ cardKey: 'flow-app/t2', from: 'today', to: 'tomorrow', index: 0 }, ctx()))
+    act(() => handleDrop({ cardKey: 'flow-app/t5', from: 'done', to: 'tomorrow', index: 9 }, ctx()))
+    await waitFor(() => expect((store.files['projects/flow-app.md'].match(/scheduled: 2026-11-04/g) ?? []).length).toBe(4))
+    const tasks = hook.result.current.flow.data!.projects['flow-app'].tasks
+    for (const id of ['t1', 't2', 't5']) expect(tasks.find((x) => x.id === id)).toMatchObject({ status: 'todo', scheduled: '2026-11-04' })
+    expect(tasks.find((x) => x.id === 't5')!.done).toBeUndefined()
+    expect(hook.result.current.flow.order.tomorrow).toEqual(['flow-app/t2', 'flow-app/t1', 'flow-app/t4', 'flow-app/t5'])
+    expect(hook.result.current.flow.order.done).toEqual([])
+  })
+
+  it('Tomorrow -> To do clears the date; Tomorrow -> Today moves it to Today', async () => {
+    const files = tomorrowSeed()
+    files['projects/learn-spanish.md'] = project('Learn Spanish', t('t1', 'Buy a book', 'todo') + '    scheduled: 2026-11-04\n')
+    const { ctx, hook } = await harness(files)
+    act(() => handleDrop({ cardKey: 'flow-app/t4', from: 'tomorrow', to: 'todo', index: 0 }, ctx()))
+    act(() => handleDrop({ cardKey: 'learn-spanish/t1', from: 'tomorrow', to: 'today', index: 0 }, ctx()))
+    const d = hook.result.current.flow.data!
+    expect(d.projects['flow-app'].tasks.find((x) => x.id === 't4')).toMatchObject({ status: 'todo' })
+    expect(d.projects['flow-app'].tasks.find((x) => x.id === 't4')!.scheduled).toBeUndefined()
+    expect(d.projects['learn-spanish'].tasks[0]).toMatchObject({ status: 'today', planned: '2026-11-03' })
+    expect(d.projects['learn-spanish'].tasks[0].scheduled).toBeUndefined()
+    expect(hook.result.current.flow.order.todo?.[0]).toBe('flow-app/t4')
+    expect(hook.result.current.flow.order.tomorrow).toEqual([])
+  })
+
+  it('inbox -> Tomorrow asks for a project, then adds the task planned for tomorrow', async () => {
+    const h = await harness()
+    const Picker = () => <>{h.hook.result.current.promotion.picker}</>
+    const view = render(<Picker />)
+    act(() => handleDrop({ cardKey: 'inbox/i1', from: 'inbox', to: 'tomorrow', index: 0 }, h.ctx()))
+    view.rerender(<Picker />)
+    await userEvent.setup().click(screen.getByRole('option', { name: 'Learn Spanish' }))
+    await waitFor(() => expect(h.store.files['projects/learn-spanish.md']).toContain('Look into podcasts'))
+    expect(h.hook.result.current.flow.data!.projects['learn-spanish'].tasks.at(-1))
+      .toMatchObject({ title: 'Look into podcasts', status: 'todo', scheduled: '2026-11-04' })
+    expect(h.store.files['inbox.md']).not.toContain('Look into podcasts')
+    expect(h.hook.result.current.flow.order.tomorrow).toEqual(['learn-spanish/t2'])
   })
 
   async function dragInbox() {
