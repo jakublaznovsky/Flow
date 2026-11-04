@@ -1,4 +1,4 @@
-import type { Day, DoneEntry, Extra, FocusEntry, ISODate, Inbox, InboxItem, Notes, Project, ProjectStatus, Step, Task, TaskStatus } from '../model/types'
+import type { Day, DoneEntry, Extra, FocusEntry, ISODate, Inbox, InboxItem, Notes, Project, Review, ProjectStatus, Step, Task, TaskStatus } from '../model/types'
 import { localDate } from '../model/dates'
 import { nextInboxId, nextTaskId, pickColor } from '../model/ids'
 import { joinFrontmatter, splitFrontmatter } from './frontmatter'
@@ -203,4 +203,27 @@ export function serializeNotes(n: Notes): string {
   // Plain text when there is no frontmatter, unless the text itself opens with a `---` line.
   if (Object.keys(n.extra).length === 0 && !/^(?:\uFEFF)?(?:[ \t\r]*\n)*---[ \t\r]*(?:\n|$)/.test(n.body)) return n.body
   return joinFrontmatter(n.extra, n.body)
+}
+
+/** reviews/YYYY-Www.md: week, optional focus_project and intention (strict text); body is the reflection. */
+export function parseReview(week: string, text: string): Review {
+  const { data, body } = splitFrontmatter(text)
+  const strict = (v: unknown, what: string): string | undefined => {
+    if (v === undefined || v === null) return undefined
+    if (typeof v !== 'string') throw new Error(`${what} must be text`)
+    return v === '' ? undefined : v
+  }
+  const r: Review = { week: strict(data.week, 'week') ?? week, body, extra: pickExtra(data, ['week', 'focus_project', 'intention']) }
+  const focusProject = strict(data.focus_project, 'focus_project')
+  const intention = strict(data.intention, 'intention')
+  if (focusProject !== undefined) r.focusProject = focusProject
+  if (intention !== undefined) r.intention = intention
+  return r
+}
+
+export function serializeReview(r: Review): string {
+  const o: Obj = { week: r.week }
+  if (r.focusProject !== undefined) o.focus_project = r.focusProject
+  if (r.intention !== undefined) o.intention = r.intention
+  return joinFrontmatter({ ...o, ...r.extra }, r.body)
 }

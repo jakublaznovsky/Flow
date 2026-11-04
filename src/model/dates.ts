@@ -33,3 +33,12 @@ export function dayParts(date: ISODate): { weekday: string; day: number; month: 
   const [y, m, d] = parse(date)
   return { weekday: WEEKDAYS[new Date(y, m - 1, d).getDay()], day: d, month: MONTHS[m - 1], year: y }
 }
+
+/** ISO-8601 week of a date as `YYYY-Www` (the week belongs to the year of its Thursday). */
+export function isoWeek(date: ISODate): string {
+  const thursday = addDays(weekStart(date), 3)
+  const [y, m, d] = parse(thursday)
+  const jan1 = new Date(y, 0, 1)
+  const dayOfYear = Math.round((new Date(y, m - 1, d).getTime() - jan1.getTime()) / 86_400_000)
+  return `${y}-W${pad(Math.floor(dayOfYear / 7) + 1)}`
+}

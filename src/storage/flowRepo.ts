@@ -1,10 +1,11 @@
 import type { FileStore } from './fileStore'
-import { parseDay, parseInbox, parseNotes, parseProject, serializeDay, serializeInbox, serializeNotes, serializeProject } from './files'
+import { parseDay, parseInbox, parseNotes, parseProject, parseReview, serializeReview, serializeDay, serializeInbox, serializeNotes, serializeProject } from './files'
 import { emptyFlow, INBOX_PATH, NOTES_PATH, type FlowData, type ISODate } from '../model/types'
 
 const LOG_PATH = 'flow-issues.log'
 const PROJECT_RE = /^projects\/([^/]+)\.md$/
 const DAY_RE = /^days\/(\d{4}-\d{2}-\d{2})\.md$/
+const REVIEW_RE = /^reviews\/(\d{4}-W\d{2})\.md$/
 
 export const README_TEXT = `# Flow
 
@@ -23,6 +24,8 @@ Flow/
     <slug>.md          # one file per project
   days/
     YYYY-MM-DD.md      # one file per day with activity
+  reviews/
+    YYYY-Www.md        # one file per weekly review (ISO week)
   flow-issues.log      # unreadable files Flow skipped (for you or an AI)
 \`\`\`
 
@@ -108,6 +111,23 @@ Optional free-text note.
   omitted when there are none.
 - A day file is created only when something happens that day.
 
+## Weekly review: reviews/YYYY-Www.md
+
+\`\`\`markdown
+---
+week: 2026-W45
+focus_project: flow-app
+intention: Finish the weekly review
+---
+Free text: what went well, what got in the way.
+\`\`\`
+
+- One file per ISO week (Monday to Sunday; week 1 contains the first Thursday of the year),
+  written by the guided Weekly review in Flow. The file is created the first time you save
+  something in that week's review.
+- focus_project is a project slug (the one starred in the sidebar that week); focus_project
+  and intention are omitted when empty. The body is your reflection.
+
 ## Example prompts
 
 - Read the files in Flow/days from the last 7 days and give me honest feedback on my week.
@@ -136,14 +156,17 @@ type Parsed =
   | { kind: 'inbox'; value: FlowData['inbox'] }
   | { kind: 'notes'; value: FlowData['notes'] }
   | { kind: 'day'; date: ISODate; value: FlowData['days'][string] }
+  | { kind: 'review'; week: string; value: FlowData['reviews'][string] }
 
-function classify(path: string): { kind: 'project'; slug: string } | { kind: 'inbox' } | { kind: 'notes' } | { kind: 'day'; date: ISODate } | null {
+function classify(path: string): { kind: 'project'; slug: string } | { kind: 'inbox' } | { kind: 'notes' } | { kind: 'day'; date: ISODate } | { kind: 'review'; week: string } | null {
   if (path === INBOX_PATH) return { kind: 'inbox' }
   if (path === NOTES_PATH) return { kind: 'notes' }
   const p = PROJECT_RE.exec(path)
   if (p) return { kind: 'project', slug: p[1] }
   const d = DAY_RE.exec(path)
   if (d) return { kind: 'day', date: d[1] }
+  const r = REVIEW_RE.exec(path)
+  if (r) return { kind: 'review', week: r[1] }
   return null
 }
 
@@ -153,6 +176,7 @@ function parsePath(path: string, text: string, today: ISODate): Parsed | null {
   if (c.kind === 'inbox') return { kind: 'inbox', value: parseInbox(text, today) }
   if (c.kind === 'notes') return { kind: 'notes', value: parseNotes(text) }
   if (c.kind === 'project') return { kind: 'project', slug: c.slug, value: parseProject(c.slug, text, today) }
+  if (c.kind === 'review') return { kind: 'review', week: c.week, value: parseReview(c.week, text) }
   return { kind: 'day', date: c.date, value: parseDay(c.date, text) }
 }
 
@@ -160,6 +184,7 @@ function apply(d: FlowData, p: Parsed): void {
   if (p.kind === 'inbox') d.inbox = p.value
   else if (p.kind === 'notes') d.notes = p.value
   else if (p.kind === 'project') d.projects[p.slug] = p.value
+  else if (p.kind === 'review') d.reviews[p.week] = p.value
   else d.days[p.date] = p.value
 }
 
@@ -168,6 +193,7 @@ export async function loadFlow(store: FileStore, today: ISODate): Promise<FlowDa
   const paths = [INBOX_PATH, NOTES_PATH]
   for (const n of await store.list('projects')) if (n.endsWith('.md')) paths.push(`projects/${n}`)
   for (const n of await store.list('days')) if (DAY_RE.test(`days/${n}`)) paths.push(`days/${n}`)
+  for (const n of await store.list('reviews')) if (REVIEW_RE.test(`reviews/${n}`)) paths.push(`reviews/${n}`)
   for (const path of paths) {
     try {
       const text = await store.read(path)
@@ -183,7 +209,7 @@ export async function loadFlow(store: FileStore, today: ISODate): Promise<FlowDa
 }
 
 export async function reloadPaths(store: FileStore, d: FlowData, paths: string[], today: ISODate): Promise<FlowData> {
-  const next: FlowData = { ...d, projects: { ...d.projects }, days: { ...d.days }, skipped: [...d.skipped] }
+  const next: FlowData = { ...d, projects: { ...d.projects }, days: { ...d.days }, reviews: { ...d.reviews }, skipped: [...d.skipped] }
   for (const path of paths) {
     const c = classify(path)
     if (!c) continue
@@ -199,6 +225,7 @@ export async function reloadPaths(store: FileStore, d: FlowData, paths: string[]
       next.skipped = next.skipped.filter((s) => s !== path)
       if (c.kind === 'project') delete next.projects[c.slug]
       else if (c.kind === 'day') delete next.days[c.date]
+      else if (c.kind === 'review') delete next.reviews[c.week]
       else if (c.kind === 'notes') next.notes = emptyFlow().notes
       else next.inbox = emptyFlow().inbox
       continue
@@ -221,6 +248,7 @@ function serializePath(d: FlowData, path: string): string | null {
   if (c.kind === 'inbox') return serializeInbox(d.inbox)
   if (c.kind === 'notes') return serializeNotes(d.notes)
   if (c.kind === 'project') return d.projects[c.slug] ? serializeProject(d.projects[c.slug]) : null
+  if (c.kind === 'review') return d.reviews[c.week] ? serializeReview(d.reviews[c.week]) : null
   return d.days[c.date] ? serializeDay(d.days[c.date]) : null
 }
 

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { setDayNote } from '../model/notes-day'
 import { buildReviewPrompt } from '../model/review'
 import { doneOn, focusMinutesOn, heatmap, projectProgress, weekDates } from '../model/stats'
 import type { Change, FlowData } from '../model/types'
+import { useCopyText } from './useCopyText'
 
 interface Props { data: FlowData; today: string; apply: (fn: (d: FlowData) => Change) => void }
 
@@ -28,23 +29,7 @@ function TodayNote({ body, today, apply }: { body: string; today: string; apply:
 }
 
 function AiReview({ data, today }: { data: FlowData; today: string }) {
-  const [copied, setCopied] = useState(false)
-  const [fallback, setFallback] = useState<string | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  useEffect(() => () => clearTimeout(timer.current), [])
-  const copy = async () => {
-    const text = buildReviewPrompt(data, today)
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('no clipboard')
-      await navigator.clipboard.writeText(text)
-      setFallback(null)
-      setCopied(true)
-      clearTimeout(timer.current)
-      timer.current = setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setFallback(text)
-    }
-  }
+  const { copied, fallback, copy } = useCopyText(() => buildReviewPrompt(data, today))
   return (
     <>
       <p className="progress-hint">Copies a prompt with your last 7 days to paste into Claude or another AI.</p>

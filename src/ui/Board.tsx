@@ -13,6 +13,8 @@ import ProgressView from './ProgressView'
 import WeekView from './WeekView'
 import NotesPanel from './NotesPanel'
 import NotesView from './NotesView'
+import WeeklyReview from './WeeklyReview'
+import { focusProjectThisWeek } from '../model/review-week'
 import ProjectHeader from './ProjectHeader'
 import ProjectPicker from './ProjectPicker'
 import SearchBox from './SearchBox'
@@ -102,7 +104,7 @@ export function usePromotion(flow: ReturnType<typeof useFlow>, query = '') {
   return { openPicker, picker, pendingTo: pending?.to ?? null }
 }
 
-const isView = (v: unknown): v is View => v === 'board' || v === 'week' || v === 'progress' || v === 'notes'
+const isView = (v: unknown): v is View => v === 'board' || v === 'week' || v === 'progress' || v === 'notes' || v === 'review'
 
 const NON_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color'])
 
@@ -153,6 +155,7 @@ export default function Board({ store, settings, now, onReady }: Props) {
       else if (e.key === 'p') { e.preventDefault(); setView('progress') }
       else if (e.key === 'o') { e.preventDefault(); setView('notes') }
       else if (e.key === 'w') { e.preventDefault(); setView('week') }
+      else if (e.key === 'r') { e.preventDefault(); setView('review') }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -195,6 +198,7 @@ export default function Board({ store, settings, now, onReady }: Props) {
         hidden={all.filter((p) => p.status !== 'active')}
         progress={progress}
         filter={filter}
+        focusSlug={focusProjectThisWeek(data, today)}
         onFilter={setFilter}
         onCreate={(t) => { const s = createProjectNamed(t); if (s) setFilter(null) }}
         onUpdate={(slug, patch) => apply((d) => updateProject(d, slug, patch))}
@@ -241,6 +245,8 @@ export default function Board({ store, settings, now, onReady }: Props) {
             <WeekView flow={flow} />
           ) : view === 'notes' ? (
             <NotesView data={data} apply={apply} initial={filter} />
+          ) : view === 'review' ? (
+            <WeeklyReview data={data} today={today} apply={apply} onFinish={() => setView('board')} />
           ) : (
             <ProgressView data={data} today={today} apply={apply} />
           )}

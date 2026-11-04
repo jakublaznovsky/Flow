@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Project, ProjectStatus } from '../model/types'
 import { PROJECT_COLORS } from '../model/ids'
 
-export type View = 'board' | 'week' | 'progress' | 'notes'
+export type View = 'board' | 'week' | 'progress' | 'notes' | 'review'
 type Patch = { title?: string; color?: string; status?: ProjectStatus }
 
 interface Props {
@@ -12,6 +12,8 @@ interface Props {
   hidden: Project[]          // paused, done or archived projects
   progress: Record<string, { done: number; total: number }>
   filter: string | null
+  /** Project named as this week's focus by the weekly review. */
+  focusSlug?: string
   onFilter: (slug: string | null) => void
   onCreate: (title: string) => void
   onUpdate: (slug: string, patch: Patch) => void
@@ -50,6 +52,15 @@ function NotesIcon() {
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3.5 1.75h6.25L12.5 4.5v9.75h-9z" />
       <path d="M5.5 7.5h5M5.5 10.25h5" />
+    </svg>
+  )
+}
+
+function ReviewIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2.5" y="2.25" width="11" height="11.5" rx="1.5" />
+      <path d="M5.25 8.25l1.9 1.9 3.6-3.9" />
     </svg>
   )
 }
@@ -102,7 +113,7 @@ function ProjectMenu({ project, onUpdate, onStatus, onClose }: {
   )
 }
 
-export default function Sidebar({ view, onView, projects, hidden, progress, filter, onFilter, onCreate, onUpdate }: Props) {
+export default function Sidebar({ view, onView, projects, hidden, progress, filter, focusSlug, onFilter, onCreate, onUpdate }: Props) {
   const [menu, setMenu] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -140,6 +151,9 @@ export default function Sidebar({ view, onView, projects, hidden, progress, filt
         <button className="nav-item" aria-pressed={view === 'notes'} onClick={() => onView('notes')}>
           <NotesIcon /><span>Notes</span><kbd aria-hidden="true">O</kbd>
         </button>
+        <button className="nav-item" aria-pressed={view === 'review'} onClick={() => onView('review')}>
+          <ReviewIcon /><span>Weekly review</span><kbd aria-hidden="true">R</kbd>
+        </button>
       </div>
 
       <div className="section-label" id="projects-label">Projects</div>
@@ -161,6 +175,7 @@ export default function Sidebar({ view, onView, projects, hidden, progress, filt
                 >
                   <span className="dot" aria-hidden="true" style={{ background: p.color }} />
                   <span className="project-title">{p.title}</span>
+                  {focusSlug === p.slug && <span className="focus-star" role="img" aria-label="This week's focus">★</span>}
                 </button>
                 <div
                   className="progress"

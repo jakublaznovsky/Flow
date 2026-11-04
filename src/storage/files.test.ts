@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseDay, parseInbox, parseNotes, parseProject, serializeDay, serializeInbox, serializeNotes, serializeProject } from './files'
+import { parseDay, parseInbox, parseNotes, parseProject, parseReview, serializeReview, serializeDay, serializeInbox, serializeNotes, serializeProject } from './files'
 import { pickColor } from '../model/ids'
 
 const today = '2026-11-05'
@@ -297,5 +297,29 @@ describe('task scheduled date', () => {
   })
   it.each([['tomorrow'], ['2026-11-6'], ['20261106'], ['[2026-11-06]'], ['{a: 1}'], ['12'], ['2026-13-45'], ['2026-02-30'], ['2026-00-10']])('rejects a bad scheduled value (%s)', (bad) => {
     expect(() => parseProject('p', withTask(`    scheduled: ${bad}\n`), today)).toThrow()
+  })
+})
+
+describe('reviews/YYYY-Www.md', () => {
+  it('parses week, focus project, intention and the reflection body', () => {
+    const r = parseReview('2026-W45', '---\nweek: 2026-W45\nfocus_project: flow-app\nintention: Ship it\n---\nWent fine.\n')
+    expect(r).toEqual({ week: '2026-W45', focusProject: 'flow-app', intention: 'Ship it', body: 'Went fine.\n', extra: {} })
+  })
+  it('round-trips, keeping unknown keys and omitting empty optionals', () => {
+    const text = '---\nweek: 2026-W45\nmood: calm\n---\nBody\n'
+    const r = parseReview('2026-W45', text)
+    expect(r.extra).toEqual({ mood: 'calm' })
+    expect(serializeReview(r)).toBe(text)
+    const full = parseReview('2026-W45', serializeReview({ ...r, focusProject: 'a', intention: 'b' }))
+    expect(full).toMatchObject({ focusProject: 'a', intention: 'b', extra: { mood: 'calm' } })
+  })
+  it('takes the week from the file name when the key is missing', () => {
+    expect(parseReview('2026-W45', 'Just words').week).toBe('2026-W45')
+  })
+  it.each(['week: [a]', 'week: 45', 'focus_project: 3', 'intention: [x]', 'intention: {a: 1}'])('rejects %s', (line) => {
+    expect(() => parseReview('2026-W45', `---\n${line}\n---\n`)).toThrow()
+  })
+  it('throws on broken frontmatter', () => {
+    expect(() => parseReview('2026-W45', '---\nweek: [oops\n---\n')).toThrow()
   })
 })

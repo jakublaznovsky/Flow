@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { localDate, addDays, weekStart, dayParts } from './dates'
+import { localDate, addDays, weekStart, dayParts, isoWeek } from './dates'
 
 describe('localDate', () => {
   it('formats a date as ISO YYYY-MM-DD in local time', () => {
@@ -49,5 +49,20 @@ describe('dayParts', () => {
   it('names weekday, day, month and year in local time', () => {
     expect(dayParts('2026-11-05')).toEqual({ weekday: 'Thu', day: 5, month: 'Nov', year: 2026 })
     expect(dayParts('2027-01-03')).toEqual({ weekday: 'Sun', day: 3, month: 'Jan', year: 2027 })
+  })
+})
+
+describe('isoWeek', () => {
+  it('numbers ISO-8601 weeks (Thursday rule)', () => {
+    expect(isoWeek('2026-11-04')).toBe('2026-W45')
+    expect(isoWeek('2026-11-02')).toBe('2026-W45')
+    expect(isoWeek('2026-11-08')).toBe('2026-W45')
+    expect(isoWeek('2026-11-09')).toBe('2026-W46')
+    expect(isoWeek('2026-12-31')).toBe('2026-W53')
+    expect(isoWeek('2027-01-01')).toBe('2026-W53')
+    expect(isoWeek('2027-01-03')).toBe('2026-W53')
+    expect(isoWeek('2027-01-04')).toBe('2027-W01')
+    expect(isoWeek('2024-12-30')).toBe('2025-W01')
+    expect(isoWeek('2026-01-01')).toBe('2026-W01')
   })
 })

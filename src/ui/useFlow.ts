@@ -9,13 +9,15 @@ import type { Settings } from './settings'
 
 /** Copy one reloaded path from `from` into `into` (a fresh copy of the current data). */
 function mergePath(into: FlowData, from: FlowData, path: string): FlowData {
-  const out: FlowData = { ...into, projects: { ...into.projects }, days: { ...into.days }, skipped: into.skipped.filter((s) => s !== path) }
+  const out: FlowData = { ...into, projects: { ...into.projects }, days: { ...into.days }, reviews: { ...into.reviews }, skipped: into.skipped.filter((s) => s !== path) }
   if (from.skipped.includes(path)) out.skipped.push(path)
   const proj = /^projects\/(.+)\.md$/.exec(path)?.[1]
   const day = /^days\/(.+)\.md$/.exec(path)?.[1]
+  const review = /^reviews\/(.+)\.md$/.exec(path)?.[1]
   if (path === 'inbox.md') out.inbox = from.inbox
   else if (path === 'notes.md') out.notes = from.notes
   else if (proj) { if (from.projects[proj]) out.projects[proj] = from.projects[proj]; else delete out.projects[proj] }
+  else if (review) { if (from.reviews[review]) out.reviews[review] = from.reviews[review]; else delete out.reviews[review] }
   else if (day) { if (from.days[day]) out.days[day] = from.days[day]; else delete out.days[day] }
   return out
 }

@@ -157,3 +157,43 @@ describe('notes.md', () => {
     expect(README_TEXT).toContain('notes.md')
   })
 })
+
+describe('reviews/', () => {
+  const REVIEW = '---\nweek: 2026-W45\nfocus_project: good\n---\nReflection\n'
+  it('loads only reviews/YYYY-Www.md and never creates review files', async () => {
+    const s = new MemoryFileStore({ 'projects/good.md': GOOD, 'reviews/2026-W45.md': REVIEW, 'reviews/notes.md': 'x', 'reviews/2026-W5.md': 'x' })
+    await ensureFolder(s)
+    const d = await loadFlow(s, T)
+    expect(Object.keys(d.reviews)).toEqual(['2026-W45'])
+    expect(d.reviews['2026-W45'].focusProject).toBe('good')
+    expect(Object.keys(s.files).filter((p) => p.startsWith('reviews/')).sort()).toEqual(['reviews/2026-W45.md', 'reviews/2026-W5.md', 'reviews/notes.md'])
+  })
+  it('skips and logs a broken review and never writes it', async () => {
+    const bad = '---\nintention: [x]\n---\nmine'
+    const s = new MemoryFileStore({ 'reviews/2026-W45.md': bad })
+    const d = await loadFlow(s, T)
+    expect(d.skipped).toEqual(['reviews/2026-W45.md'])
+    expect(s.files['flow-issues.log']).toContain('reviews/2026-W45.md')
+    await saveFlow(s, { ...d, reviews: { '2026-W45': { week: '2026-W45', body: 'x', extra: {} } } }, ['reviews/2026-W45.md'])
+    expect(s.files['reviews/2026-W45.md']).toBe(bad)
+  })
+  it('saves a review to reviews/<week>.md', async () => {
+    const s = new MemoryFileStore()
+    const d = await loadFlow(s, T)
+    await saveFlow(s, { ...d, reviews: { '2026-W45': { week: '2026-W45', intention: 'Calm', body: 'Hi\n', extra: {} } } }, ['reviews/2026-W45.md'])
+    expect(s.files['reviews/2026-W45.md']).toBe('---\nweek: 2026-W45\nintention: Calm\n---\nHi\n')
+  })
+  it('reloadPaths picks up edits and removal', async () => {
+    const s = new MemoryFileStore({ 'reviews/2026-W45.md': REVIEW })
+    const d = await loadFlow(s, T)
+    await s.write('reviews/2026-W45.md', '---\nweek: 2026-W45\n---\nTwo')
+    const r = await reloadPaths(s, d, ['reviews/2026-W45.md'], T)
+    expect(r.reviews['2026-W45']).toEqual({ week: '2026-W45', body: 'Two', extra: {} })
+    delete s.files['reviews/2026-W45.md']
+    expect((await reloadPaths(s, r, ['reviews/2026-W45.md'], T)).reviews['2026-W45']).toBeUndefined()
+  })
+  it('README documents reviews/', () => {
+    expect(README_TEXT).toContain('reviews/YYYY-Www.md')
+    expect(README_TEXT).toContain('focus_project')
+  })
+})
