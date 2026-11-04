@@ -183,6 +183,16 @@ describe('aiErrorDetail', () => {
     expect(aiErrorDetail(new Anthropic.BadRequestError(400, { type: 'error', error: { type: 'invalid_request_error', message: 'tasks: maxItems is not supported' } }, undefined, h)))
       .toBe('Claude API 400 (invalid_request_error): tasks: maxItems is not supported')
   })
+  it('cuts long details and adds the request id', () => {
+    const e = new Anthropic.BadRequestError(400, { type: 'error', error: { type: 'invalid_request_error', message: 'x'.repeat(1000) } }, undefined, new Headers({ 'request-id': 'req_123' }))
+    const d = aiErrorDetail(e)!
+    expect(d.length).toBeLessThan(400)
+    expect(d).toContain('[request req_123]')
+  })
+  it('names a too-low credit balance plainly', () => {
+    const e = new Anthropic.BadRequestError(400, { type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } }, undefined, h)
+    expect(aiErrorMessage(e)).toBe('Your Anthropic credit balance is too low — top it up at console.anthropic.com.')
+  })
   it('returns nothing for a user stop', () => {
     expect(aiErrorDetail(new Anthropic.APIUserAbortError())).toBeUndefined()
   })

@@ -158,7 +158,10 @@ export function aiErrorMessage(e: unknown): string {
   if (e instanceof PermissionDeniedError) return "This API key can't use that model — try another model in Settings."
   if (e instanceof NotFoundError) return "This model isn't available for your key — pick another model in Settings."
   if (e instanceof RateLimitError) return 'Claude is busy or a usage limit was reached — try again in a minute.'
-  if (e instanceof BadRequestError) return "Claude couldn't process this request — the details are in flow-issues.log."
+  if (e instanceof BadRequestError) {
+    if (/credit balance/i.test(apiMessage(e))) return "Your Anthropic credit balance is too low — top it up at console.anthropic.com."
+    return "Claude couldn't process this request — the details are in flow-issues.log."
+  }
   if (e instanceof APIConnectionError) return "Couldn't reach Claude — check your internet connection."
   if (e instanceof APIError) return 'Claude had a problem answering — try again in a moment.'
   return 'Something went wrong talking to Claude — try again.'
@@ -168,11 +171,18 @@ export function aiErrorMessage(e: unknown): string {
 export function aiErrorDetail(e: unknown): string | undefined {
   if (e instanceof APIUserAbortError) return undefined
   if (e instanceof APIError) {
-    // The API's own explanation sits in the response body: { type: 'error', error: { type, message } }.
-    const body = e.error as { error?: { type?: unknown; message?: unknown } } | undefined
-    const msg = typeof body?.error?.message === 'string' ? body.error.message : e.message
+    const body = e.error as { error?: { type?: unknown } } | undefined
     const kind = typeof body?.error?.type === 'string' ? ` (${body.error.type})` : ''
-    return `Claude API ${e.status ?? 'error'}${kind}: ${msg}`.replace(/\s+/g, ' ')
+    const id = e.requestID ? ` [request ${e.requestID}]` : ''
+    return `Claude API ${e.status ?? 'error'}${kind}: ${clip(apiMessage(e))}${id}`.replace(/\s+/g, ' ')
   }
   return `Claude request failed: ${e instanceof Error ? e.message : String(e)}`.replace(/\s+/g, ' ')
 }
+
+/** The API's own explanation from the response body ({ type: 'error', error: { type, message } }), else the SDK message. */
+function apiMessage(e: InstanceType<typeof APIError>): string {
+  const body = e.error as { error?: { message?: unknown } } | undefined
+  return typeof body?.error?.message === 'string' ? body.error.message : e.message
+}
+
+const clip = (t: string, max = 300) => (t.length > max ? `${t.slice(0, max)}…` : t)
