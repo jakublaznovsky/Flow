@@ -2,26 +2,34 @@
 :root {
   color-scheme: light dark;
 
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --surface-2: #eef0f3;
-  --surface-hover: #e6e9ee;
-  --text: #1d2330;
-  --text-muted: #687083;
-  --text-faint: #9aa1b0;
-  --border: #e3e6eb;
-  --border-strong: #cfd4dc;
-  --accent: #5b5bd6;
-  --accent-hover: #4c4cc4;
-  --accent-soft: #ececfc;
-  --accent-text: #4343b0;
+  /* Warm paper and linen; amber accent, sage for done. */
+  --bg: #fcf9f3;
+  --surface: #fffdf8;
+  --surface-2: #f4eee3;
+  --surface-hover: #ede5d7;
+  --text: #2f2a25;
+  --text-muted: #6e655b;
+  --text-faint: #9c9286;
+  --border: #e7dfd2;
+  --border-strong: #d8cdbb;
+  /* --accent is for dots, rings and borders; --accent-strong fills buttons (white text ≥ 4.5:1). */
+  --accent: #c98a2b;
+  --accent-strong: #9a6516;
+  --accent-hover: #87580f;
+  --accent-soft: #f7ecd9;
+  --accent-text: #875a14;
   --on-accent: #ffffff;
-  --danger: #c2453d;
-  --danger-soft: #fbecea;
+  --success: #7c9a7e;
+  --success-strong: #6f8f71;
+  --success-soft: #e9efe6;
+  --success-text: #527054;
+  --danger: #b4483c;
+  --danger-soft: #f8e9e5;
+  --backdrop: rgba(47, 42, 37, 0.32);
 
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 1px rgba(16, 24, 40, 0.03);
-  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08), 0 1px 3px rgba(16, 24, 40, 0.05);
-  --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.14), 0 2px 6px rgba(16, 24, 40, 0.06);
+  --shadow-sm: 0 1px 2px rgba(74, 52, 24, 0.07), 0 1px 1px rgba(74, 52, 24, 0.03);
+  --shadow-md: 0 4px 12px rgba(74, 52, 24, 0.09), 0 1px 3px rgba(74, 52, 24, 0.05);
+  --shadow-lg: 0 12px 32px rgba(74, 52, 24, 0.15), 0 2px 6px rgba(74, 52, 24, 0.07);
 
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -44,22 +52,29 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f1116;
-    --surface: #181b22;
-    --surface-2: #14171d;
-    --surface-hover: #232733;
-    --text: #e5e7ec;
-    --text-muted: #9aa1b0;
-    --text-faint: #6b7282;
-    --border: #262a35;
-    --border-strong: #353b48;
-    --accent: #8486f2;
-    --accent-hover: #9597f5;
-    --accent-soft: rgba(132, 134, 242, 0.16);
-    --accent-text: #b3b4fa;
-    --on-accent: #10111a;
+    /* Slightly warm neutrals; the same amber and sage, lifted for dark backgrounds. */
+    --bg: #12110f;
+    --surface: #1c1a17;
+    --surface-2: #171512;
+    --surface-hover: #282520;
+    --text: #ebe6de;
+    --text-muted: #a69e93;
+    --text-faint: #736c62;
+    --border: #2a2722;
+    --border-strong: #3b3630;
+    --accent: #dda24c;
+    --accent-strong: #dda24c;
+    --accent-hover: #e8b465;
+    --accent-soft: rgba(221, 162, 76, 0.15);
+    --accent-text: #efc27f;
+    --on-accent: #1d160b;
+    --success: #8fb291;
+    --success-strong: #86ab89;
+    --success-soft: rgba(143, 178, 145, 0.14);
+    --success-text: #a9c9ab;
     --danger: #ec7a72;
     --danger-soft: rgba(236, 122, 114, 0.14);
+    --backdrop: rgba(0, 0, 0, 0.5);
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.3);
@@ -87,4 +102,5 @@ body {
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-strong); }
 ::selection { background: var(--accent-soft); }
