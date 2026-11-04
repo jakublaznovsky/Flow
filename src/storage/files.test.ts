@@ -244,3 +244,35 @@ describe('notes.md', () => {
     expect(parseNotes(serializeNotes(n))).toEqual(n)
   })
 })
+
+describe('task steps', () => {
+  const withSteps = (steps: string) =>
+    `---\ntitle: P\nstatus: active\ncolor: "#4f8cff"\ncreated: 2026-11-03\ntasks:\n  - id: t1\n    title: T\n    status: todo\n    created: 2026-11-03\n${steps}---\n`
+  it('parses and round-trips steps including extra keys', () => {
+    const text = withSteps('    steps:\n      - text: one\n        done: true\n        note: hi\n      - text: two\n        done: false\n')
+    const p = parseProject('p', text, today)
+    expect(p.tasks[0].steps).toEqual([
+      { text: 'one', done: true, extra: { note: 'hi' } },
+      { text: 'two', done: false, extra: {} },
+    ])
+    expect(parseProject('p', serializeProject(p), today)).toEqual(p)
+    expect(serializeProject(p)).toContain('note: hi')
+  })
+  it('omits steps when absent or empty', () => {
+    const p = parseProject('p', withSteps(''), today)
+    expect(p.tasks[0].steps).toBeUndefined()
+    expect(serializeProject(p)).not.toContain('steps')
+    p.tasks[0].steps = []
+    expect(serializeProject(p)).not.toContain('steps')
+  })
+  it.each([
+    ['done: "yes"'], ['done: 1'], ['done: null'], ['text: ""\n        done: false'],
+  ])('rejects a bad step (%s)', (bad) => {
+    const body = bad.startsWith('text') ? bad : `text: x\n        ${bad}`
+    expect(() => parseProject('p', withSteps(`    steps:\n      - ${body}\n`), today)).toThrow()
+  })
+  it('rejects steps that are not a list or a step that is not a mapping', () => {
+    expect(() => parseProject('p', withSteps('    steps: nope\n'), today)).toThrow()
+    expect(() => parseProject('p', withSteps('    steps:\n      - plain\n'), today)).toThrow()
+  })
+})

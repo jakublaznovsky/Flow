@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { boardColumns, searchCards, type Card as CardData, type ColumnId } from '../model/board'
 import { addInboxItem, deleteInboxItem, editInboxItem } from '../model/inbox'
+import { addStep, deleteStep, editStep, toggleStep } from '../model/steps'
 import { addTask, changeTaskProject, deleteTask, editTask, moveTask } from '../model/tasks'
 import AddCard from './AddCard'
 import Card from './Card'
@@ -122,6 +123,12 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
                   onDelete={() => deleteCard(card)}
                   onFocus={onFocus ? () => onFocus(card.key, card.title) : undefined}
                   inFocus={card.key === focusRef}
+                  steps={card.kind === 'task' ? {
+                    onAdd: (text) => apply((d) => addStep(d, card.key, text)),
+                    onToggle: (i) => apply((d) => toggleStep(d, card.key, i)),
+                    onEdit: (i, text) => apply((d) => editStep(d, card.key, i, text)),
+                    onDelete: (i) => apply((d) => deleteStep(d, card.key, i)),
+                  } : undefined}
                 />
               ))}
             </Column>

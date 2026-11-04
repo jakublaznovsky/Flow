@@ -4,9 +4,10 @@ import { promoteInboxItem } from '../model/inbox'
 import { addDecision, createProject, updateProject } from '../model/projects'
 import { doneOn, projectProgress, weekDates } from '../model/stats'
 import { logFocus } from '../model/focus'
-import { moveTask } from '../model/tasks'
+import { findTask, moveTask } from '../model/tasks'
 import type { FileStore } from '../storage/fileStore'
 import FocusBar from './FocusBar'
+import { nextStep } from '../model/steps'
 import BoardView from './BoardView'
 import ProgressView from './ProgressView'
 import NotesPanel from './NotesPanel'
@@ -171,6 +172,7 @@ export default function Board({ store, settings, now, onReady }: Props) {
     if (slug) remember(slug)
     return slug
   }
+  const focusTask = focus.state ? findTask(data, focus.state.ref)?.task : undefined
   const focused = filter ? data.projects[filter] : undefined
   const showHeader = view === 'board' && !!focused
   const showNotes = showHeader && notesOpen
@@ -215,6 +217,7 @@ export default function Board({ store, settings, now, onReady }: Props) {
         <div className="focus-slot">
           <FocusBar
             focus={focus}
+            nextStep={focusTask ? nextStep(focusTask) : undefined}
             onMarkDone={(ref) => { apply((d) => moveTask(d, ref, 'done', today)); focus.close() }}
           />
         </div>

@@ -1,8 +1,8 @@
-import type { FlowData, ISODate } from './types'
+import type { FlowData, ISODate, Step } from './types'
 
 export type ColumnId = 'inbox' | 'todo' | 'today' | 'done'
 export interface Card {
-  key: string; kind: 'task' | 'inbox'; title: string; firstStep?: string
+  key: string; kind: 'task' | 'inbox'; title: string; firstStep?: string; steps?: Step[]
   projectSlug?: string; projectTitle?: string; color?: string; created: ISODate
 }
 export type ColumnOrder = Partial<Record<ColumnId, string[]>>   // card keys
@@ -36,6 +36,7 @@ export function boardColumns(
         projectSlug: project.slug, projectTitle: project.title, color: project.color, created: t.created,
       }
       if (t.firstStep !== undefined) card.firstStep = t.firstStep
+      if (t.steps && t.steps.length > 0) card.steps = t.steps
       cols[t.status].push(card)
     }
   }

@@ -1,4 +1,4 @@
-import type { Day, DoneEntry, Extra, FocusEntry, ISODate, Inbox, InboxItem, Notes, Project, ProjectStatus, Task, TaskStatus } from '../model/types'
+import type { Day, DoneEntry, Extra, FocusEntry, ISODate, Inbox, InboxItem, Notes, Project, ProjectStatus, Step, Task, TaskStatus } from '../model/types'
 import { nextInboxId, nextTaskId, pickColor } from '../model/ids'
 import { joinFrontmatter, splitFrontmatter } from './frontmatter'
 
@@ -53,7 +53,17 @@ function assignIds<T extends { id: string }>(items: (Omit<T, 'id'> & { id?: stri
   return items as T[]
 }
 
-const TASK_KNOWN = ['id', 'title', 'status', 'first_step', 'created', 'planned', 'done']
+const TASK_KNOWN = ['id', 'title', 'status', 'first_step', 'created', 'planned', 'done', 'steps']
+
+function parseSteps(v: unknown): Step[] | undefined {
+  const items = list(v, 'steps').map((raw): Step => {
+    if (!isObj(raw)) throw new Error('step must be a mapping')
+    if (typeof raw.text !== 'string' || !raw.text.trim()) throw new Error('step text must be a non-empty string')
+    if (typeof raw.done !== 'boolean') throw new Error('step done must be true or false')
+    return { text: raw.text, done: raw.done, extra: pickExtra(raw, ['text', 'done']) }
+  })
+  return items.length > 0 ? items : undefined
+}
 
 function parseTask(raw: unknown, today: ISODate): Omit<Task, 'id'> & { id?: string } {
   if (!isObj(raw)) throw new Error('task must be a mapping')
@@ -66,6 +76,7 @@ function parseTask(raw: unknown, today: ISODate): Omit<Task, 'id'> & { id?: stri
     created: present(raw.created) ? str(raw.created) : today,
     planned: optStr(raw.planned),
     done: optStr(raw.done),
+    steps: parseSteps(raw.steps),
     extra: pickExtra(raw, TASK_KNOWN),
   }
 }
@@ -76,6 +87,7 @@ function taskToObj(t: Task): Obj {
   o.created = t.created
   if (t.planned !== undefined) o.planned = t.planned
   if (t.done !== undefined) o.done = t.done
+  if (t.steps && t.steps.length > 0) o.steps = t.steps.map((s) => ({ text: s.text, done: s.done, ...s.extra }))
   return { ...o, ...t.extra }
 }
 

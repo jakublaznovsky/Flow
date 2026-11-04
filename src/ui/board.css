@@ -380,3 +380,38 @@ input.quick-capture, input.quick-capture:focus {
 .card-focus:hover { background: var(--accent-soft); color: var(--accent-text); border-color: var(--accent); }
 .focus-mark { font-size: 11.5px; color: var(--accent-text); background: var(--accent-soft); border-radius: 999px; padding: 1px 8px; }
 .card.in-focus { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+
+/* ---------- Checklist inside a task ---------- */
+.next-step { color: var(--text-faint); }
+.steps-ctl { display: flex; align-items: center; gap: 4px; flex: none; margin-left: auto; cursor: default; }
+.steps-pill {
+  font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--text-muted);
+  background: var(--surface-2); border-radius: 999px; padding: 1px 8px;
+}
+.steps-toggle {
+  display: grid; place-items: center; width: 22px; height: 22px; padding: 0; background: none; border: 0;
+  border-radius: var(--radius-sm, 4px); color: var(--text-faint); cursor: pointer;
+  opacity: 0; transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.card:hover .steps-toggle, .card:focus-within .steps-toggle, .steps-toggle[aria-expanded='true'], .steps-toggle:focus-visible { opacity: 1; }
+.steps-toggle[aria-expanded='true'] { transform: rotate(180deg); }
+.steps-toggle:hover { color: var(--text); background: var(--surface-2); }
+.card:has(> .checklist) { flex-wrap: wrap; }
+.checklist { flex: 0 0 100%; box-sizing: border-box; padding-left: 28px; margin-top: 2px; cursor: default; display: flex; flex-direction: column; gap: 4px; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.steps li { display: flex; align-items: center; gap: 8px; min-height: 26px; }
+.steps li input[type='checkbox'] { margin: 0; width: 16px; height: 16px; }
+.step-text {
+  flex: 1; min-width: 0; background: none; border: 0; padding: 0; text-align: left; font: inherit; font-size: 13px;
+  color: var(--text); overflow-wrap: anywhere; cursor: text;
+}
+.steps li.is-ticked .step-text { color: var(--text-muted); text-decoration: line-through; }
+.step-edit, .step-add { flex: 1; min-width: 0; font-size: 13px; padding: 3px 6px; }
+.step-add { width: 100%; flex: none; }
+.step-del {
+  background: none; border: 0; padding: 0 4px; font-size: 15px; line-height: 1; color: var(--text-faint);
+  border-radius: 3px; cursor: pointer; opacity: 0;
+}
+.steps li:hover .step-del, .steps li:focus-within .step-del { opacity: 1; }
+.step-del:hover { color: var(--danger, var(--text)); }
+.focus-next { display: block; font-size: 12px; font-weight: 400; opacity: 0.8; overflow: hidden; text-overflow: ellipsis; }
