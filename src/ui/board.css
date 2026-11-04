@@ -571,3 +571,4 @@ input.quick-capture, input.quick-capture:focus {
 .btn:disabled { opacity: 0.5; cursor: default; }
 .settings-status { margin: 0; font-size: 12px; color: var(--text-muted); }
 .settings-privacy { margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.ai-result { margin-top: var(--space-1); }

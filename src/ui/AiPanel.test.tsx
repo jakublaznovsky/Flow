@@ -181,6 +181,14 @@ describe('Review my week', () => {
     expect(screen.queryByRole('complementary', { name: 'Review of your week' })).not.toBeInTheDocument()
   })
 
+  it('Escape typed in a text field does not close it', async () => {
+    const { user } = await setup()
+    await user.click(await aiCard().findByRole('button', { name: 'Review my week' }))
+    await user.click(screen.getByRole('textbox', { name: "Today's note" }))
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('complementary', { name: 'Review of your week' })).toBeInTheDocument()
+  })
+
   it('closes when another view is opened', async () => {
     const { user, ai } = await setup()
     await user.click(await aiCard().findByRole('button', { name: 'Review my week' }))
@@ -194,6 +202,7 @@ describe('Review my week', () => {
     await user.keyboard('r')
     await screen.findByRole('region', { name: 'Weekly review' })
     for (let i = 0; i < 3; i++) await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByRole('button', { name: 'Plan tomorrow' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Review my week' }))
     expect(screen.getByRole('complementary', { name: 'Review of your week' })).toBeInTheDocument()
     expect(ai.calls[0].kind).toBe('review')
@@ -237,6 +246,20 @@ describe('Plan tomorrow', () => {
       expect(home).toContain('scheduled: 2026-11-05')
     })
     expect(store.files['projects/flow-app.md']).toContain('scheduled: 2026-11-05')
+  })
+
+  it('says "Couldn\'t add" for a suggestion that changed nothing', async () => {
+    const files = { ...seed(),
+      'projects/flow-app.md': seed()['projects/flow-app.md'].replace('status: active', 'status: paused'),
+      'projects/home.md': seed()['projects/home.md'].replace('status: active', 'status: paused') }
+    const { user, ai, store } = await setup({ files })
+    ai.setPlan({ summary: 'S', tasks: [{ title: 'Buy stamps', project: 'Home', first_step: 'Wallet' }] })
+    await user.click(await aiCard().findByRole('button', { name: 'Plan tomorrow' }))
+    const row = within(await panel('Plan for tomorrow').findByRole('listitem', { name: 'Buy stamps' }))
+    await user.click(row.getByRole('button', { name: 'Plan for tomorrow' }))
+    expect(row.getByText("Couldn't add")).toBeInTheDocument()
+    expect(row.queryByText('Added')).not.toBeInTheDocument()
+    expect(store.files['projects/home.md']).not.toContain('Buy stamps')
   })
 
   it('shows one calm line when planning fails', async () => {

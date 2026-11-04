@@ -1,4 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
+import {
+  APIConnectionError, APIError, APIUserAbortError, AuthenticationError, BadRequestError, PermissionDeniedError, RateLimitError,
+} from '@anthropic-ai/sdk/error'
 import type {
   BetaMessage, BetaMessageStreamParams, MessageCreateParamsNonStreaming,
 } from '@anthropic-ai/sdk/resources/beta/messages/messages'
@@ -101,7 +104,30 @@ export function parsePlan(json: string): Plan {
   return { summary: summary.trim(), tasks: out }
 }
 
-const defaultFactory = (apiKey: string): SdkClient => new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
+let sdk: Promise<typeof Anthropic> | undefined
+/** The SDK is loaded on first use, so it stays out of the main bundle. */
+const loadSdk = () => (sdk ??= import('@anthropic-ai/sdk').then((m) => m.default))
+
+/** Real SDK client behind a synchronous facade; the SDK module loads with the first request. */
+function defaultFactory(apiKey: string): SdkClient {
+  let client: Promise<Anthropic> | undefined
+  const get = () => (client ??= loadSdk().then((A) => new A({ apiKey, dangerouslyAllowBrowser: true })))
+  return {
+    beta: {
+      messages: {
+        create: async (params, options) => (await get()).beta.messages.create(params, options),
+        stream(params, options) {
+          const stream = get().then((c) => c.beta.messages.stream(params, options))
+          return {
+            // Listeners attach once the stream exists, before any network event can arrive.
+            on(event, listener) { void stream.then((s) => s.on(event, listener), () => {}); return this },
+            finalMessage: async () => (await stream).finalMessage(),
+          }
+        },
+      },
+    },
+  }
+}
 
 /** Claude client for the owner's own API key (the SDK runs in the webview). */
 export function createAiClient(apiKey: string, factory: (apiKey: string) => SdkClient = defaultFactory): AiClient {
@@ -127,12 +153,12 @@ export function createAiClient(apiKey: string, factory: (apiKey: string) => SdkC
 export function aiErrorMessage(e: unknown): string {
   if (e instanceof RefusalError) return 'Claude declined this request.'
   if (e instanceof FormatError) return "Claude's answer couldn't be read — try again."
-  if (e instanceof Anthropic.APIUserAbortError) return 'Stopped.'
-  if (e instanceof Anthropic.AuthenticationError) return "Claude didn't accept the API key — check it in Settings."
-  if (e instanceof Anthropic.PermissionDeniedError) return "This API key can't use that model — try another model in Settings."
-  if (e instanceof Anthropic.RateLimitError) return 'Claude is busy or a usage limit was reached — try again in a minute.'
-  if (e instanceof Anthropic.BadRequestError) return "Claude couldn't take this request — check your Anthropic account, for example its credit balance."
-  if (e instanceof Anthropic.APIConnectionError) return "Couldn't reach Claude — check your internet connection."
-  if (e instanceof Anthropic.APIError) return 'Claude had a problem answering — try again in a moment.'
+  if (e instanceof APIUserAbortError) return 'Stopped.'
+  if (e instanceof AuthenticationError) return "Claude didn't accept the API key — check it in Settings."
+  if (e instanceof PermissionDeniedError) return "This API key can't use that model — try another model in Settings."
+  if (e instanceof RateLimitError) return 'Claude is busy or a usage limit was reached — try again in a minute.'
+  if (e instanceof BadRequestError) return "Claude couldn't take this request — check your Anthropic account, for example its credit balance."
+  if (e instanceof APIConnectionError) return "Couldn't reach Claude — check your internet connection."
+  if (e instanceof APIError) return 'Claude had a problem answering — try again in a moment.'
   return 'Something went wrong talking to Claude — try again.'
 }

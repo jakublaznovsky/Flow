@@ -60,6 +60,28 @@ describe('planSuggestions', () => {
     expect(c.changed).toEqual(['projects/alpha.md'])
   })
 
+  it('treats a ref of a paused project as a new task in an active project', () => {
+    const d = sample()
+    d.projects.old.tasks = [t('t1', 'Paused task', 'todo')]
+    const c = planSuggestions(d, [{ ref: 'old/t1', title: 'Paused task', project: 'Alpha', first_step: 's' }], TODAY)
+    expect(c.data.projects.old.tasks[0].scheduled).toBeUndefined()
+    expect(c.data.projects.alpha.tasks.find((x) => x.title === 'Paused task')?.scheduled).toBe('2026-11-05')
+    expect(c.added).toEqual([true])
+  })
+
+  it('reports per suggestion whether it is now on tomorrow', () => {
+    const d = sample()
+    d.projects.alpha.tasks[0].scheduled = '2026-11-05'
+    const c = planSuggestions(d, [
+      { ref: 'alpha/t1', title: 'Write docs', project: 'Alpha', first_step: 'x' },
+      { title: 'New', project: 'Home', first_step: 'y' },
+      { title: '   ', project: 'Home', first_step: 'y' },
+    ], TODAY)
+    expect(c.added).toEqual([true, true, false])
+    const none = planSuggestions(emptyFlow(), [{ title: 'X', project: 'Y', first_step: 'z' }], TODAY)
+    expect(none.added).toEqual([false])
+  })
+
   it('does nothing without an active project', () => {
     const d = emptyFlow()
     const c = planSuggestions(d, [{ title: 'X', project: 'Y', first_step: 'z' }], TODAY)

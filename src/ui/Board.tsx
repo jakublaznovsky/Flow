@@ -11,6 +11,7 @@ import { createAiClient, DEFAULT_MODEL, isAiModel, type AiClient, type AiModel }
 import { buildPlanPrompt, buildReviewPrompt } from '../ai/prompts'
 import AiPanel, { AiActions, type AiKind } from './AiPanel'
 import SettingsPanel from './SettingsPanel'
+import { typingTarget } from './typing'
 import type { FileStore } from '../storage/fileStore'
 import FocusBar from './FocusBar'
 import { nextStep } from '../model/steps'
@@ -137,14 +138,6 @@ function useAiSettings(settings: Settings) {
   const removeKey = () => { setApiKey(null); void settings.set('anthropicApiKey', null) }
   const setModel = (m: AiModel) => { setModelState(m); void settings.set('aiModel', m) }
   return { apiKey, model, saveKey, removeKey, setModel }
-}
-
-const NON_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color'])
-
-/** True while focus is in a text field (typed letters belong to it, not to shortcuts). */
-function typingTarget(el: Element | null): boolean {
-  if (el instanceof HTMLInputElement) return !NON_TEXT_INPUTS.has(el.type)
-  return el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || (el instanceof HTMLElement && el.isContentEditable)
 }
 
 export default function Board({ store, settings, now, onReady, ai }: Props) {
@@ -297,7 +290,7 @@ export default function Board({ store, settings, now, onReady, ai }: Props) {
           ) : view === 'notes' ? (
             <NotesView data={data} apply={apply} initial={filter} />
           ) : view === 'review' ? (
-            <WeeklyReview data={data} today={today} apply={apply} onFinish={() => setView('board')} aiSlot={aiActions(false)} />
+            <WeeklyReview data={data} today={today} apply={apply} onFinish={() => setView('board')} aiSlot={aiActions(true)} />
           ) : view === 'settings' ? (
             <SettingsPanel hasKey={!!aiSettings.apiKey} model={aiSettings.model}
               onSaveKey={aiSettings.saveKey} onRemoveKey={aiSettings.removeKey} onModel={aiSettings.setModel} />
@@ -323,7 +316,11 @@ export default function Board({ store, settings, now, onReady, ai }: Props) {
             prompt={aiRun.prompt}
             onClose={() => setAiRun(null)}
             onSaveNotes={saveReviewToNotes}
-            onAdd={(list) => apply((d) => planSuggestions(d, list, today, focusProjectThisWeek(d, today)))}
+            onAdd={(list) => {
+              let added = list.map(() => false)
+              apply((d) => { const c = planSuggestions(d, list, today, focusProjectThisWeek(d, today)); added = c.added; return c })
+              return added
+            }}
           />
         )}
         </div>

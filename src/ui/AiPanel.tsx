@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { aiErrorMessage, type AiClient, type AiModel, type Plan, type PlanSuggestion } from '../ai/claude'
 import Markdownish from './Markdownish'
+import { typingTarget } from './typing'
 import { useCopyText } from './useCopyText'
 
 export type AiKind = 'review' | 'plan'
@@ -15,8 +16,8 @@ interface Props {
   onClose: () => void
   /** Append the review to General notes; false when notes.md can't be written. */
   onSaveNotes: (text: string) => boolean
-  /** Put suggestions on tomorrow, all in one change. */
-  onAdd: (list: PlanSuggestion[]) => void
+  /** Put suggestions on tomorrow, all in one change; says per suggestion whether it worked. */
+  onAdd: (list: PlanSuggestion[]) => boolean[]
 }
 
 const TITLE: Record<AiKind, string> = { review: 'Review of your week', plan: 'Plan for tomorrow' }
@@ -44,14 +45,14 @@ function Thinking() {
 }
 
 function Suggestions({ plan, onAdd }: { plan: Plan; onAdd: Props['onAdd'] }) {
-  const [added, setAdded] = useState<Set<number>>(new Set())
+  const [result, setResult] = useState<Record<number, 'added' | 'failed'>>({})
   const add = (idx: number[]) => {
-    const todo = idx.filter((i) => !added.has(i))
+    const todo = idx.filter((i) => result[i] === undefined)
     if (todo.length === 0) return
-    onAdd(todo.map((i) => plan.tasks[i]))
-    setAdded((cur) => new Set([...cur, ...todo]))
+    const ok = onAdd(todo.map((i) => plan.tasks[i]))
+    setResult((cur) => ({ ...cur, ...Object.fromEntries(todo.map((i, j) => [i, ok[j] ? 'added' : 'failed'])) }))
   }
-  const remaining = plan.tasks.map((_, i) => i).filter((i) => !added.has(i))
+  const remaining = plan.tasks.map((_, i) => i).filter((i) => result[i] === undefined)
   return (
     <>
       {plan.summary && <p className="ai-summary">{plan.summary}</p>}
@@ -64,9 +65,9 @@ function Suggestions({ plan, onAdd }: { plan: Plan; onAdd: Props['onAdd'] }) {
                 <span className="ai-muted">{s.project}{s.ref ? '' : ' · new'}</span>
               </div>
               {s.first_step && <div className="ai-step"><span className="ai-step-label">First step</span> <span>{s.first_step}</span></div>}
-              {added.has(i)
-                ? <span className="ai-added">Added</span>
-                : <button type="button" className="btn" onClick={() => add([i])}>Plan for tomorrow</button>}
+              {result[i] === 'added' ? <span className="ai-added">Added</span>
+                : result[i] === 'failed' ? <span className="ai-muted ai-result">Couldn't add</span>
+                  : <button type="button" className="btn" onClick={() => add([i])}>Plan for tomorrow</button>}
             </li>
           ))}
         </ul>
@@ -113,7 +114,9 @@ export default function AiPanel({ kind, client, model, prompt, onClose, onSaveNo
   const closeRef = useRef(onClose)
   closeRef.current = onClose
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) closeRef.current() }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented && !typingTarget(document.activeElement)) closeRef.current()
+    }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [])

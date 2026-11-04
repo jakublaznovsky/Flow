@@ -115,7 +115,10 @@ describe('planTomorrow', () => {
     const sdk = fakeSdk({ create: text(JSON.stringify({ summary: 'S', tasks })) })
     const plan = await createAiClient('k', sdk.factory).planTomorrow('P', 'claude-haiku-5-5')
     expect(plan.tasks.map((t) => t.title)).toEqual(['A', 'B', 'C'])
-    expect(sdk.create.mock.calls[0][0]).not.toHaveProperty('fallbacks')
+    const haiku = sdk.create.mock.calls[0][0] as Record<string, unknown>
+    expect(haiku.model).toBe('claude-haiku-5-5')
+    expect(haiku).not.toHaveProperty('fallbacks')
+    expect(haiku).not.toHaveProperty('betas')
   })
 
   it('rejects an answer that is not the expected JSON', async () => {
@@ -145,5 +148,21 @@ describe('aiErrorMessage', () => {
     expect(aiErrorMessage(new Anthropic.InternalServerError(500, {}, 'oops', h))).toBe('Claude had a problem answering — try again in a moment.')
     expect(aiErrorMessage(new Anthropic.APIUserAbortError())).toBe('Stopped.')
     expect(aiErrorMessage(new Error('weird'))).toBe('Something went wrong talking to Claude — try again.')
+  })
+})
+
+
+describe('default SDK client', () => {
+  it('loads the SDK on the first request and maps an abort (no network)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const ctrl = new AbortController()
+    ctrl.abort()
+    const client = createAiClient('sk-test')
+    const review = await client.reviewWeek('P', 'claude-opus-5-5', () => {}, ctrl.signal).catch((e: unknown) => e)
+    const plan = await client.planTomorrow('P', 'claude-haiku-5-5', ctrl.signal).catch((e: unknown) => e)
+    expect(aiErrorMessage(review)).toBe('Stopped.')
+    expect(aiErrorMessage(plan)).toBe('Stopped.')
+    expect(fetchSpy).not.toHaveBeenCalled()
+    fetchSpy.mockRestore()
   })
 })
