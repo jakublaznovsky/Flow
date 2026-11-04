@@ -36,12 +36,22 @@ describe('planSuggestions', () => {
     expect(c.added).toEqual([true])
   })
 
-  it('creates a new task in the project matched by title, with its first step, scheduled for tomorrow', () => {
+  it('creates a new task in the project matched by title, its first step as the first checklist step, scheduled for tomorrow', () => {
     const c = planSuggestions(sample(), [{ title: 'Buy stamps', project: '  home ', first_step: 'Find the wallet' }], TODAY)
     expect(c.data.projects.home.tasks).toEqual([
-      { id: 't1', title: 'Buy stamps', status: 'todo', created: TODAY, firstStep: 'Find the wallet', scheduled: '2026-11-05', extra: {} },
+      { id: 't1', title: 'Buy stamps', status: 'todo', created: TODAY, scheduled: '2026-11-05', extra: {},
+        steps: [{ text: 'Find the wallet', done: false, extra: {} }] },
     ])
     expect(c.changed).toEqual(['projects/home.md'])
+  })
+
+  it('adds no step (and no first_step) when the suggested first step is blank', () => {
+    const c = planSuggestions(sample(), [{ title: 'Buy stamps', project: 'Home', first_step: '   ' }], TODAY)
+    const task = c.data.projects.home.tasks[0]
+    expect(task.steps).toBeUndefined()
+    expect(task.firstStep).toBeUndefined()
+    expect(task.scheduled).toBe('2026-11-05')
+    expect(c.added).toEqual([true])
   })
 
   it('treats unknown and done refs as new tasks; unknown projects fall back to the preferred, else first active project', () => {

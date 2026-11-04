@@ -241,7 +241,7 @@ describe('Plan tomorrow', () => {
     await waitFor(() => expect(store.files['projects/flow-app.md']).toMatch(/id: t1\n\s+title: Write spec\n\s+status: todo\n\s+created: 2026-11-01\n\s+scheduled: 2026-11-05/))
   })
 
-  it('Add all creates the new task with its first step in the matched project', async () => {
+  it('Add all creates the new task with its first step as a checklist step in the matched project', async () => {
     const { user, ai, store } = await setup()
     ai.setPlan(PLAN)
     await user.click(await aiCard().findByRole('button', { name: 'Plan tomorrow' }))
@@ -252,7 +252,8 @@ describe('Plan tomorrow', () => {
     await waitFor(() => {
       const home = store.files['projects/home.md']
       expect(home).toContain('title: Buy stamps')
-      expect(home).toContain('first_step: Find the wallet')
+      expect(home).toMatch(/steps:\n\s+- text: Find the wallet\n\s+done: false/)
+      expect(home).not.toContain('first_step')
       expect(home).toContain('scheduled: 2026-11-05')
     })
     expect(store.files['projects/flow-app.md']).toContain('scheduled: 2026-11-05')

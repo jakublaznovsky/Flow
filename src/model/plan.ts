@@ -1,7 +1,8 @@
 import { addDays } from './dates'
 import { nextTaskIdFor } from './ids'
 import { scheduleTask } from './schedule'
-import { addTask, editTask, findTask } from './tasks'
+import { addStep } from './steps'
+import { addTask, findTask } from './tasks'
 import type { Change, FlowData, ISODate } from './types'
 
 /** A task suggested for tomorrow; no `ref` (or an unknown/done one) means a new task. */
@@ -12,7 +13,7 @@ const merge = (a: string[], b: string[]) => [...new Set([...a, ...b])]
 /**
  * Plan suggestions for tomorrow, as one Change. An existing open task of an active project is
  * scheduled for tomorrow; one already in Today is left there and counts as planned. Anything else becomes a
- * new To do task with its first step, in the active project whose title matches (case-insensitive),
+ * new To do task (its first step as the first checklist step), in the active project whose title matches (case-insensitive),
  * else `preferred` (if active), else the first active project; it is scheduled for tomorrow too.
  * `added[i]` says whether suggestion i is now on tomorrow.
  */
@@ -39,7 +40,8 @@ export function planSuggestions(
       ?? (preferred && data.projects[preferred]?.status === 'active' ? preferred : active[0].slug)
     const ref = `${slug}/${nextTaskIdFor(data, slug)}`
     if (!step(addTask(data, slug, s.title, 'todo', today))) { added.push(false); continue }
-    step(editTask(data, ref, { firstStep: s.first_step }, today))
+    // Claude's first step becomes the first checklist step (cards no longer show `first_step`).
+    step(addStep(data, ref, s.first_step ?? ''))
     step(scheduleTask(data, ref, tomorrow, today))
     added.push(true)
   }
