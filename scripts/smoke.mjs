@@ -10,9 +10,12 @@ const shot = (page, name) => page.screenshot({ path: new URL(`../docs/${name}`, 
 const fail = (msg) => { console.error(`SMOKE FAIL: ${msg}`); process.exitCode = 1 }
 const VIEWPORT = { width: 1280, height: 800 }
 
-/** Real pointer drag from the centre of one element to the centre of another. */
+/** Where a board card is picked up: its title row (its checklist keeps its own clicks). */
+const grip = async (el) => ((await el.locator('.card-head').count()) ? el.locator('.card-head').first() : el)
+
+/** Real pointer drag from the centre of one element (a card: its title row) to the centre of another. */
 async function drag(page, from, to) {
-  const a = await from.boundingBox()
+  const a = await (await grip(from)).boundingBox()
   const b = await to.boundingBox()
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2)
   await page.mouse.down()
@@ -32,24 +35,53 @@ try {
   await page.goto(url)
   const col = (name) => page.getByRole('region', { name, exact: true })
 
-  // --- Board: drag a card to Today, tick another off ---
-  for (const name of ['Parking lot', 'To do', 'Tomorrow', 'Today', 'Done']) {
+  const doneBar = col('Done')
+  const doneToggle = doneBar.getByRole('button', { name: /^Done today \(\d+\)$/ })
+  const doneCount = async () => Number(/\((\d+)\)/.exec(await doneToggle.innerText())?.[1])
+
+  // --- Board: Parking lot | To do | Today | Tomorrow, and the Done bar underneath ---
+  for (const name of ['Parking lot', 'To do', 'Today', 'Tomorrow']) {
     await col(name).getByRole('heading', { name }).waitFor({ timeout: 5000 })
   }
-  // Five columns fit 1280x800 next to the sidebar: no horizontal page scroll, cards stay readable.
+  await doneToggle.waitFor({ timeout: 5000 })
+  // Four columns fit 1280x800 next to the sidebar (no horizontal page scroll); the Done bar spans
+  // their width below them and the whole board fits the window height.
   {
-    const { scroll, widths } = await page.evaluate(() => ({
-      scroll: document.documentElement.scrollWidth - window.innerWidth,
-      widths: [...document.querySelectorAll('.column')].map((c) => Math.round(c.getBoundingClientRect().width)),
-    }))
-    if (scroll > 0) fail(`board scrolls horizontally by ${scroll}px`)
-    else if (widths.some((w) => w < 180)) fail(`columns too narrow: ${widths.join(', ')}`)
-    else console.log(`ok: five columns fit without horizontal scroll (${widths.join(', ')} px)`)
+    const { scroll, names, widths, bar, columnsBottom, vscroll } = await page.evaluate(() => {
+      const r = (el) => el.getBoundingClientRect()
+      const bar = document.querySelector('.done-bar')
+      const cols = [...document.querySelectorAll('.column')]
+      return {
+        scroll: document.documentElement.scrollWidth - window.innerWidth,
+        vscroll: document.documentElement.scrollHeight - window.innerHeight,
+        names: cols.map((c) => c.querySelector('h2')?.textContent),
+        widths: cols.map((c) => Math.round(r(c).width)),
+        bar: bar && { top: r(bar).top, bottom: r(bar).bottom, left: r(bar).left, right: r(bar).right },
+        columnsBottom: Math.max(...cols.map((c) => r(c).bottom)),
+        columnsLeft: Math.min(...cols.map((c) => r(c).left)),
+      }
+    })
+    if (names.join() !== 'Parking lot,To do,Today,Tomorrow') fail(`column order: ${names.join(', ')}`)
+    else if (scroll > 0 || vscroll > 0) fail(`board scrolls (${scroll}px across, ${vscroll}px down)`)
+    else if (widths.some((w) => w < 220)) fail(`columns too narrow: ${widths.join(', ')}`)
+    else if (!bar || bar.top < columnsBottom || bar.bottom > 800) fail('Done bar is not below the columns, inside the window')
+    else console.log(`ok: four columns (${widths.join(', ')} px) and the Done bar below them, no page scroll`)
+  }
+  // --- Card: the checklist is always visible (no chevron, no "Next:" line) ---
+  {
+    const c = col('Today').locator('li.card', { hasText: 'Build the week view' })
+    const steps = await c.locator('ul.steps > li').count()
+    const toggles = await c.locator('[aria-expanded]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))
+    const next = await c.getByText(/^Next:/).count()
+    if (steps < 2) fail(`checklist not visible on the card (${steps} steps)`)
+    else if (toggles.some((t) => !t?.startsWith('Plan '))) fail(`card has a toggle besides the plan menu: ${toggles.join(', ')}`)
+    else if (next) fail('card still shows a "Next:" line')
+    else if (!(await c.getByRole('textbox', { name: 'Add step' }).isVisible())) fail('Add step input not visible')
+    else console.log(`ok: card shows its ${steps} steps and Add step, with no chevron`)
   }
   // --- Checklist: drag the first step's handle below the second; the card stays put ---
   {
     const stepCard = col('Today').locator('li.card', { hasText: 'Build the week view' })
-    await stepCard.getByRole('button', { name: 'Show steps' }).click()
     const rows = stepCard.locator('ul.steps > li')
     const order = async () => (await rows.locator('.step-text').allInnerTexts()).map((t) => t.trim())
     const before = await order()
@@ -69,14 +101,13 @@ try {
     if (after.join('|') !== want.join('|')) fail(`step order after drag: ${after.join(', ')} (wanted ${want.join(', ')})`)
     else if (!(await col('Today').locator('li.card', { hasText: 'Build the week view' }).count())) fail('step drag moved the card out of Today')
     else console.log(`ok: step "${before[0]}" dragged below "${before[1]}"; card stayed in Today`)
-    await stepCard.getByRole('button', { name: 'Hide steps' }).click()
   }
 
   const card = col('To do').locator('li.card').first()
   const title = (await card.locator('.card-title').innerText()).trim()
   // Mid-drag: the dragged card must follow the pointer across columns (not be clipped by its column).
   {
-    const a = await card.boundingBox()
+    const a = await (await grip(card)).boundingBox()
     const b = await col('Today').locator('ul.cards').boundingBox()
     const sx = a.x + a.width / 2, sy = a.y + a.height / 2
     const mx = (sx + b.x + b.width / 2) / 2, my = (sy + b.y + 40) / 2
@@ -111,6 +142,29 @@ try {
   await page.getByLabel(`Done: ${title}`).check()
   await col('Done').getByText(title).waitFor({ timeout: 3000 })
   console.log(`ok: "${title}" dragged to Today and completed`)
+
+  // --- Done bar: drop a card on it (open, then collapsed); its checkbox reopens a card ---
+  {
+    await page.waitForTimeout(100) // dnd-kit ignores clicks for 50 ms after a drag
+    const verbs = col('Today').locator('li.card', { hasText: 'Learn the 50 most common verbs' })
+    await drag(page, verbs, doneBar)
+    await doneBar.getByText('Learn the 50 most common verbs').waitFor({ timeout: 3000 })
+    console.log('ok: a Today card dropped on the open Done bar is done')
+    const before = await doneCount()
+    await page.waitForTimeout(100)
+    await doneToggle.click()
+    if ((await doneToggle.getAttribute('aria-expanded')) !== 'false' || (await doneBar.locator('li.card').count())) fail('Done bar did not collapse')
+    const week = col('Today').locator('li.card', { hasText: 'Build the week view' })
+    await drag(page, week, doneBar)
+    await page.waitForFunction((n) => /\((\d+)\)/.exec(document.querySelector('.done-bar-toggle')?.textContent ?? '')?.[1] === String(n), before + 1, { timeout: 3000 })
+    if (await col('Today').getByText('Build the week view', { exact: true }).count()) fail('card dropped on the collapsed Done bar is still in Today')
+    else console.log(`ok: dropped on the collapsed Done bar (count ${before} -> ${before + 1})`)
+    await page.waitForTimeout(100)
+    await doneToggle.click()
+    await doneBar.getByLabel('Done: Build the week view').click()
+    await col('Today').getByText('Build the week view', { exact: true }).waitFor({ timeout: 3000 })
+    console.log('ok: Done bar toggles open again; unticking there reopens the card in Today')
+  }
 
   // --- Tomorrow: drag a To do card into Tomorrow ---
   const todoCard = col('To do').locator('li.card').first()
@@ -149,6 +203,13 @@ try {
   }, isSunday)
   const tray = week.getByRole('region', { name: 'Unscheduled' })
   const dayCol = week.getByRole('region', { name: target, exact: true })
+  {
+    const t = await tray.boundingBox()
+    const d = await week.getByRole('region', { name: /^Mon \d+ / }).boundingBox()
+    const head = await week.locator('.week-days').boundingBox()
+    if (!(t && d && t.y + t.height <= d.y && t.width >= head.width - 1)) fail('Unscheduled drawer is not a full-width row above the days')
+    else console.log('ok: Unscheduled drawer sits above the seven days, full width')
+  }
   const weekCard = tray.locator('li.week-card').first()
   const weekTitle = (await weekCard.locator('.week-card-title').innerText()).trim()
   await drag(page, weekCard, dayCol)
@@ -156,6 +217,15 @@ try {
   await page.waitForTimeout(800)
   await shot(page, 'screenshot-week.png')
   console.log(`ok: "${weekTitle}" scheduled for ${target}${isSunday ? ' (next week, today is Sunday)' : ''}`)
+  {
+    await page.waitForTimeout(100)
+    const toggle = tray.getByRole('button', { name: /^Unscheduled/ })
+    await toggle.click()
+    const closed = (await toggle.getAttribute('aria-expanded')) === 'false' && (await tray.locator('li.week-card').count()) === 0
+    await toggle.click()
+    if (!closed || (await toggle.getAttribute('aria-expanded')) !== 'true') fail('Unscheduled drawer does not collapse and reopen')
+    else console.log('ok: Unscheduled drawer collapses and reopens')
+  }
 
   // --- Week: a Today item onto a future day, a card onto a past day (done that day) ---
   {
@@ -244,20 +314,21 @@ try {
   await page.getByLabel('Claude API key').waitFor({ timeout: 3000 })
   console.log('ok: Settings shows the API key field')
 
-  // --- Settings: hide two board columns; the other three share the width ---
+  // --- Settings: hide two board columns; the other two share the width ---
   {
     const group = page.getByRole('group', { name: 'Board columns' })
     for (const name of ['Parking lot', 'Tomorrow']) await group.getByRole('checkbox', { name, exact: true }).uncheck()
     await key(page, 'b')
     await col('Today').getByRole('heading', { name: 'Today' }).waitFor({ timeout: 3000 })
-    const { names, widths, scroll } = await page.evaluate(() => ({
+    const { names, widths, scroll, bar } = await page.evaluate(() => ({
       names: [...document.querySelectorAll('.column h2')].map((h) => h.textContent),
       widths: [...document.querySelectorAll('.column')].map((c) => Math.round(c.getBoundingClientRect().width)),
       scroll: document.documentElement.scrollWidth - window.innerWidth,
+      bar: !!document.querySelector('.done-bar'),
     }))
-    if (names.join() !== 'To do,Today,Done') fail(`visible columns: ${names.join(', ')}`)
-    else if (scroll > 0 || widths.some((w) => w < 300)) fail(`three columns do not share the width: ${widths.join(', ')}`)
-    else console.log(`ok: hidden columns; three share the width (${widths.join(', ')} px)`)
+    if (names.join() !== 'To do,Today' || !bar) fail(`visible columns: ${names.join(', ')}${bar ? ' + Done bar' : ''}`)
+    else if (scroll > 0 || widths.some((w) => w < 400)) fail(`two columns do not share the width: ${widths.join(', ')}`)
+    else console.log(`ok: hidden columns; two share the width (${widths.join(', ')} px) above the Done bar`)
     if (process.env.FLOW_COLUMNS_SHOT) await page.screenshot({ path: process.env.FLOW_COLUMNS_SHOT })
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
     for (const name of ['Parking lot', 'Tomorrow']) await group.getByRole('checkbox', { name, exact: true }).check()
@@ -270,7 +341,6 @@ try {
   await shot(dark, 'screenshot-dark.png')
   if (process.env.FLOW_STEP_SHOT_DARK) {
     const c = dark.getByRole('region', { name: 'Today', exact: true }).locator('li.card', { hasText: 'Build the week view' })
-    await c.getByRole('button', { name: 'Show steps' }).click()
     const rows = c.locator('ul.steps > li')
     const h = await rows.nth(0).locator('.step-grip').boundingBox()
     const r1 = await rows.nth(1).boundingBox()

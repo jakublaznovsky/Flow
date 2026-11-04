@@ -9,10 +9,11 @@ of the Claude buttons (see below).
 
 ## What you can do
 
-- **Board.** Five columns: **Parking lot** (loose thoughts), **To do**, **Tomorrow**, **Today**
-  and **Done**. Drag cards between columns and tick them off. Drop a task on the Parking lot to
-  park it (its first step, steps and planned day are kept in the note). Tasks in Tomorrow move to
-  Today by themselves the next morning.
+- **Board.** Four columns: **Parking lot** (loose thoughts), **To do**, **Today** and
+  **Tomorrow**, with a **Done today** bar underneath. Drag cards between columns and tick them off;
+  drop a card on the Done bar to finish it. The bar folds down to one thin line when you want the
+  room. Drop a task on the Parking lot to park it (its steps and planned day are kept in the note).
+  Tasks in Tomorrow move to Today by themselves the next morning.
 - **Plan a task in two clicks.** The small calendar button on a card offers Today, Tomorrow, the
   next few days, next week or any date. A new task can get a "Plan for" date right away.
 - **Focus on one project.** Click a project in the sidebar to see only its cards, with its goal,
@@ -22,10 +23,11 @@ of the Claude buttons (see below).
 - **Focus timer.** Press **Focus** on a Today card to start a quiet 15, 25 or 45 minute timer.
   When it ends, nothing pops up; the bar at the top just offers "Mark done" or "Another round".
   Finished sessions are logged so you can see your focus time.
-- **Checklists.** Break a task into steps. The card shows `2/5` and the next step to do.
-  Drag a step by its grip to reorder it (or focus the grip and press Alt+Up / Alt+Down).
-- **Plan your week.** The **Week** view has seven day columns and an Unscheduled tray. Drag a
-  task onto a day. When that day comes, the task moves to Today by itself.
+- **Checklists.** Break a task into steps, right on the card: its steps are always visible, with a
+  small "Add step" line and `2/5` next to the title. Drag a step by its grip to reorder it (or
+  focus the grip and press Alt+Up / Alt+Down).
+- **Plan your week.** The **Week** view has an Unscheduled drawer across the top (it folds away)
+  and seven day columns under it. Drag a task onto a day. When that day comes, the task moves to Today by itself.
   You can move any task freely, Today tasks too; dropping one on a past day marks it done that day.
 - **Weekly review.** A short guided review: what you finished, what is unfinished (keep, push to
   next week, send back or delete), a project to focus on next week, and a few words of reflection.
@@ -77,9 +79,10 @@ a key you can still press **Copy AI review** and paste the text into any AI your
 
 ## Settings
 
-- **Board columns:** tick the columns you want on the board (Parking lot, To do, Tomorrow, Today,
-  Done). Hidden columns keep their cards; the others share the width. One column always stays.
-  The choice is kept in Flow's own settings on this computer, not in your Flow folder.
+- **Board columns:** tick the columns you want on the board (Parking lot, To do, Today, Tomorrow,
+  Done — unticking Done hides the Done bar). Hidden columns keep their cards; the others share the
+  width. One always stays. The choice, and whether the Done bar and the Week view's Unscheduled
+  drawer are open, is kept in Flow's own settings on this computer, not in your Flow folder.
 - **Quick capture:** in the desktop app, Settings shows whether Ctrl+Shift+Space is working. If
   another app already uses that shortcut, it says so there (details in `flow-issues.log`).
 

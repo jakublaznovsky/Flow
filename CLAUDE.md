@@ -1,6 +1,7 @@
 # Flow
 
-Tauri 2 + React + TypeScript desktop planner. One board: Parking lot / To do / Tomorrow / Today / Done.
+Tauri 2 + React + TypeScript desktop planner. One board: Parking lot | To do | Today | Tomorrow columns,
+with Done as a collapsible bar underneath (v0.2.6).
 Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 `docs/superpowers/specs/2026-11-03-flow-design.md` for the design.
 
@@ -12,7 +13,8 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 - `npm run app:dev` runs the desktop app via Tauri.
 - `node scripts/smoke.mjs` is a Playwright smoke test with real pointer drag-and-drop
   across Board, Week, Progress, Notes, Review, Settings (needs `npm run dev` running; writes
-  `docs/screenshot*.png`: board, dark, progress, week). jsdom cannot drive dnd-kit.
+  `docs/screenshot*.png`: board, dark, progress, week). jsdom cannot drive dnd-kit. Board cards are
+  dragged by their title row (the always-open checklist keeps its own pointer events).
 
 ## Structure
 
@@ -31,7 +33,8 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   (`prompts.ts`) and the dev-only canned client (`fake.ts`).
 - `src/ui/` React components (Board, Column, Card, quick capture, folder setup) and `useFlow`.
   Board.tsx is the shell; views: `BoardView`, `WeekView`, `ProgressView`, `NotesView`,
-  `WeeklyReview`, `SettingsPanel`; plus `Sidebar`, `ProjectHeader`, `NotesPanel`, `PlanMenu` (calendar
+  `WeeklyReview`, `SettingsPanel`; plus `DoneBar` (Done under the columns), `useStoredFlag` (boolean
+  local settings), `Sidebar`, `ProjectHeader`, `NotesPanel`, `PlanMenu` (calendar
   menu on To do/Tomorrow/Today cards: scheduleTask), `FocusBar` +
   `useFocus`, `SearchBox`, `AiPanel`; tokens and themes in `theme.css`, styles in `board.css`.
 - `src/shortcut.ts` idempotent global-shortcut registration (injected plugin functions).
@@ -40,6 +43,13 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 
 ## Rules
 
+- v0.2.6 board: `COLUMNS` order is inbox, todo, today, tomorrow, done; `done` renders as the
+  `DoneBar` (region "Done", heading/toggle "Done today (N)", aria-expanded), a drop target open or
+  closed; open shows compact done cards (checkbox, title, pill, tag; no checklist).
+- v0.2.6 cards: no chevron, no "Next:" line, no first-step line; a task card always shows its
+  checklist between the title row (title + `n/m` pill) and the footer (project tag tinted ~15% with
+  a dot, day chip, calendar). Light theme: warm paper/linen, amber accent (`--accent`, darker
+  `--accent-strong` for filled buttons, `--accent-text`), sage `--success*` for done/checks/heatmap.
 - Never write a file that failed to parse; it is skipped and recorded in `Flow/flow-issues.log`.
 - No warnings, nags or pop-ups in the UI; problems go only to the issue log. One owner exception:
   deleting a project asks first in an in-app dialog (`DeleteDialog` in Sidebar.tsx: alertdialog,
@@ -50,6 +60,9 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 - Browser dev (`npm run dev`) uses `MemoryFileStore` seeded with example data; nothing persists.
 - Day `focus` list: entries `ref, title, project, minutes`; omitted when empty; sessions under
   1 minute are not logged; each session is logged once. Timer state is in memory only.
+- `first_step` is kept in files but never shown on cards; the edit form offers "First step" only for
+  a task that already has one (so it can be cleared). Claude's suggested first step is added as the
+  new task's first checklist step, not as `first_step`.
 - Task `steps: [{text, done}]` and `scheduled: YYYY-MM-DD` are omitted when empty; unknown fields
   on steps are preserved. Ticking the last step never completes the task.
 - Step reorder: only the step's grip handle starts a drag, in a nested DndContext inside the
@@ -90,5 +103,8 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   `registerShortcut` (`src/shortcut.ts`): unregister first, then register, serialized. Failures go
   only to the issue log; Settings shows one muted status line (none in the browser).
 - `hiddenColumns` (array of ColumnId) in local app settings hides board columns; never all five,
-  never in the Flow folder. Hidden columns' data and promotion are unchanged.
+  never in the Flow folder. Hidden columns' data and promotion are unchanged. Hiding `done` hides
+  the Done bar.
+- `doneBarOpen` and `weekTrayOpen` (booleans, default true) in local app settings remember whether
+  the Done bar and the Week view's Unscheduled drawer (full width, above the days) are open.
 - Browser seed data in `src/main.tsx` is generated relative to today's local date.
