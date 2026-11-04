@@ -1,11 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { setDayNote } from '../model/notes-day'
 import { buildReviewPrompt } from '../model/review'
 import { doneOn, focusMinutesOn, heatmap, projectProgress, weekDates } from '../model/stats'
 import type { Change, FlowData } from '../model/types'
 import { useCopyText } from './useCopyText'
 
-interface Props { data: FlowData; today: string; apply: (fn: (d: FlowData) => Change) => void }
+interface Props {
+  data: FlowData
+  today: string
+  apply: (fn: (d: FlowData) => Change) => void
+  /** Extra controls shown next to "Copy AI review". */
+  aiSlot?: ReactNode
+}
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -28,12 +34,15 @@ function TodayNote({ body, today, apply }: { body: string; today: string; apply:
   )
 }
 
-function AiReview({ data, today }: { data: FlowData; today: string }) {
+function AiReview({ data, today, aiSlot }: { data: FlowData; today: string; aiSlot?: ReactNode }) {
   const { copied, fallback, copy } = useCopyText(() => buildReviewPrompt(data, today))
   return (
     <>
       <p className="progress-hint">Copies a prompt with your last 7 days to paste into Claude or another AI.</p>
-      <button type="button" className="btn" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy AI review'}</button>
+      <div className="review-ai progress-ai">
+        <button type="button" className="btn" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy AI review'}</button>
+        {aiSlot}
+      </div>
       {fallback !== null && (
         <textarea className="progress-fallback" aria-label="AI review prompt" readOnly value={fallback} onFocus={(e) => e.currentTarget.select()} />
       )}
@@ -41,7 +50,7 @@ function AiReview({ data, today }: { data: FlowData; today: string }) {
   )
 }
 
-export default function ProgressView({ data, today, apply }: Props) {
+export default function ProgressView({ data, today, apply, aiSlot }: Props) {
   const week = weekDates(today)
   const cols = heatmap(data, today)
   const active = Object.values(data.projects).filter((p) => p.status === 'active')
@@ -108,7 +117,7 @@ export default function ProgressView({ data, today, apply }: Props) {
           <TodayNote body={data.days[today]?.body ?? ''} today={today} apply={apply} />
         </section>
         <section className="p-card" aria-labelledby="p-ai"><h2 id="p-ai">AI review</h2>
-          <AiReview data={data} today={today} />
+          <AiReview data={data} today={today} aiSlot={aiSlot} />
         </section>
       </div>
     </section>

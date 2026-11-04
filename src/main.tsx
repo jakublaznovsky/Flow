@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, type ComponentProps } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { addInboxItem } from './model/inbox'
@@ -52,10 +52,18 @@ Free notes about the project.
 
 const rootEl = document.getElementById('root')!
 
-function renderBrowser() {
+async function renderBrowser() {
+  const settings = new MemorySettings()
+  // Dev-only `?fakeAi=1`: a canned Claude client (no key, no network) for checking the AI panel by eye.
+  let ai: ComponentProps<typeof App>['ai']
+  if (import.meta.env.DEV && new URLSearchParams(location.search).has('fakeAi')) {
+    const { fakeAiClient } = await import('./ai/fake')
+    await settings.set('anthropicApiKey', 'fake')
+    ai = () => fakeAiClient
+  }
   createRoot(rootEl).render(
     <StrictMode>
-      <App store={store} settings={new MemorySettings()} />
+      <App store={store} settings={settings} ai={ai} />
     </StrictMode>,
   )
 }
@@ -146,4 +154,4 @@ async function renderTauri() {
 }
 
 if ('__TAURI_INTERNALS__' in window) renderTauri().catch(() => {})
-else renderBrowser()
+else renderBrowser().catch(() => {})

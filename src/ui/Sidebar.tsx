@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Project, ProjectStatus } from '../model/types'
 import { PROJECT_COLORS } from '../model/ids'
 
-export type View = 'board' | 'week' | 'progress' | 'notes' | 'review'
+export type View = 'board' | 'week' | 'progress' | 'notes' | 'review' | 'settings'
 type Patch = { title?: string; color?: string; status?: ProjectStatus }
 
 interface Props {
@@ -61,6 +61,15 @@ function ReviewIcon() {
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2.5" y="2.25" width="11" height="11.5" rx="1.5" />
       <path d="M5.25 8.25l1.9 1.9 3.6-3.9" />
+    </svg>
+  )
+}
+
+function GearIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="8" cy="8" r="2.25" />
+      <path d="M8 1.75v1.5M8 12.75v1.5M1.75 8h1.5M12.75 8h1.5M3.6 3.6l1.06 1.06M11.34 11.34l1.06 1.06M3.6 12.4l1.06-1.06M11.34 4.66l1.06-1.06" />
     </svg>
   )
 }
@@ -250,7 +259,12 @@ export default function Sidebar({ view, onView, projects, hidden, progress, filt
         )}
       </div>
 
-      <div className="sidebar-foot"><kbd>Ctrl+Shift+Space</kbd> · quick capture</div>
+      <div className="sidebar-foot">
+        <button className="nav-item" aria-label="Settings" aria-pressed={view === 'settings'} onClick={() => onView('settings')}>
+          <GearIcon /><span>Settings</span>
+        </button>
+        <div className="sidebar-hint"><kbd>Ctrl+Shift+Space</kbd> · quick capture</div>
+      </div>
     </nav>
   )
 }

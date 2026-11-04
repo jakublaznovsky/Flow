@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { boardColumns, searchCards, type Card as CardData, type ColumnId } from '../model/board'
 import { promoteInboxItem } from '../model/inbox'
 import { addDecision, createProject, updateProject } from '../model/projects'
 import { doneOn, projectProgress, weekDates } from '../model/stats'
 import { logFocus } from '../model/focus'
 import { findTask, moveTask } from '../model/tasks'
+import { appendNotes } from '../model/notes'
+import { planSuggestions } from '../model/plan'
+import { createAiClient, DEFAULT_MODEL, isAiModel, type AiClient, type AiModel } from '../ai/claude'
+import { buildPlanPrompt, buildReviewPrompt } from '../ai/prompts'
+import AiPanel, { AiActions, type AiKind } from './AiPanel'
+import SettingsPanel from './SettingsPanel'
 import type { FileStore } from '../storage/fileStore'
 import FocusBar from './FocusBar'
 import { nextStep } from '../model/steps'
@@ -27,7 +33,14 @@ import './board.css'
 
 /** Handle for host shells (Tauri) to push changes into the board. Returns an optional cleanup. */
 export interface BoardApi { apply: ReturnType<typeof useFlow>['apply']; today: () => string }
-interface Props { store: FileStore; settings: Settings; now?: () => Date; onReady?: (api: BoardApi) => void | (() => void) }
+interface Props {
+  store: FileStore
+  settings: Settings
+  now?: () => Date
+  onReady?: (api: BoardApi) => void | (() => void)
+  /** Claude client for an API key; defaults to the real SDK client. */
+  ai?: (apiKey: string) => AiClient
+}
 
 export interface DropContext {
   flow: ReturnType<typeof useFlow>
@@ -104,7 +117,27 @@ export function usePromotion(flow: ReturnType<typeof useFlow>, query = '') {
   return { openPicker, picker, pendingTo: pending?.to ?? null }
 }
 
-const isView = (v: unknown): v is View => v === 'board' || v === 'week' || v === 'progress' || v === 'notes' || v === 'review'
+const isView = (v: unknown): v is View =>
+  v === 'board' || v === 'week' || v === 'progress' || v === 'notes' || v === 'review' || v === 'settings'
+
+/** The owner's Claude key and model from local settings (never the Flow folder). */
+function useAiSettings(settings: Settings) {
+  const [apiKey, setApiKey] = useState<string | null>(null)
+  const [model, setModelState] = useState<AiModel>(DEFAULT_MODEL)
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all([settings.get<unknown>('anthropicApiKey'), settings.get<unknown>('aiModel')]).then(([k, m]) => {
+      if (cancelled) return
+      if (typeof k === 'string' && k !== '') setApiKey(k)
+      if (isAiModel(m)) setModelState(m)
+    })
+    return () => { cancelled = true }
+  }, [settings])
+  const saveKey = (key: string) => { setApiKey(key); void settings.set('anthropicApiKey', key) }
+  const removeKey = () => { setApiKey(null); void settings.set('anthropicApiKey', null) }
+  const setModel = (m: AiModel) => { setModelState(m); void settings.set('aiModel', m) }
+  return { apiKey, model, saveKey, removeKey, setModel }
+}
 
 const NON_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color'])
 
@@ -114,7 +147,7 @@ function typingTarget(el: Element | null): boolean {
   return el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || (el instanceof HTMLElement && el.isContentEditable)
 }
 
-export default function Board({ store, settings, now, onReady }: Props) {
+export default function Board({ store, settings, now, onReady, ai }: Props) {
   const flow = useFlow(store, settings, now)
   const { data, today, filter, setFilter, remember, apply } = flow
   const todayRef = useRef(today)
@@ -130,6 +163,9 @@ export default function Board({ store, settings, now, onReady }: Props) {
   const clearAddRequest = useCallback(() => setAddRequest(false), [])
   const searchRef = useRef<HTMLInputElement>(null)
   const viewChosen = useRef(false)
+  const aiSettings = useAiSettings(settings)
+  const aiClient = useMemo(() => (aiSettings.apiKey ? (ai ?? createAiClient)(aiSettings.apiKey) : null), [ai, aiSettings.apiKey])
+  const [aiRun, setAiRun] = useState<{ id: number; kind: AiKind; prompt: string } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -138,6 +174,9 @@ export default function Board({ store, settings, now, onReady }: Props) {
     })
     return () => { cancelled = true }
   }, [settings])
+
+  // The AI panel belongs to the view it was opened from (and would crowd the board).
+  useEffect(() => setAiRun(null), [view])
 
   const setView = useCallback((v: View) => {
     viewChosen.current = true
@@ -184,6 +223,18 @@ export default function Board({ store, settings, now, onReady }: Props) {
   const doneThisWeek = focused
     ? weekDates(today).reduce((n, date) => n + doneOn(data, date).filter((e) => e.ref.startsWith(`${focused.slug}/`)).length, 0)
     : 0
+  const openAi = (kind: AiKind) => setAiRun((cur) => ({
+    id: (cur?.id ?? 0) + 1, kind, prompt: kind === 'review' ? buildReviewPrompt(data, today) : buildPlanPrompt(data, today),
+  }))
+  const aiActions = (withPlan: boolean) => (
+    <AiActions ready={!!aiClient} onReview={() => openAi('review')} onPlan={withPlan ? () => openAi('plan') : undefined}
+      onSetup={() => setView('settings')} />
+  )
+  const saveReviewToNotes = (text: string) => {
+    let ok = false
+    apply((d) => { const c = appendNotes(d, `Claude review ${today}`, text); ok = c.changed.length > 0; return c })
+    return ok
+  }
   const onSearch = (q: string) => {
     setQuery(q)
     if (q.trim() && view !== 'board') setView('board')
@@ -246,9 +297,12 @@ export default function Board({ store, settings, now, onReady }: Props) {
           ) : view === 'notes' ? (
             <NotesView data={data} apply={apply} initial={filter} />
           ) : view === 'review' ? (
-            <WeeklyReview data={data} today={today} apply={apply} onFinish={() => setView('board')} />
+            <WeeklyReview data={data} today={today} apply={apply} onFinish={() => setView('board')} aiSlot={aiActions(false)} />
+          ) : view === 'settings' ? (
+            <SettingsPanel hasKey={!!aiSettings.apiKey} model={aiSettings.model}
+              onSaveKey={aiSettings.saveKey} onRemoveKey={aiSettings.removeKey} onModel={aiSettings.setModel} />
           ) : (
-            <ProgressView data={data} today={today} apply={apply} />
+            <ProgressView data={data} today={today} apply={apply} aiSlot={aiActions(true)} />
           )}
         </div>
         {showNotes && focused && (
@@ -258,6 +312,18 @@ export default function Board({ store, settings, now, onReady }: Props) {
             onSaveBody={(body) => apply((d) => updateProject(d, focused.slug, { body }))}
             onAddDecision={(text) => apply((d) => addDecision(d, focused.slug, text, today))}
             onClose={() => setNotesOpen(false)}
+          />
+        )}
+        {aiRun && aiClient && (
+          <AiPanel
+            key={aiRun.id}
+            kind={aiRun.kind}
+            client={aiClient}
+            model={aiSettings.model}
+            prompt={aiRun.prompt}
+            onClose={() => setAiRun(null)}
+            onSaveNotes={saveReviewToNotes}
+            onAdd={(list) => apply((d) => planSuggestions(d, list, today, focusProjectThisWeek(d, today)))}
           />
         )}
         </div>
