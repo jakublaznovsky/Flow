@@ -22,6 +22,7 @@ of the Claude buttons (see below).
   When it ends, nothing pops up; the bar at the top just offers "Mark done" or "Another round".
   Finished sessions are logged so you can see your focus time.
 - **Checklists.** Break a task into steps. The card shows `2/5` and the next step to do.
+  Drag a step by its grip to reorder it (or focus the grip and press Alt+Up / Alt+Down).
 - **Plan your week.** The **Week** view has seven day columns and an Unscheduled tray. Drag a
   task onto a day. When that day comes, the task moves to Today by itself.
 - **Weekly review.** A short guided review: what you finished, what is unfinished (keep, push to

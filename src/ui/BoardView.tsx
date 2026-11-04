@@ -14,6 +14,7 @@ import type { Change, ISODate } from '../model/types'
 import AddCard from './AddCard'
 import Card, { CardPreview } from './Card'
 import Column from './Column'
+import { handleStepDrop } from './stepDrop'
 import type { useFlow } from './useFlow'
 
 export const COLUMNS: { id: ColumnId; title: string; empty: string }[] = [
@@ -178,6 +179,7 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
                     onToggle: (i) => apply((d) => toggleStep(d, card.key, i)),
                     onEdit: (i, text) => apply((d) => editStep(d, card.key, i, text)),
                     onDelete: (i) => apply((d) => deleteStep(d, card.key, i)),
+                    onMove: (from, to) => handleStepDrop({ ref: card.key, activeIndex: from, overIndex: to }, apply),
                   } : undefined}
                 />
               ))}

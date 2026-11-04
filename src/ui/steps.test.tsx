@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { MemoryFileStore } from '../storage/fileStore'
 import { MemorySettings } from './settings'
+import { handleStepDrop, stepIds } from './stepDrop'
+import { emptyFlow, type Change, type FlowData } from '../model/types'
+import { findTask } from '../model/tasks'
 
 const NOW = new Date(2026, 10, 3, 10, 0)
 const project = (tasks: string) =>
@@ -118,6 +121,84 @@ describe('card checklist', () => {
     await act(async () => {})
     expect(card('Set up Tauri')).not.toHaveClass('is-dragging')
     expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
+  })
+})
+
+describe('reordering steps', () => {
+  const texts = (li: HTMLElement) => within(li).getAllByRole('button', { name: /^Reorder step / }).map((b) => b.getAttribute('aria-label'))
+
+  it('gives each step a drag handle; the handle is the only drag start', async () => {
+    const { card, user } = await setup()
+    await user.click(within(card('Set up Tauri')).getByRole('button', { name: 'Show steps' }))
+    expect(texts(card('Set up Tauri'))).toEqual(['Reorder step Install Rust', 'Reorder step Run init', 'Reorder step Commit'])
+    // The step text still opens the inline editor; the checkbox still toggles.
+    await user.click(within(card('Set up Tauri')).getByText('Run init'))
+    expect(within(card('Set up Tauri')).getByRole('textbox', { name: 'Edit step' })).toHaveValue('Run init')
+    await user.keyboard('{Escape}')
+    await user.click(within(card('Set up Tauri')).getByRole('checkbox', { name: 'Commit' }))
+    expect(within(card('Set up Tauri')).getByRole('checkbox', { name: 'Commit' })).toBeChecked()
+    // Dragging the handle never drags the card.
+    const handle = within(card('Set up Tauri')).getByRole('button', { name: 'Reorder step Run init' })
+    fireEvent.pointerDown(handle, { button: 0, clientX: 0, clientY: 0, isPrimary: true })
+    fireEvent.pointerMove(document, { clientX: 0, clientY: 40 })
+    await act(async () => {})
+    expect(card('Set up Tauri')).not.toHaveClass('is-dragging')
+    fireEvent.pointerUp(document)
+    await act(async () => {})
+    expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
+  })
+
+  it('Alt+ArrowDown / Alt+ArrowUp move the step, persist, and keep focus on its handle', async () => {
+    const { card, file, user } = await setup()
+    await user.click(within(card('Set up Tauri')).getByRole('button', { name: 'Show steps' }))
+    within(card('Set up Tauri')).getByRole('button', { name: 'Reorder step Install Rust' }).focus()
+    await user.keyboard('{Alt>}{ArrowDown}{/Alt}')
+    expect(texts(card('Set up Tauri'))).toEqual(['Reorder step Run init', 'Reorder step Install Rust', 'Reorder step Commit'])
+    await vi.waitFor(() => expect(file()).toMatch(/text: Run init\n\s+done: false\n\s+- text: Install Rust\n\s+done: true/))
+    expect(document.activeElement).toHaveAttribute('aria-label', 'Reorder step Install Rust')
+    await user.keyboard('{Alt>}{ArrowDown}{/Alt}')
+    expect(texts(card('Set up Tauri'))).toEqual(['Reorder step Run init', 'Reorder step Commit', 'Reorder step Install Rust'])
+    expect(document.activeElement).toHaveAttribute('aria-label', 'Reorder step Install Rust')
+    await user.keyboard('{Alt>}{ArrowDown}{/Alt}') // already last: no change
+    expect(texts(card('Set up Tauri'))).toEqual(['Reorder step Run init', 'Reorder step Commit', 'Reorder step Install Rust'])
+    await user.keyboard('{Alt>}{ArrowUp}{/Alt}')
+    expect(texts(card('Set up Tauri'))).toEqual(['Reorder step Run init', 'Reorder step Install Rust', 'Reorder step Commit'])
+    expect(document.activeElement).toHaveAttribute('aria-label', 'Reorder step Install Rust')
+    expect(file()).toMatch(/title: Set up Tauri\n\s+status: todo/)
+    // Plain arrows (no Alt) do nothing.
+    await user.keyboard('{ArrowDown}')
+    expect(texts(card('Set up Tauri'))).toEqual(['Reorder step Run init', 'Reorder step Install Rust', 'Reorder step Commit'])
+  })
+})
+
+describe('handleStepDrop', () => {
+  const data = (): FlowData => {
+    const d = emptyFlow()
+    d.projects.p = {
+      slug: 'p', title: 'P', status: 'active', color: '#000', created: '2026-11-01', body: '', extra: {},
+      tasks: [{ id: 't1', title: 'T', status: 'todo', created: '2026-11-01', extra: {},
+        steps: [{ text: 'a', done: true, extra: {} }, { text: 'b', done: false, extra: {} }, { text: 'c', done: false, extra: {} }] }],
+    }
+    return d
+  }
+  const run = (activeIndex: number, overIndex: number) => {
+    const calls: Change[] = []
+    const ok = handleStepDrop({ ref: 'p/t1', activeIndex, overIndex }, (fn) => { calls.push(fn(data())) })
+    return { ok, calls }
+  }
+  it('moves the dragged step to the index it was dropped on', () => {
+    const { ok, calls } = run(0, 2)
+    expect(ok).toBe(true)
+    expect(calls).toHaveLength(1)
+    expect(findTask(calls[0].data, 'p/t1')!.task.steps!.map((s) => s.text)).toEqual(['b', 'c', 'a'])
+    expect(calls[0].changed).toEqual(['projects/p.md'])
+  })
+  it('does nothing for a drop on itself or outside the list', () => {
+    for (const [a, o] of [[1, 1], [0, -1], [-1, 0]]) expect(run(a, o)).toEqual({ ok: false, calls: [] })
+  })
+  it('stepIds are stable across reorder and unique for duplicate text', () => {
+    expect(stepIds([{ text: 'a' }, { text: 'b' }, { text: 'a' }])).toEqual(['a#0', 'b#0', 'a#1'])
+    expect(stepIds([{ text: 'b' }, { text: 'a' }])).toEqual(['b#0', 'a#0'])
   })
 })
 

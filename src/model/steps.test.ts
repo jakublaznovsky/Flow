@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { addStep, deleteStep, editStep, nextStep, toggleStep } from './steps'
+import { addStep, deleteStep, editStep, moveStep, nextStep, toggleStep } from './steps'
 import { findTask } from './tasks'
 import { emptyFlow, type FlowData } from './types'
 
@@ -56,6 +56,28 @@ describe('steps', () => {
     expect(steps(d, 'flow-app/t2')!.map((s) => s.text)).toEqual(['b'])
     d = deleteStep(d, 'flow-app/t2', 0).data
     expect(steps(d, 'flow-app/t2')).toBeUndefined()
+  })
+  it('moves a step, keeping done state and extras, without mutating the input', () => {
+    const d = sample()
+    const r = moveStep(d, 'flow-app/t2', 0, 1)
+    expect(steps(r.data, 'flow-app/t2')).toEqual([{ text: 'b', done: false, extra: { n: 1 } }, { text: 'a', done: true, extra: {} }])
+    expect(r.changed).toEqual(['projects/flow-app.md'])
+    expect(steps(d, 'flow-app/t2')!.map((s) => s.text)).toEqual(['a', 'b'])
+    expect(steps(moveStep(d, 'flow-app/t2', 1, 0).data, 'flow-app/t2')!.map((s) => s.text)).toEqual(['b', 'a'])
+  })
+  it('moves across several places in a longer list', () => {
+    const d = addStep(addStep(sample(), 'flow-app/t2', 'c').data, 'flow-app/t2', 'd').data
+    expect(steps(moveStep(d, 'flow-app/t2', 0, 3).data, 'flow-app/t2')!.map((s) => s.text)).toEqual(['b', 'c', 'd', 'a'])
+    expect(steps(moveStep(d, 'flow-app/t2', 3, 1).data, 'flow-app/t2')!.map((s) => s.text)).toEqual(['a', 'd', 'b', 'c'])
+  })
+  it('moveStep: same, out-of-range or non-integer index and unknown ref are no change', () => {
+    const d = sample()
+    for (const [from, to] of [[0, 0], [0, 2], [2, 0], [-1, 0], [0, -1], [0.5, 1], [NaN, 1]]) {
+      expect(moveStep(d, 'flow-app/t2', from, to)).toEqual({ data: d, changed: [] })
+    }
+    expect(moveStep(d, 'flow-app/t1', 0, 1).changed).toEqual([])
+    expect(moveStep(d, 'flow-app/zz', 0, 1).changed).toEqual([])
+    expect(moveStep(d, 'nope', 0, 1).changed).toEqual([])
   })
   it('nextStep is the first unchecked step', () => {
     const t = findTask(sample(), 'flow-app/t2')!.task

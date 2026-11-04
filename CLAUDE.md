@@ -21,6 +21,8 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   progress), `review` (Copy AI review prompt text), `notes` (general notes), `notes-day` (today's
   note), `steps` (task checklists), `schedule` (scheduled dates, `promoteScheduled`, `weekPlan`),
   `review-week` (weekly review files, focus project), `plan` (apply Claude's suggested tasks).
+  v0.2.3: `moveStep` (steps.ts) reorders a task's checklist; `src/ui/stepDrop.ts` has the pure
+  `handleStepDrop` and `stepIds` used by the Checklist in Card.tsx.
   v0.2.1: `boardColumns` puts To do tasks scheduled for tomorrow in the Tomorrow column (not in
   To do); `parkTask` (inbox.ts) turns a task dropped on the Parking lot into an inbox item.
 - `src/storage/` Markdown/frontmatter parsing, `FileStore` interface (`MemoryFileStore`,
@@ -48,6 +50,9 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   1 minute are not logged; each session is logged once. Timer state is in memory only.
 - Task `steps: [{text, done}]` and `scheduled: YYYY-MM-DD` are omitted when empty; unknown fields
   on steps are preserved. Ticking the last step never completes the task.
+- Step reorder: only the step's grip handle starts a drag, in a nested DndContext inside the
+  Checklist (the board never sees step drags; the card never moves). Alt+Up/Down on the focused
+  grip moves the step; focus stays on its grip. Done state and step extras move with the step.
 - Decisions are `- YYYY-MM-DD: <text>` lines, last in the `## Decisions` section of the project body.
 - Promotion is active-only: To do tasks with `scheduled <= today` in active projects move to Today
   on load/date change and lose `scheduled`; paused/done/archived projects keep their date.

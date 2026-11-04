@@ -46,6 +46,32 @@ try {
     else if (widths.some((w) => w < 180)) fail(`columns too narrow: ${widths.join(', ')}`)
     else console.log(`ok: five columns fit without horizontal scroll (${widths.join(', ')} px)`)
   }
+  // --- Checklist: drag the first step's handle below the second; the card stays put ---
+  {
+    const stepCard = col('Today').locator('li.card', { hasText: 'Build the week view' })
+    await stepCard.getByRole('button', { name: 'Show steps' }).click()
+    const rows = stepCard.locator('ul.steps > li')
+    const order = async () => (await rows.locator('.step-text').allInnerTexts()).map((t) => t.trim())
+    const before = await order()
+    if (before.length < 2) throw new Error(`expected at least 2 steps, got ${before.length}`)
+    const h = await rows.nth(0).locator('.step-grip').boundingBox()
+    const r1 = await rows.nth(1).boundingBox()
+    const sx = h.x + h.width / 2, sy = h.y + h.height / 2
+    await page.mouse.move(sx, sy)
+    await page.mouse.down()
+    await page.mouse.move(sx, r1.y + r1.height * 0.9, { steps: 12 })
+    await page.waitForTimeout(250)
+    if (process.env.FLOW_STEP_SHOT) await stepCard.screenshot({ path: process.env.FLOW_STEP_SHOT })
+    await page.mouse.up()
+    await page.waitForTimeout(300)
+    const after = await order()
+    const want = [before[1], before[0], ...before.slice(2)]
+    if (after.join('|') !== want.join('|')) fail(`step order after drag: ${after.join(', ')} (wanted ${want.join(', ')})`)
+    else if (!(await col('Today').locator('li.card', { hasText: 'Build the week view' }).count())) fail('step drag moved the card out of Today')
+    else console.log(`ok: step "${before[0]}" dragged below "${before[1]}"; card stayed in Today`)
+    await stepCard.getByRole('button', { name: 'Hide steps' }).click()
+  }
+
   const card = col('To do').locator('li.card').first()
   const title = (await card.locator('.card-title').innerText()).trim()
   // Mid-drag: the dragged card must follow the pointer across columns (not be clipped by its column).
@@ -185,6 +211,20 @@ try {
   await dark.goto(url)
   await dark.getByRole('region', { name: 'Today', exact: true }).getByRole('heading', { name: 'Today' }).waitFor({ timeout: 5000 })
   await shot(dark, 'screenshot-dark.png')
+  if (process.env.FLOW_STEP_SHOT_DARK) {
+    const c = dark.getByRole('region', { name: 'Today', exact: true }).locator('li.card', { hasText: 'Build the week view' })
+    await c.getByRole('button', { name: 'Show steps' }).click()
+    const rows = c.locator('ul.steps > li')
+    const h = await rows.nth(0).locator('.step-grip').boundingBox()
+    const r1 = await rows.nth(1).boundingBox()
+    await dark.mouse.move(h.x + h.width / 2, h.y + h.height / 2)
+    await dark.mouse.down()
+    await dark.mouse.move(h.x + h.width / 2, r1.y + r1.height * 0.9, { steps: 12 })
+    await dark.waitForTimeout(250)
+    await c.screenshot({ path: process.env.FLOW_STEP_SHOT_DARK })
+    await dark.keyboard.press('Escape')
+    await dark.mouse.up()
+  }
 
   console.log('SMOKE OK')
 } catch (e) {

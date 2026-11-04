@@ -1,6 +1,11 @@
-import { useState, type CSSProperties } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import type { Step } from '../model/types'
-import { useSortable } from '@dnd-kit/sortable'
+import {
+  DndContext, PointerSensor, closestCenter, useSensor, useSensors, type Announcements, type DragEndEvent, type Modifier,
+  type ScreenReaderInstructions, type UniqueIdentifier,
+} from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { stepIds } from './stepDrop'
 import type { Card as CardData, ColumnId } from '../model/board'
 import { dayParts } from '../model/dates'
 import type { ISODate } from '../model/types'
@@ -26,42 +31,125 @@ interface Props {
     onToggle: (index: number) => void
     onEdit: (index: number, text: string) => void
     onDelete: (index: number) => void
+    /** Move the step at `from` to index `to` (drag and drop or Alt+Arrow on its handle). */
+    onMove: (from: number, to: number) => void
   }
+}
+
+const reduceMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+/** Steps only move up and down inside their own list. */
+const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 })
+/** Screen-reader text for step drags: the step text, not its internal id. */
+const stepName = (id: UniqueIdentifier) => String(id).replace(/#\d+$/, '')
+const stepA11y: { screenReaderInstructions: ScreenReaderInstructions; announcements: Announcements } = {
+  screenReaderInstructions: { draggable: 'Drag to reorder, or press Alt+Up or Alt+Down to move this step.' },
+  announcements: {
+    onDragStart: ({ active }) => `Picked up step ${stepName(active.id)}.`,
+    onDragOver: ({ active, over }) => over ? `Step ${stepName(active.id)} is over ${stepName(over.id)}.` : `Step ${stepName(active.id)} is outside the list.`,
+    onDragEnd: ({ active, over }) => over ? `Step ${stepName(active.id)} dropped at ${stepName(over.id)}.` : `Step ${stepName(active.id)} dropped.`,
+    onDragCancel: ({ active }) => `Moving step ${stepName(active.id)} was cancelled.`,
+  },
+}
+
+/** One checklist row; only its grip handle starts a drag (text, checkbox and × keep their clicks). */
+function StepRow({ id, text, ticked, onKeyDown, handleRef, children }: {
+  id: string; text: string; ticked: boolean
+  onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => void
+  handleRef: (el: HTMLButtonElement | null) => void
+  children: ReactNode
+}) {
+  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
+    id, transition: reduceMotion() ? null : { duration: 160, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+  })
+  const style = { transform: transform ? `translate3d(0, ${Math.round(transform.y)}px, 0)` : undefined, transition }
+  const cls = [ticked && 'is-ticked', isDragging && 'is-dragging-step'].filter(Boolean).join(' ') || undefined
+  return (
+    <li ref={setNodeRef} className={cls} style={style}>
+      <button
+        type="button" className="step-grip" {...attributes} {...listeners} aria-label={`Reorder step ${text}`}
+        ref={(el) => { setActivatorNodeRef(el); handleRef(el) }} onKeyDown={onKeyDown}
+      >
+        <svg viewBox="0 0 8 12" width="8" height="12" aria-hidden="true" fill="currentColor">
+          <circle cx="2" cy="2" r="1.1" /><circle cx="6" cy="2" r="1.1" />
+          <circle cx="2" cy="6" r="1.1" /><circle cx="6" cy="6" r="1.1" />
+          <circle cx="2" cy="10" r="1.1" /><circle cx="6" cy="10" r="1.1" />
+        </svg>
+      </button>
+      {children}
+    </li>
+  )
 }
 
 function Checklist({ steps, api }: { steps: Step[]; api: NonNullable<Props['steps']> }) {
   const [adding, setAdding] = useState('')
   const [editIdx, setEditIdx] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
+  // Step drags live in their own DndContext, so they never reach the board's card drag.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+  const ids = stepIds(steps)
+  const handles = useRef<(HTMLButtonElement | null)[]>([])
+  const focusAfterMove = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    if (focusAfterMove.current === null) return
+    handles.current[focusAfterMove.current]?.focus()
+    focusAfterMove.current = null
+  }, [steps])
   const commitEdit = () => {
     if (editIdx !== null) api.onEdit(editIdx, editText)
     setEditIdx(null)
+  }
+  const move = (from: number, to: number) => {
+    if (from < 0 || to < 0 || to >= steps.length || from === to) return
+    setEditIdx(null)
+    api.onMove(from, to)
+  }
+  const onDragEnd = (e: DragEndEvent) => {
+    if (e.over) move(ids.indexOf(String(e.active.id)), ids.indexOf(String(e.over.id)))
+  }
+  const onHandleKey = (i: number) => (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+    e.preventDefault()
+    e.stopPropagation()
+    const to = e.key === 'ArrowUp' ? i - 1 : i + 1
+    if (to < 0 || to >= steps.length) return
+    focusAfterMove.current = to
+    move(i, to)
   }
   return (
     // Stop pointer-down here so the card's drag listeners never see clicks inside the checklist.
     <div className="checklist" onPointerDown={(e) => e.stopPropagation()}>
       {steps.length > 0 && (
-        <ul role="list" className="steps">
-          {steps.map((st, i) => (
-            <li key={i} className={st.done ? 'is-ticked' : undefined}>
-              <input type="checkbox" aria-label={editIdx === i ? `Done: ${st.text}` : st.text} checked={st.done} onChange={() => api.onToggle(i)} />
-              {editIdx === i ? (
-                <input
-                  autoFocus className="step-edit" aria-label="Edit step" value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') { e.preventDefault(); commitEdit() }
-                    else if (e.key === 'Escape') { e.stopPropagation(); setEditIdx(null) }
-                  }}
-                  onBlur={commitEdit}
-                />
-              ) : (
-                <button type="button" className="step-text" onClick={() => { setEditText(st.text); setEditIdx(i) }}>{st.text}</button>
-              )}
-              <button type="button" className="step-del" aria-label={`Delete step ${st.text}`} onClick={() => api.onDelete(i)}>×</button>
-            </li>
-          ))}
-        </ul>
+        <DndContext
+          sensors={sensors} collisionDetection={closestCenter} modifiers={[verticalOnly]}
+          onDragEnd={onDragEnd} accessibility={stepA11y}
+        >
+          <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+            <ul role="list" className="steps">
+              {steps.map((st, i) => (
+                <StepRow
+                  key={ids[i]} id={ids[i]} text={st.text} ticked={st.done}
+                  onKeyDown={onHandleKey(i)} handleRef={(el) => { handles.current[i] = el }}
+                >
+                  <input type="checkbox" aria-label={editIdx === i ? `Done: ${st.text}` : st.text} checked={st.done} onChange={() => api.onToggle(i)} />
+                  {editIdx === i ? (
+                    <input
+                      autoFocus className="step-edit" aria-label="Edit step" value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); commitEdit() }
+                        else if (e.key === 'Escape') { e.stopPropagation(); setEditIdx(null) }
+                      }}
+                      onBlur={commitEdit}
+                    />
+                  ) : (
+                    <button type="button" className="step-text" onClick={() => { setEditText(st.text); setEditIdx(i) }}>{st.text}</button>
+                  )}
+                  <button type="button" className="step-del" aria-label={`Delete step ${st.text}`} onClick={() => api.onDelete(i)}>×</button>
+                </StepRow>
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
       )}
       <input
         className="step-add" aria-label="Add step" placeholder="Add step" value={adding}

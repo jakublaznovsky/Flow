@@ -46,6 +46,16 @@ export function deleteStep(d: FlowData, ref: string, index: number): Change {
   })
 }
 
+/** Move the step at `from` to index `to` (the index it has afterwards); done state and extras move with it. */
+export function moveStep(d: FlowData, ref: string, from: number, to: number): Change {
+  return withSteps(d, ref, (t) => {
+    if (from === to || !valid(t, from) || !valid(t, to)) return false
+    const [step] = t.steps!.splice(from, 1)
+    t.steps!.splice(to, 0, step)
+    return true
+  })
+}
+
 export function nextStep(task: Task): string | undefined {
   return task.steps?.find((s) => !s.done)?.text
 }
