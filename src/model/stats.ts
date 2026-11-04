@@ -15,14 +15,6 @@ export function focusMinutesOn(d: FlowData, date: ISODate): number {
   return (d.days[date]?.focus ?? []).reduce((sum, f) => sum + f.minutes, 0)
 }
 
-/** Consecutive days with at least one done entry; starts today if it has one, else yesterday. */
-export function streak(d: FlowData, today: ISODate): number {
-  let date = doneOn(d, today).length > 0 ? today : addDays(today, -1)
-  let n = 0
-  while (doneOn(d, date).length > 0) { n++; date = addDays(date, -1) }
-  return n
-}
-
 export interface HeatCell { date: ISODate; count: number; level: 0 | 1 | 2 | 3 | 4; future: boolean }
 
 function level(count: number): HeatCell['level'] {

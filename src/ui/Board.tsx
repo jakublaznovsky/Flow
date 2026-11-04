@@ -8,6 +8,7 @@ import { moveTask } from '../model/tasks'
 import type { FileStore } from '../storage/fileStore'
 import FocusBar from './FocusBar'
 import BoardView from './BoardView'
+import ProgressView from './ProgressView'
 import NotesPanel from './NotesPanel'
 import ProjectHeader from './ProjectHeader'
 import ProjectPicker from './ProjectPicker'
@@ -230,7 +231,7 @@ export default function Board({ store, settings, now, onReady }: Props) {
               focusRef={focus.state?.finished ? null : focus.state?.ref}
             />
           ) : (
-            <section className="progress-view" aria-label="Progress"><h2>Progress</h2></section>
+            <ProgressView data={data} today={today} apply={apply} />
           )}
         </div>
         {showNotes && focused && (

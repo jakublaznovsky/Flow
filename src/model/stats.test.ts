@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { emptyFlow } from './types'
 import type { FlowData, Day, DoneEntry, FocusEntry, Task } from './types'
 import { addDays } from './dates'
-import { weekDates, doneOn, focusMinutesOn, streak, heatmap, projectProgress } from './stats'
+import { weekDates, doneOn, focusMinutesOn, heatmap, projectProgress } from './stats'
 
 const done = (ref: string): DoneEntry => ({ ref, title: ref, project: ref.split('/')[0], extra: {} })
 const focus = (ref: string, minutes: number): FocusEntry => ({ ref, title: ref, project: ref.split('/')[0], minutes, extra: {} })
@@ -38,31 +38,6 @@ describe('doneOn / focusMinutesOn', () => {
     const d = withDays(day(TODAY, 0, [25, 15]))
     expect(focusMinutesOn(d, TODAY)).toBe(40)
     expect(focusMinutesOn(d, '2026-11-01')).toBe(0)
-  })
-})
-
-describe('streak', () => {
-  it('counts back from today when today has done', () => {
-    const d = withDays(day('2026-11-04', 1), day('2026-11-03', 2), day('2026-11-02', 1))
-    expect(streak(d, TODAY)).toBe(3)
-  })
-  it('counts from yesterday when nothing today', () => {
-    const d = withDays(day('2026-11-03', 1), day('2026-11-02', 1))
-    expect(streak(d, TODAY)).toBe(2)
-  })
-  it('stops at the first gap', () => {
-    const d = withDays(day('2026-11-04', 1), day('2026-11-03', 1), day('2026-11-01', 5))
-    expect(streak(d, TODAY)).toBe(2)
-  })
-  it('is 1 with only today', () => {
-    expect(streak(withDays(day(TODAY, 1)), TODAY)).toBe(1)
-  })
-  it('is 0 with nothing today or yesterday', () => {
-    expect(streak(withDays(day('2026-11-01', 3)), TODAY)).toBe(0)
-    expect(streak(emptyFlow(), TODAY)).toBe(0)
-  })
-  it('ignores day files with an empty done list', () => {
-    expect(streak(withDays(day(TODAY, 0), day('2026-11-03', 2)), TODAY)).toBe(1)
   })
 })
 
