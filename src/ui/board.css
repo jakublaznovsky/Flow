@@ -185,7 +185,9 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
   transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 .card:hover { border-color: var(--border-strong); box-shadow: inset 3px 0 0 var(--project), var(--shadow-md); }
-.card.is-dragging { cursor: grabbing; box-shadow: inset 3px 0 0 var(--project), var(--shadow-lg); }
+/* While dragging, the original stays as a quiet placeholder; the floating copy is .is-overlay. */
+.card.is-dragging { opacity: 0.35; box-shadow: none; }
+.card.is-overlay { cursor: grabbing; box-shadow: inset 3px 0 0 var(--project), var(--shadow-lg); pointer-events: none; }
 .card.is-done .card-title { text-decoration: line-through; color: var(--text-muted); }
 .card.is-done { background: color-mix(in srgb, var(--surface) 70%, transparent); box-shadow: inset 3px 0 0 var(--project); }
 .card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }

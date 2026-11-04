@@ -38,6 +38,35 @@ try {
   }
   const card = col('To do').locator('li.card').first()
   const title = (await card.locator('.card-title').innerText()).trim()
+  // Mid-drag: the dragged card must follow the pointer across columns (not be clipped by its column).
+  {
+    const a = await card.boundingBox()
+    const b = await col('Today').locator('ul.cards').boundingBox()
+    const sx = a.x + a.width / 2, sy = a.y + a.height / 2
+    const mx = (sx + b.x + b.width / 2) / 2, my = (sy + b.y + 40) / 2
+    await page.mouse.move(sx, sy)
+    await page.mouse.down()
+    await page.mouse.move(mx, my, { steps: 8 })
+    // Visible = the card's box, cut by every ancestor that clips overflow, still contains the pointer.
+    const visible = await page.evaluate(([x, y, t]) => [...document.querySelectorAll('.card')].some((el) => {
+      if (!el.textContent?.includes(t)) return false
+      let r = el.getBoundingClientRect()
+      let l = r.left, top = r.top, rt = r.right, b = r.bottom
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        const s = getComputedStyle(p)
+        if (s.overflowX !== 'visible' || s.overflowY !== 'visible') {
+          const q = p.getBoundingClientRect()
+          l = Math.max(l, q.left); top = Math.max(top, q.top); rt = Math.min(rt, q.right); b = Math.min(b, q.bottom)
+        }
+      }
+      return x >= l && x <= rt && y >= top && y <= b
+    }), [mx, my, title])
+    if (!visible) fail(`mid-drag: dragged card "${title}" is not visible under the pointer`)
+    else console.log('ok: dragged card follows the pointer between columns')
+    await page.keyboard.press('Escape') // cancel this probe drag
+    await page.mouse.up()
+    await page.waitForTimeout(300)
+  }
   await drag(page, card, col('Today').locator('ul.cards'))
   await col('Today').getByText(title).waitFor({ timeout: 3000 })
   // Screenshot while the dragged card sits in Today, so the board looks lived-in.

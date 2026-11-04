@@ -1,12 +1,15 @@
-import type { ReactNode } from 'react'
-import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { useState, type ReactNode } from 'react'
+import {
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
+  type DragEndEvent, type DragStartEvent, type DropAnimation,
+} from '@dnd-kit/core'
 import { boardColumns, searchCards, type Card as CardData, type ColumnId } from '../model/board'
 import { addInboxItem, deleteInboxItem, editInboxItem } from '../model/inbox'
 import { addStep, deleteStep, editStep, toggleStep } from '../model/steps'
 import { scheduleTask } from '../model/schedule'
 import { addTask, changeTaskProject, deleteTask, editTask, moveTask } from '../model/tasks'
 import AddCard from './AddCard'
-import Card from './Card'
+import Card, { CardPreview } from './Card'
 import Column from './Column'
 import type { useFlow } from './useFlow'
 
@@ -16,6 +19,12 @@ export const COLUMNS: { id: ColumnId; title: string; empty: string }[] = [
   { id: 'today', title: 'Today', empty: 'pick up to 3' },
   { id: 'done', title: 'Done', empty: 'Done today shows here' },
 ]
+
+/** Short settle animation into the drop place; none when the OS asks for reduced motion. */
+function dropAnimation(): DropAnimation | null {
+  const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  return reduce ? null : { duration: 160, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }
+}
 
 interface Props {
   flow: ReturnType<typeof useFlow>
@@ -34,6 +43,9 @@ interface Props {
 export default function BoardView({ flow, query, picker, onDrop, createProject, addRequest, onAddHandled, onFocus, focusRef }: Props) {
   const { data, today, filter, order, lastProject, remember, apply } = flow
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  // The card being dragged is drawn in a DragOverlay (fixed position, above all columns) so it is
+  // never clipped by a column's scroll area; the original stays in place as a faded placeholder.
+  const [dragging, setDragging] = useState<{ card: CardData; column: ColumnId } | null>(null)
   if (!data) return null
 
   const active = Object.values(data.projects).filter((p) => p.status === 'active')
@@ -42,7 +54,14 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
   const columnOf = (key: string): ColumnId | undefined =>
     COLUMNS.find(({ id }) => cols[id].some((c) => c.key === key))?.id
 
+  const onDragStart = (e: DragStartEvent) => {
+    const key = String(e.active.id)
+    const column = columnOf(key)
+    const card = column && cols[column].find((c) => c.key === key)
+    setDragging(card && column ? { card, column } : null)
+  }
   const onDragEnd = (e: DragEndEvent) => {
+    setDragging(null)
     if (!e.over) return
     const cardKey = String(e.active.id)
     const from = columnOf(cardKey)
@@ -98,7 +117,7 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
           {picker}
         </div>
       )}
-      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
         <div className="columns">
           {COLUMNS.map(({ id, title, empty }) => (
             <Column
@@ -146,6 +165,9 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
             </Column>
           ))}
         </div>
+        <DragOverlay dropAnimation={dropAnimation()}>
+          {dragging && <CardPreview card={dragging.card} column={dragging.column} />}
+        </DragOverlay>
       </DndContext>
     </div>
   )

@@ -71,6 +71,36 @@ function Checklist({ steps, api }: { steps: Step[]; api: NonNullable<Props['step
   )
 }
 
+/** Static look-alike of a card, shown in the drag overlay so it can float above every column. */
+export function CardPreview({ card, column }: { card: CardData; column: ColumnId }) {
+  const list = card.steps ?? []
+  const chip = card.scheduled ? dayParts(card.scheduled) : undefined
+  return (
+    <div
+      className={`card is-overlay${column === 'done' ? ' is-done' : ''}${card.kind === 'inbox' ? ' is-inbox' : ''}`}
+      style={{ '--project': card.color ?? 'var(--border-strong)' } as CSSProperties}
+      aria-hidden="true"
+    >
+      {card.kind === 'task' && <input type="checkbox" tabIndex={-1} readOnly checked={column === 'done'} />}
+      <div className="card-body">
+        <div className="card-head">
+          <span className="card-title">{card.title}</span>
+          {list.length > 0 && (
+            <div className="steps-ctl"><span className="steps-pill">{list.filter((x) => x.done).length}/{list.length}</span></div>
+          )}
+        </div>
+        {card.firstStep && <div className="step">{card.firstStep}</div>}
+        {(card.projectTitle || chip) && (
+          <div className="card-meta">
+            {card.projectTitle && <span className="tag"><span className="tag-text">{card.projectTitle}</span></span>}
+            {chip && <span className="day-chip">{chip.weekday} {chip.day}</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Card({ card, column, projects, onToggle, onSave, onDelete, onFocus, inFocus, steps }: Props) {
   const [editing, setEditing] = useState(false)
   const [showSteps, setShowSteps] = useState(false)
@@ -81,7 +111,7 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
     id: card.key, data: { column }, disabled: editing,
   })
   const stripe = { '--project': card.color ?? 'var(--border-strong)' } as CSSProperties
-  const dragStyle = { ...stripe, transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined, transition, opacity: isDragging ? 0.5 : undefined }
+  const dragStyle = { ...stripe, transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined, transition }
   const [title, setTitle] = useState(card.title)
   const [step, setStep] = useState(card.firstStep ?? '')
   const [project, setProject] = useState(card.projectSlug ?? '')
