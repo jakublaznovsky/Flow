@@ -25,6 +25,7 @@ of the Claude buttons (see below).
   Drag a step by its grip to reorder it (or focus the grip and press Alt+Up / Alt+Down).
 - **Plan your week.** The **Week** view has seven day columns and an Unscheduled tray. Drag a
   task onto a day. When that day comes, the task moves to Today by itself.
+  You can move any task freely, Today tasks too; dropping one on a past day marks it done that day.
 - **Weekly review.** A short guided review: what you finished, what is unfinished (keep, push to
   next week, send back or delete), a project to focus on next week, and a few words of reflection.
   It is saved in your folder and the chosen project gets a star in the sidebar next week.

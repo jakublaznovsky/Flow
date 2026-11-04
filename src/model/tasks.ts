@@ -130,3 +130,44 @@ export function changeTaskProject(d: FlowData, ref: string, toSlug: string): Cha
   const data: FlowData = { ...d, projects: { ...d.projects, [from.slug]: from, [to.slug]: to } }
   return { data, changed: [projectPath(from.slug), projectPath(to.slug)], ref: `${to.slug}/${moved.id}` }
 }
+
+/**
+ * Mark a task done on `date` (today or earlier; a later date changes nothing): status done,
+ * `done: date`, `scheduled` cleared, a snapshot on that day's done list (no duplicate). A task
+ * already done on another day is re-dated: its snapshot leaves that day. Planned lists are history
+ * and stay as they are. No change when a file it would write was skipped.
+ */
+export function completeOn(d: FlowData, ref: string, date: ISODate, today: ISODate): Change {
+  const found = findTask(d, ref)
+  if (!found || date > today) return noChange(d)
+  const { task: src } = found
+  const slug = found.project.slug
+  const target = d.days[date]
+  const snapshotThere = !!target?.done.some((e) => e.ref === ref)
+  if (src.status === 'done' && src.done === date && src.scheduled === undefined && snapshotThere) return noChange(d)
+  const oldDate = src.status === 'done' && src.done && src.done !== date ? src.done : undefined
+  const oldDay = oldDate && d.days[oldDate]?.done.some((e) => e.ref === ref) ? oldDate : undefined
+  const paths = [projectPath(slug), dayPath(date), ...(oldDay ? [dayPath(oldDay)] : [])]
+  if (paths.some((p) => d.skipped.includes(p))) return noChange(d)
+
+  const project = structuredClone(found.project)
+  const task = project.tasks.find((t) => t.id === src.id)!
+  task.status = 'done'
+  task.done = date
+  delete task.scheduled
+  const days: Record<ISODate, Day> = {}
+  const changed = [projectPath(slug)]
+  if (!snapshotThere) {
+    const day = cloneDay(d, date)
+    day.done.push({ ref, title: task.title, project: project.title, extra: {} })
+    days[date] = day
+    changed.push(dayPath(date))
+  }
+  if (oldDay) {
+    const day = cloneDay(d, oldDay)
+    day.done = day.done.filter((e) => e.ref !== ref)
+    days[oldDay] = day
+    changed.push(dayPath(oldDay))
+  }
+  return { data: withParts(d, project, days), changed }
+}

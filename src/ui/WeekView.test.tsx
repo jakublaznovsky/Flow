@@ -149,14 +149,83 @@ describe('handleWeekDrop', () => {
     expect(taskOf(store, 'projects/flow-app.md', 't2')).toContain('status: todo')
   })
 
-  it('ignores drops on past days and unknown targets', async () => {
+  it('ignores unknown targets and unknown cards', async () => {
     const { store, writes, ctx } = await harness()
     const before = { ...store.files }
-    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: 'day-2026-11-03' }, ctx()))
     act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: 'somewhere' }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t9', target: 'day-2026-11-03' }, ctx()))
     await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
     expect(store.files).toEqual(before)
     expect(writes).toEqual({})
+  })
+
+  const withToday = () => {
+    const files = seed()
+    files['projects/learn-spanish.md'] = project('Learn Spanish', '#30a46c',
+      task('t1', 'Buy a book', 'todo') + task('t2', 'Practise verbs', 'today', `    planned: ${T}\n`))
+    files[`days/${T}.md`] = `---\ndate: ${T}\nplanned:\n  - learn-spanish/t2\ndone: []\n---\n`
+    return files
+  }
+
+  it('a Today task dropped on a future day leaves Today and is planned for that day', async () => {
+    const { store, hook, ctx } = await harness(withToday())
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t2', target: 'day-2026-11-06' }, ctx()))
+    await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't2')).toContain('scheduled: 2026-11-06'))
+    expect(taskOf(store, 'projects/learn-spanish.md', 't2')).toContain('status: todo')
+    expect(hook.result.current.data!.projects['learn-spanish'].tasks[1].status).toBe('todo')
+  })
+
+  it('a Today task dropped on a past day is done that day', async () => {
+    const { store, ctx } = await harness(withToday())
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t2', target: 'day-2026-11-03' }, ctx()))
+    await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't2')).toContain('status: done'))
+    expect(taskOf(store, 'projects/learn-spanish.md', 't2')).toContain('done: 2026-11-03')
+    expect(store.files['days/2026-11-03.md']).toContain('ref: learn-spanish/t2')
+    expect(store.files[`days/${T}.md`]).toContain('learn-spanish/t2') // planned history kept
+  })
+
+  it('a done entry dropped on today reopens the task in Today', async () => {
+    const { store, ctx } = await harness()
+    act(() => handleWeekDrop({ cardKey: 'flow-app/t3', target: `day-${T}` }, ctx()))
+    await waitFor(() => expect(taskOf(store, 'projects/flow-app.md', 't3')).toContain('status: today'))
+    expect(taskOf(store, 'projects/flow-app.md', 't3')).not.toContain('done:')
+    expect(store.files['days/2026-11-02.md']).not.toContain('flow-app/t3')
+  })
+
+  it('a done entry dropped on a future day reopens it and plans it', async () => {
+    const { store, ctx } = await harness()
+    act(() => handleWeekDrop({ cardKey: 'flow-app/t3', target: 'day-2026-11-07' }, ctx()))
+    await waitFor(() => expect(taskOf(store, 'projects/flow-app.md', 't3')).toContain('scheduled: 2026-11-07'))
+    expect(taskOf(store, 'projects/flow-app.md', 't3')).toContain('status: todo')
+    expect(store.files['days/2026-11-02.md']).not.toContain('flow-app/t3')
+  })
+
+  it('a done entry dropped on another past day is re-dated', async () => {
+    const { store, ctx } = await harness()
+    act(() => handleWeekDrop({ cardKey: 'flow-app/t3', target: 'day-2026-11-03' }, ctx()))
+    await waitFor(() => expect(taskOf(store, 'projects/flow-app.md', 't3')).toContain('done: 2026-11-03'))
+    expect(store.files['days/2026-11-03.md']).toContain('ref: flow-app/t3')
+    expect(store.files['days/2026-11-02.md']).not.toContain('flow-app/t3')
+  })
+
+  it('an unscheduled task dropped on a past day is done that day', async () => {
+    const { store, ctx } = await harness()
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: 'day-2026-11-02' }, ctx()))
+    await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('status: done'))
+    expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('done: 2026-11-02')
+    expect(store.files['days/2026-11-02.md']).toContain('ref: learn-spanish/t1')
+    expect(store.files['days/2026-11-02.md']).toContain('ref: flow-app/t3')
+  })
+
+  it('Unscheduled turns a done or Today task back into an undated To do task', async () => {
+    const { store, ctx } = await harness(withToday())
+    act(() => handleWeekDrop({ cardKey: 'flow-app/t3', target: 'unscheduled' }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t2', target: 'unscheduled' }, ctx()))
+    await waitFor(() => expect(taskOf(store, 'projects/flow-app.md', 't3')).toContain('status: todo'))
+    await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't2')).toContain('status: todo'))
+    expect(taskOf(store, 'projects/flow-app.md', 't3')).not.toContain('done:')
+    expect(taskOf(store, 'projects/learn-spanish.md', 't2')).not.toContain('scheduled')
+    expect(store.files['days/2026-11-02.md']).not.toContain('flow-app/t3')
   })
 })
 
@@ -226,6 +295,24 @@ describe('Week view', () => {
     expect(within(view.getByRole('region', { name: 'Unscheduled' })).queryByText('Practise verbs')).not.toBeInTheDocument()
     await user.click(within(screen.getByRole('navigation', { name: 'Sidebar' })).getByRole('button', { name: 'Flow app' }))
     expect(view.queryByText('Practise verbs')).not.toBeInTheDocument()
+  })
+
+  it('In Today items and done entries of existing tasks are draggable; deleted tasks\' entries are not', async () => {
+    const files = seed()
+    files['projects/learn-spanish.md'] = project('Learn Spanish', '#30a46c', task('t1', 'Buy a book', 'todo') + task('t2', 'Practise verbs', 'today', '    planned: 2026-11-04\n'))
+    files['days/2026-11-03.md'] = '---\ndate: 2026-11-03\nplanned: []\ndone:\n  - ref: flow-app/t9\n    title: Long gone\n    project: Flow app\n---\n'
+    const { view } = await open(files)
+    const draggable = (el: HTMLElement) => el.getAttribute('aria-roledescription') === 'draggable'
+    const inToday = within(view.getByRole('region', { name: 'Wed 4 Nov' })).getByText('Practise verbs').closest('li')!
+    expect(inToday).toHaveClass('week-in-today')
+    expect(draggable(inToday)).toBe(true)
+    expect(inToday).toHaveAttribute('role', 'button')
+    const done = within(view.getByRole('region', { name: 'Mon 2 Nov' })).getByText('Pick a name').closest('li')!
+    expect(done).toHaveClass('is-done')
+    expect(draggable(done)).toBe(true)
+    const gone = within(view.getByRole('region', { name: 'Tue 3 Nov' })).getByText('Long gone').closest('li')!
+    expect(draggable(gone)).toBe(false)
+    expect(gone).not.toHaveAttribute('role')
   })
 
   it('respects the project filter', async () => {

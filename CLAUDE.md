@@ -56,6 +56,11 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 - Decisions are `- YYYY-MM-DD: <text>` lines, last in the `## Decisions` section of the project body.
 - Promotion is active-only: To do tasks with `scheduled <= today` in active projects move to Today
   on load/date change and lose `scheduled`; paused/done/archived projects keep their date.
+- Week view drops (v0.2.5, `handleWeekDrop`): To do, In Today and done entries (task still in an
+  active project) all drag. Future day: reopen if done, then `scheduleTask`. Today's column:
+  `moveTask(today)`. Past day: `completeOn` (tasks.ts) = done that day, `scheduled` cleared,
+  snapshot `extra: {}` on that day (no duplicate), removed from the previous done day; planned lists
+  untouched; no change if a file to write is skipped. Unscheduled: back to To do, date cleared.
 - Tomorrow column = no new state: it is `scheduled === today + 1`. Drops onto it schedule tomorrow
   (Done tasks reopen first); Tomorrow → To do clears the date.
 - Parking a task: text `<title> — first step: X; steps: a ✓, b; planned: <scheduled ?? planned>`

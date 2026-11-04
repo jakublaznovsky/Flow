@@ -157,6 +157,44 @@ try {
   await shot(page, 'screenshot-week.png')
   console.log(`ok: "${weekTitle}" scheduled for ${target}${isSunday ? ' (next week, today is Sunday)' : ''}`)
 
+  // --- Week: a Today item onto a future day, a card onto a past day (done that day) ---
+  {
+    if (isSunday) await page.getByRole('button', { name: 'This week' }).click()
+    const label = (n) => page.evaluate((n) => {
+      const d = new Date()
+      d.setDate(d.getDate() + n)
+      return `${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'short' })}`
+    }, n)
+    const todayCol = week.locator('section.week-col[aria-current="date"]')
+    if (isSunday) console.log('skip: Today item to a future day (today is Sunday, no later day this week)')
+    else {
+      const item = todayCol.locator('li.week-in-today').first()
+      const itemTitle = (await item.locator('.week-in-today-title').innerText()).trim()
+      const future = week.getByRole('region', { name: await label(1), exact: true })
+      await drag(page, item, future)
+      await future.locator('li.week-card', { hasText: itemTitle }).waitFor({ timeout: 3000 })
+      if (await todayCol.locator('li.week-in-today', { hasText: itemTitle }).count()) fail(`"${itemTitle}" is still In Today after the drop`)
+      await key(page, 'b')
+      await col('Today').getByRole('heading', { name: 'Today' }).waitFor({ timeout: 3000 })
+      if (await col('Today').getByText(itemTitle, { exact: true }).count()) fail(`"${itemTitle}" is still in the board's Today`)
+      else console.log(`ok: Today item "${itemTitle}" moved to ${await label(1)} and left the board's Today`)
+      await key(page, 'w')
+      await week.waitFor({ timeout: 3000 })
+    }
+    const isMonday = await page.evaluate(() => new Date().getDay() === 1)
+    if (isMonday) console.log('skip: drop on a past day (today is Monday, no earlier day this week)')
+    else {
+      const pastName = await label(-1)
+      const past = week.getByRole('region', { name: pastName, exact: true })
+      const c = week.locator('li.week-card').first() // any To do card (the seed's tray may be empty by now)
+      const t = (await c.locator('.week-card-title').innerText()).trim()
+      await drag(page, c, past)
+      await past.locator('li.week-done.is-done', { hasText: t }).waitFor({ timeout: 3000 })
+      if (await week.locator('li.week-card', { hasText: t }).count()) fail(`"${t}" is still a To do card after the past-day drop`)
+      else console.log(`ok: "${t}" dropped on ${pastName} shows as done there`)
+    }
+  }
+
   // --- Progress (key p): heatmap and "This week" ---
   await key(page, 'p')
   await page.getByRole('heading', { name: 'This week' }).waitFor({ timeout: 3000 })

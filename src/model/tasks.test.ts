@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { addTask, editTask, moveTask, deleteTask, findTask, changeTaskProject } from './tasks'
+import { addTask, editTask, moveTask, deleteTask, findTask, changeTaskProject, completeOn } from './tasks'
 import { emptyFlow, type FlowData, type Task } from './types'
 
 function deepFreeze<T>(o: T): T {
@@ -258,5 +258,88 @@ describe('changeTaskProject', () => {
     expect(changeTaskProject(d, 'flow-app/t2', 'flow-app')).toEqual({ data: d, changed: [], ref: 'flow-app/t2' })
     expect(changeTaskProject(d, 'flow-app/t2', 'nope')).toEqual({ data: d, changed: [], ref: 'flow-app/t2' })
     expect(changeTaskProject(d, 'flow-app/t9', 'learn-spanish').changed).toEqual([])
+  })
+})
+
+describe('completeOn', () => {
+  const P = '2026-11-02'
+  const Q = '2026-11-03'
+  function withDays(): FlowData {
+    const d = structuredClone(sample()) as FlowData
+    const ft = d.projects['flow-app'].tasks
+    ft[0] = task('t1', 'Write spec', { scheduled: '2026-11-06' })
+    ft.push(task('t3', 'Pick a name', { status: 'done', done: Q }))
+    ft.push(task('t4', 'Now thing', { status: 'today', planned: T }))
+    d.days[Q] = { date: Q, planned: ['flow-app/t3'], focus: [], body: 'note', extra: { mood: 'ok' },
+      done: [{ ref: 'flow-app/t3', title: 'Pick a name', project: 'Flow app', extra: { x: 1 } },
+        { ref: 'other/t1', title: 'Other', project: 'Other', extra: {} }] }
+    d.days[T] = { date: T, planned: ['flow-app/t4'], done: [], focus: [], body: '', extra: {} }
+    return deepFreeze(d)
+  }
+
+  it('marks a To do task done on a past day, clears scheduled and creates the day', () => {
+    const c = completeOn(withDays(), 'flow-app/t1', P, T)
+    const t = findTask(c.data, 'flow-app/t1')!.task
+    expect(t).toMatchObject({ status: 'done', done: P })
+    expect(t.scheduled).toBeUndefined()
+    expect(c.data.days[P]).toEqual({ date: P, planned: [], focus: [], body: '', extra: {},
+      done: [{ ref: 'flow-app/t1', title: 'Write spec', project: 'Flow app', extra: {} }] })
+    expect(c.changed).toEqual(['projects/flow-app.md', `days/${P}.md`])
+  })
+
+  it('completes a Today task on a past day and leaves planned lists alone', () => {
+    const c = completeOn(withDays(), 'flow-app/t4', Q, T)
+    expect(findTask(c.data, 'flow-app/t4')!.task).toMatchObject({ status: 'done', done: Q, planned: T })
+    expect(c.data.days[Q].planned).toEqual(['flow-app/t3'])
+    expect(c.data.days[T].planned).toEqual(['flow-app/t4'])
+    expect(c.data.days[Q].done.map((e) => e.ref)).toEqual(['flow-app/t3', 'other/t1', 'flow-app/t4'])
+    expect(c.changed).toEqual(['projects/flow-app.md', `days/${Q}.md`])
+  })
+
+  it('re-dates a task done on another day: snapshot moves, the old day keeps the rest', () => {
+    const c = completeOn(withDays(), 'flow-app/t3', P, T)
+    expect(findTask(c.data, 'flow-app/t3')!.task).toMatchObject({ status: 'done', done: P })
+    expect(c.data.days[Q].done.map((e) => e.ref)).toEqual(['other/t1'])
+    expect(c.data.days[Q]).toMatchObject({ body: 'note', extra: { mood: 'ok' }, planned: ['flow-app/t3'] })
+    expect(c.data.days[P].done).toEqual([{ ref: 'flow-app/t3', title: 'Pick a name', project: 'Flow app', extra: {} }])
+    expect(c.changed.sort()).toEqual([`days/${P}.md`, `days/${Q}.md`, 'projects/flow-app.md'])
+  })
+
+  it('is idempotent on the same date', () => {
+    const d = withDays()
+    const c = completeOn(d, 'flow-app/t3', Q, T)
+    expect(c.changed).toEqual([])
+    expect(c.data).toBe(d)
+  })
+
+  it('does not duplicate an existing snapshot on the target day', () => {
+    const d = structuredClone(withDays()) as FlowData
+    d.days[Q].done.push({ ref: 'flow-app/t1', title: 'Write spec', project: 'Flow app', extra: {} })
+    const c = completeOn(deepFreeze(d), 'flow-app/t1', Q, T)
+    expect(c.data.days[Q].done.filter((e) => e.ref === 'flow-app/t1')).toHaveLength(1)
+    expect(findTask(c.data, 'flow-app/t1')!.task).toMatchObject({ status: 'done', done: Q })
+  })
+
+  it('changes nothing for an unknown ref or when a file it would write is skipped', () => {
+    const d = withDays()
+    const skip = (paths: string[]) => deepFreeze({ ...structuredClone(d), skipped: paths }) as FlowData
+    for (const [data, ref, date] of [
+      [d, 'flow-app/t9', P], [d, 'nope/t1', P],
+      [skip([`days/${P}.md`]), 'flow-app/t1', P],
+      [skip(['projects/flow-app.md']), 'flow-app/t1', P],
+      [skip([`days/${Q}.md`]), 'flow-app/t3', P],
+    ] as const) {
+      const c = completeOn(data, ref, date, T)
+      expect(c.changed).toEqual([])
+      expect(c.data).toBe(data)
+    }
+  })
+})
+
+describe('completeOn guards', () => {
+  it('changes nothing for a date after today', () => {
+    const d = sample()
+    const c = completeOn(d, 'flow-app/t1', '2026-11-05', T)
+    expect(c).toEqual({ data: d, changed: [] })
   })
 })

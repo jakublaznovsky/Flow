@@ -517,6 +517,8 @@ input.quick-capture, input.quick-capture:focus {
 .week-col.is-today h3 { color: var(--accent-text); }
 .week-col.is-past { opacity: 0.55; }
 .week-col.is-over { border-color: var(--accent); }
+/* Past days stay dim, but light up as a drop target (dropping there = done that day). */
+.week-col.is-past.is-over { opacity: 0.9; background: var(--accent-soft); }
 .week-tray h3 { font-size: 13px; }
 .week-cards {
   list-style: none; margin: 0; padding: 2px 2px var(--space-2); flex: 1 1 auto; min-height: 0;
@@ -532,7 +534,7 @@ input.quick-capture, input.quick-capture:focus {
 }
 .week-done svg { flex: none; margin-top: 2px; color: var(--accent); opacity: 0.8; }
 .week-done span { min-width: 0; text-decoration: line-through; text-decoration-color: var(--text-faint); }
-/* Today tasks on today's day: read-only and muted; they are already on the board's Today column. */
+/* Today tasks on today's day: muted (they are already on the board's Today column), but draggable. */
 .week-in-today {
   --project: var(--border-strong);
   display: flex; flex-direction: column; gap: 1px; padding: 5px 8px 5px 11px; font-size: 12.5px; line-height: 1.35;
@@ -542,6 +544,12 @@ input.quick-capture, input.quick-capture:focus {
 }
 .week-in-today-title { min-width: 0; }
 .week-in-today-label { font-size: 11px; color: var(--accent-text); }
+.week-in-today.is-draggable, .week-done.is-draggable { cursor: grab; touch-action: none; border-radius: var(--radius-md); }
+.week-done.is-draggable:hover { background: var(--surface-hover); }
+.week-in-today.is-placeholder, .week-done.is-placeholder { opacity: 0.4; }
+.week-in-today.is-overlay, .week-done.is-overlay { cursor: grabbing; pointer-events: none; box-shadow: var(--shadow-lg); }
+.week-in-today.is-overlay { background: var(--surface); box-shadow: inset 3px 0 0 color-mix(in srgb, var(--project) 55%, transparent), var(--shadow-lg); }
+.week-done.is-overlay { background: var(--surface); border-radius: var(--radius-md); }
 
 /* ---------- Weekly review ---------- */
 .review-view { flex: 1; min-height: 0; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: var(--space-4) 2px; }
