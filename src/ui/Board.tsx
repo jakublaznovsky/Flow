@@ -118,8 +118,9 @@ export function usePromotion(flow: ReturnType<typeof useFlow>, query = '') {
   return { openPicker, picker, pendingTo: pending?.to ?? null }
 }
 
-const isView = (v: unknown): v is View =>
-  v === 'board' || v === 'week' || v === 'progress' || v === 'notes' || v === 'review' || v === 'settings'
+/** Views the app reopens on; Settings and the Weekly review are one-off visits, so the next start opens the Board. */
+const isRestorableView = (v: unknown): v is View =>
+  v === 'board' || v === 'week' || v === 'progress' || v === 'notes'
 
 /** The owner's Claude key and model from local settings (never the Flow folder). */
 function useAiSettings(settings: Settings) {
@@ -163,7 +164,7 @@ export default function Board({ store, settings, now, onReady, ai }: Props) {
   useEffect(() => {
     let cancelled = false
     void settings.get<unknown>('view').then((v) => {
-      if (!cancelled && !viewChosen.current && isView(v)) setViewState(v)
+      if (!cancelled && !viewChosen.current && isRestorableView(v)) setViewState(v)
     })
     return () => { cancelled = true }
   }, [settings])
@@ -174,7 +175,7 @@ export default function Board({ store, settings, now, onReady, ai }: Props) {
   const setView = useCallback((v: View) => {
     viewChosen.current = true
     setViewState(v)
-    void settings.set('view', v)
+    void settings.set('view', isRestorableView(v) ? v : 'board')
   }, [settings])
 
   useEffect(() => {

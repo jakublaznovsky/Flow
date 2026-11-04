@@ -36,7 +36,7 @@ const row = (title: string) => within(screen.getByRole('list', { name: 'Unfinish
 afterEach(() => { Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true }) })
 
 describe('WeeklyReview', () => {
-  it('"r" and the sidebar item open it at step 1 and persist the view; opening writes nothing', async () => {
+  it('"r" and the sidebar item open it at step 1 (the next start opens on the Board); opening writes nothing', async () => {
     const settings = new MemorySettings()
     const { store, user } = await setup(seed(), settings)
     await user.click(screen.getByRole('button', { name: /Weekly review/ }))
@@ -44,7 +44,7 @@ describe('WeeklyReview', () => {
     expect(view.getByRole('listitem', { current: 'step' })).toHaveTextContent('1 Your week')
     expect(view.getAllByRole('listitem').slice(0, 4).map((l) => l.textContent)).toEqual(['1 Your week', '2 Unfinished', '3 Next week', '4 Reflect'])
     expect(store.files[REVIEW]).toBeUndefined()
-    await waitFor(async () => expect(await settings.get('view')).toBe('review'))
+    await waitFor(async () => expect(await settings.get('view')).toBe('board'))
     await user.keyboard('b')
     await open(user)
   })

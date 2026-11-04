@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
@@ -250,6 +250,40 @@ describe('Board', () => {
     view.unmount()
     render(<App store={store} settings={settings} now={() => NOW} />)
     expect(await screen.findByRole('region', { name: 'Progress' })).toBeInTheDocument()
+  })
+
+  it('does not restore Settings or Weekly review: the app opens on the Board', async () => {
+    for (const key of ['s', 'r']) {
+      const settings = new MemorySettings()
+      await settings.set('view', 'week')
+      const store = new MemoryFileStore(seed())
+      const user = userEvent.setup()
+      const view = render(<App store={store} settings={settings} now={() => NOW} />)
+      await screen.findByRole('region', { name: 'Week', exact: true })
+      if (key === 's') await user.click(screen.getByRole('button', { name: 'Settings' }))
+      else await user.keyboard('r')
+      await screen.findByRole('region', { name: key === 's' ? 'Settings' : 'Weekly review' })
+      await waitFor(async () => expect(await settings.get('view')).toBe('board'))
+      view.unmount()
+      render(<App store={store} settings={settings} now={() => NOW} />)
+      await screen.findByText('Buy a book')
+      await new Promise((r) => setTimeout(r, 20))
+      expect(screen.getByRole('heading', { name: 'To do' })).toBeInTheDocument()
+      cleanup()
+    }
+  })
+
+  it('an older stored "settings" or "review" view opens on the Board', async () => {
+    for (const stored of ['settings', 'review']) {
+      const settings = new MemorySettings()
+      await settings.set('view', stored)
+      render(<App store={new MemoryFileStore(seed())} settings={settings} now={() => NOW} />)
+      await screen.findByText('Buy a book')
+      await new Promise((r) => setTimeout(r, 20))
+      expect(screen.getByRole('heading', { name: 'To do' })).toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: stored === 'settings' ? 'Settings' : 'Weekly review' })).not.toBeInTheDocument()
+      cleanup()
+    }
   })
 
   it('column headers show the card count', async () => {

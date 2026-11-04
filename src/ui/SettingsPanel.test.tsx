@@ -23,10 +23,10 @@ async function setup(settings = new MemorySettings()) {
 }
 
 describe('Settings', () => {
-  it('opens from the gear at the bottom of the sidebar and persists the view', async () => {
+  it('opens from the gear at the bottom of the sidebar; the next start opens on the Board', async () => {
     const { settings } = await setup()
     expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-pressed', 'true')
-    await waitFor(async () => expect(await settings.get('view')).toBe('settings'))
+    await waitFor(async () => expect(await settings.get('view')).toBe('board'))
   })
 
   it('saves the API key in local settings (never in the Flow folder) and enables the AI buttons', async () => {
