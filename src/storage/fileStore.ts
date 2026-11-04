@@ -4,6 +4,7 @@ export interface FileStore {
   read(path: string): Promise<string | null> // null if missing
   write(path: string, text: string): Promise<void> // atomic, creates parent dirs
   append(path: string, text: string): Promise<void>
+  remove(path: string): Promise<void> // a missing file is fine
   watch(onChange: (paths: string[]) => void): Promise<() => void> // only external changes
 }
 
@@ -32,6 +33,10 @@ export class MemoryFileStore implements FileStore {
 
   async append(path: string, text: string): Promise<void> {
     this.files[path] = (this.files[path] ?? '') + text
+  }
+
+  async remove(path: string): Promise<void> {
+    delete this.files[path]
   }
 
   async watch(onChange: (paths: string[]) => void): Promise<() => void> {

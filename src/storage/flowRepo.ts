@@ -26,6 +26,8 @@ Flow/
     YYYY-MM-DD.md      # one file per day with activity
   reviews/
     YYYY-Www.md        # one file per weekly review (ISO week)
+  deleted/
+    <slug>-YYYY-MM-DD.md # deleted projects (moved here; move back to projects/ to restore)
   flow-issues.log      # unreadable files Flow skipped (for you or an AI)
 \`\`\`
 
@@ -286,4 +288,26 @@ export async function saveFlow(store: FileStore, d: FlowData, changed: string[])
     }
   }
   return failed
+}
+
+/**
+ * Move a file (a deleted project) to `deleted/<name>-<today>.md` (-2, -3… when taken): copy its
+ * exact text first, then remove the original; never removes when the copy failed. Returns the
+ * new path, or null after logging one line (the original then stays).
+ */
+export async function moveToDeleted(store: FileStore, path: string, today: ISODate): Promise<string | null> {
+  try {
+    const text = await store.read(path)
+    if (text === null) throw new Error('file is missing')
+    const name = path.slice(path.lastIndexOf('/') + 1).replace(/\.md$/, '')
+    let target = `deleted/${name}-${today}.md`
+    for (let n = 2; (await store.read(target)) !== null; n++) target = `deleted/${name}-${today}-${n}.md`
+    await store.write(target, text)
+    if ((await store.read(target)) !== text) throw new Error('copy could not be verified')
+    await store.remove(path)
+    return target
+  } catch (e) {
+    await logIssue(store, path, `not deleted: ${reasonOf(e)}`)
+    return null
+  }
 }

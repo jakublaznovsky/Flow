@@ -17,7 +17,8 @@ of the Claude buttons (see below).
   next few days, next week or any date. A new task can get a "Plan for" date right away.
 - **Focus on one project.** Click a project in the sidebar to see only its cards, with its goal,
   a progress bar and how much you finished this week. Edit the goal and the project notes in
-  place, and add short dated decisions.
+  place, and add short dated decisions. A project's ⋯ menu pauses, completes, archives or
+  deletes it (Flow asks first; a deleted project's file moves to `deleted/`, so it can be restored).
 - **Focus timer.** Press **Focus** on a Today card to start a quiet 15, 25 or 45 minute timer.
   When it ends, nothing pops up; the bar at the top just offers "Mark done" or "Another round".
   Finished sessions are logged so you can see your focus time.
@@ -153,6 +154,7 @@ Flow/
                      YAML header, project notes and decisions below
   days/YYYY-MM-DD.md what you planned and finished each day, plus focus sessions
   reviews/YYYY-Www.md one file per weekly review
+  deleted/           deleted projects (move a file back to projects/ to restore it)
   flow-issues.log    files Flow could not read (Flow never overwrites them)
 ```
 

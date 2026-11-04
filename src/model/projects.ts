@@ -55,3 +55,17 @@ export function addDecision(d: FlowData, slug: string, text: string, today: ISOD
   const project = { ...structuredClone(src), body }
   return { data: { ...d, projects: { ...d.projects, [slug]: project } }, changed: [projectPath(slug)] }
 }
+
+/**
+ * Remove a project (also an unreadable, skipped one) from the data. Nothing is written: the
+ * caller moves `path` into deleted/ first (see `moveToDeleted`). Inbox and day files keep
+ * their history (done/planned/focus snapshots). No-op (no `path`) for an unknown slug.
+ */
+export function deleteProject(d: FlowData, slug: string): Change & { path?: string } {
+  const path = projectPath(slug)
+  const skipped = d.skipped.includes(path)
+  if (!d.projects[slug] && !skipped) return { data: d, changed: [] }
+  const projects = { ...d.projects }
+  delete projects[slug]
+  return { data: { ...d, projects, skipped: d.skipped.filter((p) => p !== path) }, changed: [], path }
+}

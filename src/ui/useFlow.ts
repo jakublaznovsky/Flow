@@ -4,7 +4,8 @@ import type { ColumnOrder } from '../model/board'
 import { localDate } from '../model/dates'
 import { promoteScheduled } from '../model/schedule'
 import type { FileStore } from '../storage/fileStore'
-import { ensureFolder, loadFlow, reloadPaths, saveFlow } from '../storage/flowRepo'
+import { ensureFolder, loadFlow, moveToDeleted, reloadPaths, saveFlow } from '../storage/flowRepo'
+import { deleteProject } from '../model/projects'
 import type { Settings } from './settings'
 
 /** Copy one reloaded path from `from` into `into` (a fresh copy of the current data). */
@@ -115,6 +116,33 @@ export function useFlow(store: FileStore, settings: Settings, now: () => Date = 
     })
   }, [store])
 
+  /**
+   * Delete a project: after earlier saves, its file moves to deleted/ (copy, then remove); only
+   * then does it leave the data. A failed move is logged and the project stays. Clears the focus
+   * filter and the remembered last project when they point at it. Resolves to true on success.
+   */
+  const removeProject = useCallback((slug: string): Promise<boolean> => {
+    const run = saving.current.then(async () => {
+      const cur = dataRef.current
+      const path = cur ? deleteProject(cur, slug).path : undefined
+      if (!path) return false
+      if ((await moveToDeleted(store, path, todayRef.current)) === null) return false
+      const latest = dataRef.current!
+      const next = deleteProject(latest, slug).data
+      pending.current.delete(path)
+      applyLog.current.push({ n: ++applyCount.current, paths: [path] })
+      if (applyLog.current.length > 50) applyLog.current.shift()
+      dataRef.current = next
+      setData(next)
+      setFilter((f) => (f === slug ? null : f))
+      setLastProject((l) => (l === slug ? null : l))
+      if ((await settings.get<string>('lastProject')) === slug) await settings.set('lastProject', null)
+      return true
+    })
+    saving.current = run.then(() => undefined, () => undefined)
+    return run.catch(() => false)
+  }, [store, settings])
+
   // Tasks planned for a day show up in Today by themselves: after load, when the date changes, and
   // whenever the data changes (external edits, a project made active again). Loop-safe: when
   // nothing is due the Change is empty and apply returns without setting state.
@@ -122,5 +150,5 @@ export function useFlow(store: FileStore, settings: Settings, now: () => Date = 
     if (data) apply((d) => promoteScheduled(d, today))
   }, [data, today, apply])
 
-  return { data, today, filter, setFilter, order, setOrder, lastProject, remember, apply }
+  return { data, today, filter, setFilter, order, setOrder, lastProject, remember, apply, removeProject }
 }

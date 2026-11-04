@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { MemoryFileStore } from './fileStore'
-import { ensureFolder, loadFlow, reloadPaths, saveFlow, logIssue, README_TEXT } from './flowRepo'
+import { ensureFolder, loadFlow, reloadPaths, saveFlow, logIssue, moveToDeleted, README_TEXT } from './flowRepo'
 import { moveTask } from '../model/tasks'
 
 const T = '2026-11-04'
@@ -195,5 +195,64 @@ describe('reviews/', () => {
   it('README documents reviews/', () => {
     expect(README_TEXT).toContain('reviews/YYYY-Www.md')
     expect(README_TEXT).toContain('focus_project')
+  })
+})
+
+describe('moveToDeleted', () => {
+  it('copies the exact text to deleted/<slug>-<date>.md, then removes the original', async () => {
+    const s = new MemoryFileStore({ 'projects/good.md': GOOD })
+    const calls: string[] = []
+    const write = s.write.bind(s), remove = s.remove.bind(s)
+    s.write = async (p, t) => { calls.push(`write ${p}`); return write(p, t) }
+    s.remove = async (p) => { calls.push(`remove ${p}`); return remove(p) }
+    expect(await moveToDeleted(s, 'projects/good.md', T)).toBe(`deleted/good-${T}.md`)
+    expect(s.files[`deleted/good-${T}.md`]).toBe(GOOD)
+    expect(s.files['projects/good.md']).toBeUndefined()
+    expect(calls).toEqual([`write deleted/good-${T}.md`, 'remove projects/good.md'])
+  })
+  it('numbers the name when it is taken', async () => {
+    const s = new MemoryFileStore({ 'projects/good.md': GOOD, [`deleted/good-${T}.md`]: 'old', [`deleted/good-${T}-2.md`]: 'older' })
+    expect(await moveToDeleted(s, 'projects/good.md', T)).toBe(`deleted/good-${T}-3.md`)
+    expect(s.files[`deleted/good-${T}.md`]).toBe('old')
+    expect(s.files[`deleted/good-${T}-3.md`]).toBe(GOOD)
+  })
+  it('moves an unreadable file as-is', async () => {
+    const s = new MemoryFileStore({ 'projects/bad.md': BAD })
+    expect(await moveToDeleted(s, 'projects/bad.md', T)).toBe(`deleted/bad-${T}.md`)
+    expect(s.files[`deleted/bad-${T}.md`]).toBe(BAD)
+  })
+  it('keeps the original when the copy fails, and logs one line', async () => {
+    const s = new MemoryFileStore({ 'projects/good.md': GOOD })
+    s.write = async () => { throw new Error('disk full') }
+    let removed = false
+    s.remove = async () => { removed = true }
+    expect(await moveToDeleted(s, 'projects/good.md', T)).toBeNull()
+    expect(removed).toBe(false)
+    expect(s.files['projects/good.md']).toBe(GOOD)
+    expect(s.files['flow-issues.log'].trim().split('\n')).toHaveLength(1)
+    expect(s.files['flow-issues.log']).toContain('projects/good.md  not deleted: disk full')
+  })
+  it('logs when the remove fails; the copy stays as a backup', async () => {
+    const s = new MemoryFileStore({ 'projects/good.md': GOOD })
+    s.remove = async () => { throw new Error('denied') }
+    expect(await moveToDeleted(s, 'projects/good.md', T)).toBeNull()
+    expect(s.files['projects/good.md']).toBe(GOOD)
+    expect(s.files['flow-issues.log']).toContain('not deleted: denied')
+  })
+  it('loadFlow ignores deleted/ and the README mentions it', async () => {
+    const s = new MemoryFileStore({ 'inbox.md': '---\nitems: []\n---\n', [`deleted/good-${T}.md`]: GOOD })
+    const d = await loadFlow(s, T)
+    expect(d.projects).toEqual({})
+    expect(d.skipped).toEqual([])
+    expect(README_TEXT).toContain('deleted/')
+  })
+})
+
+describe('MemoryFileStore.remove', () => {
+  it('removes a file; missing files are fine', async () => {
+    const s = new MemoryFileStore({ 'a.md': 'x' })
+    await s.remove('a.md')
+    await s.remove('b.md')
+    expect(s.files).toEqual({})
   })
 })

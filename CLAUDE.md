@@ -41,7 +41,9 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 ## Rules
 
 - Never write a file that failed to parse; it is skipped and recorded in `Flow/flow-issues.log`.
-- No warnings, nags or pop-ups in the UI; problems go only to the issue log.
+- No warnings, nags or pop-ups in the UI; problems go only to the issue log. One owner exception:
+  deleting a project asks first in an in-app dialog (`DeleteDialog` in Sidebar.tsx: alertdialog,
+  focus on Cancel, Escape/backdrop cancel; never `window.confirm`).
 - Unknown frontmatter fields and Markdown bodies are preserved on write.
 - Dates are local-time ISO `YYYY-MM-DD` (never `toISOString().slice(0, 10)`).
 - Slugs are derived once at creation and never change on rename.
@@ -61,6 +63,11 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   `moveTask(today)`. Past day: `completeOn` (tasks.ts) = done that day, `scheduled` cleared,
   snapshot `extra: {}` on that day (no duplicate), removed from the previous done day; planned lists
   untouched; no change if a file to write is skipped. Unscheduled: back to To do, date cleared.
+- Delete project (⋯ menu / Hidden list, v0.2.5): `useFlow.removeProject` runs in the save chain:
+  `moveToDeleted` (flowRepo) copies the exact on-disk text to `deleted/<slug>-<date>.md` (-2, -3…),
+  then `FileStore.remove`s the original (never if the copy failed; failures → one log line, project
+  stays); only then `deleteProject` (projects.ts) drops it from FlowData. Days/inbox untouched;
+  focus filter and lastProject cleared. loadFlow never reads `deleted/`.
 - Tomorrow column = no new state: it is `scheduled === today + 1`. Drops onto it schedule tomorrow
   (Done tasks reopen first); Tomorrow → To do clears the date.
 - Parking a task: text `<title> — first step: X; steps: a ✓, b; planned: <scheduled ?? planned>`

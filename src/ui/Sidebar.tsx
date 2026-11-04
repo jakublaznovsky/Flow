@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import type { Project, ProjectStatus } from '../model/types'
 import { PROJECT_COLORS } from '../model/ids'
 
@@ -17,6 +18,8 @@ interface Props {
   onFilter: (slug: string | null) => void
   onCreate: (title: string) => void
   onUpdate: (slug: string, patch: Patch) => void
+  /** Delete a project (after the user approved it in the dialog). */
+  onDelete: (slug: string) => void
 }
 
 const STATUS_LABEL: Record<ProjectStatus, string> = { active: 'Active', paused: 'Paused', done: 'Done', archived: 'Archived' }
@@ -74,8 +77,52 @@ function GearIcon() {
   )
 }
 
-function ProjectMenu({ project, onUpdate, onStatus, onClose }: {
-  project: Project; onUpdate: (patch: Patch) => void; onStatus: (s: ProjectStatus) => void; onClose: (refocus: boolean) => void
+/**
+ * "Delete project?" — the one confirmation dialog in Flow (owner's exception to the no-pop-ups
+ * rule, for this destructive action only). Focus starts on Cancel and stays inside; Escape and a
+ * backdrop click cancel.
+ */
+function DeleteDialog({ project, onConfirm, onCancel }: { project: Project; onConfirm: () => void; onCancel: () => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { cancelRef.current?.focus() }, [])
+  const n = project.tasks.length
+  const onKeyDown = (e: ReactKeyboardEvent) => {
+    // Keep keys (Escape, app shortcuts) inside the dialog.
+    e.stopPropagation()
+    if (e.key === 'Escape') { e.preventDefault(); onCancel(); return }
+    if (e.key !== 'Tab') return
+    const items = [...(ref.current?.querySelectorAll<HTMLElement>('button') ?? [])]
+    if (items.length === 0) return
+    const i = items.indexOf(document.activeElement as HTMLElement)
+    const next = e.shiftKey ? (i <= 0 ? items.length - 1 : i - 1) : (i === items.length - 1 ? 0 : i + 1)
+    e.preventDefault()
+    items[next].focus()
+  }
+  return createPortal(
+    <div className="modal-backdrop" data-testid="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}>
+      <div
+        ref={ref} className="modal" role="alertdialog" aria-modal="true"
+        aria-labelledby="delete-project-title" aria-describedby="delete-project-text" onKeyDown={onKeyDown}
+      >
+        <h2 id="delete-project-title">Delete project?</h2>
+        <p id="delete-project-text">
+          Delete “{project.title}” and its {n} {n === 1 ? 'task' : 'tasks'}? Its file moves to the deleted folder
+          inside your Flow folder, so it can be restored.
+        </p>
+        <div className="modal-actions">
+          <button type="button" className="btn" ref={cancelRef} onClick={onCancel}>Cancel</button>
+          <button type="button" className="btn btn-danger" onClick={onConfirm}>Delete</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function ProjectMenu({ project, onUpdate, onStatus, onDelete, onClose }: {
+  project: Project; onUpdate: (patch: Patch) => void; onStatus: (s: ProjectStatus) => void; onDelete: () => void
+  onClose: (refocus: boolean) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [renaming, setRenaming] = useState(false)
@@ -118,16 +165,21 @@ function ProjectMenu({ project, onUpdate, onStatus, onClose }: {
       <button role="menuitem" onClick={() => onStatus('paused')}>Pause</button>
       <button role="menuitem" onClick={() => onStatus('done')}>Mark done</button>
       <button role="menuitem" onClick={() => onStatus('archived')}>Archive</button>
+      <div className="menu-sep" />
+      <button role="menuitem" className="menu-danger" onClick={onDelete}>Delete…</button>
     </div>
   )
 }
 
-export default function Sidebar({ view, onView, projects, hidden, progress, filter, focusSlug, onFilter, onCreate, onUpdate }: Props) {
+export default function Sidebar({ view, onView, projects, hidden, progress, filter, focusSlug, onFilter, onCreate, onUpdate, onDelete }: Props) {
   const [menu, setMenu] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [showHidden, setShowHidden] = useState(false)
   const menuButtons = useRef(new Map<string, HTMLButtonElement>())
+  const hiddenDeleteButtons = useRef(new Map<string, HTMLButtonElement>())
+  const allButton = useRef<HTMLButtonElement>(null)
+  const [deleting, setDeleting] = useState<Project | null>(null)
 
   const closeMenu = (refocus: boolean) => {
     if (refocus && menu) menuButtons.current.get(menu)?.focus()
@@ -139,6 +191,17 @@ export default function Sidebar({ view, onView, projects, hidden, progress, filt
     setMenu(null)
   }
   const stopAdding = () => { setAdding(false); setNewTitle('') }
+  const askDelete = (p: Project) => { setMenu(null); setDeleting(p) }
+  const cancelDelete = () => {
+    if (deleting) (menuButtons.current.get(deleting.slug) ?? hiddenDeleteButtons.current.get(deleting.slug))?.focus()
+    setDeleting(null)
+  }
+  const confirmDelete = () => {
+    if (!deleting) return
+    onDelete(deleting.slug)
+    setDeleting(null)
+    allButton.current?.focus()
+  }
 
   return (
     <nav className="sidebar" aria-label="Sidebar">
@@ -167,7 +230,7 @@ export default function Sidebar({ view, onView, projects, hidden, progress, filt
 
       <div className="section-label" id="projects-label">Projects</div>
       <div className="projects">
-        <button className="nav-item all-projects" aria-pressed={filter === null} onClick={() => onFilter(null)}>
+        <button ref={allButton} className="nav-item all-projects" aria-pressed={filter === null} onClick={() => onFilter(null)}>
           <span className="dot dot-all" aria-hidden="true" /><span>All projects</span>
         </button>
         <ul className="project-list" aria-labelledby="projects-label">
@@ -216,6 +279,7 @@ export default function Sidebar({ view, onView, projects, hidden, progress, filt
                     project={p}
                     onUpdate={(patch) => onUpdate(p.slug, patch)}
                     onStatus={(s) => setStatus(p.slug, s)}
+                    onDelete={() => askDelete(p)}
                     onClose={closeMenu}
                   />
                 )}
@@ -240,6 +304,10 @@ export default function Sidebar({ view, onView, projects, hidden, progress, filt
                     <span className="project-title">{p.title}</span>
                     <span className="status">{STATUS_LABEL[p.status]}</span>
                     <button className="link-btn" onClick={() => onUpdate(p.slug, { status: 'active' })}>Make active</button>
+                    <button
+                      className="link-btn link-danger" aria-label={`Delete ${p.title}…`} onClick={() => askDelete(p)}
+                      ref={(el) => { if (el) hiddenDeleteButtons.current.set(p.slug, el); else hiddenDeleteButtons.current.delete(p.slug) }}
+                    >Delete…</button>
                   </li>
                 ))}
               </ul>
@@ -258,6 +326,8 @@ export default function Sidebar({ view, onView, projects, hidden, progress, filt
           <button className="nav-item subtle" onClick={() => setAdding(true)}>+ New project</button>
         )}
       </div>
+
+      {deleting && <DeleteDialog project={deleting} onConfirm={confirmDelete} onCancel={cancelDelete} />}
 
       <div className="sidebar-foot">
         <button className="nav-item" aria-label="Settings" aria-pressed={view === 'settings'} onClick={() => onView('settings')}>

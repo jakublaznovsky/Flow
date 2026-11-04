@@ -311,6 +311,7 @@ export default function Board({ store, settings, now, onReady, ai, shortcut }: P
         onFilter={setFilter}
         onCreate={(t) => { const s = createProjectNamed(t); if (s) setFilter(null) }}
         onUpdate={(slug, patch) => apply((d) => updateProject(d, slug, patch))}
+        onDelete={(slug) => { void flow.removeProject(slug) }}
       />
       <main className="main">
         <div className="topbar">

@@ -156,3 +156,105 @@ describe('Sidebar', () => {
     expect(store.files['projects/garden.md']).toBeUndefined()
   })
 })
+
+describe('Delete project', () => {
+  const DAY = '---\ndate: 2026-11-02\nplanned: []\ndone:\n  - ref: flow-app/t3\n    title: Pick a name\n    project: Flow app\n---\n'
+  const withDay = () => ({ ...seed(), 'days/2026-11-02.md': DAY })
+  const openDialog = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
+    await user.click(sidebar().getByRole('button', { name: `Project menu for ${name}` }))
+    await user.click(screen.getByRole('menuitem', { name: 'Delete…' }))
+    return screen.getByRole('alertdialog', { name: 'Delete project?' })
+  }
+
+  it('asks first: the dialog names the project and its task count, focus on Cancel', async () => {
+    const { user } = setup()
+    await screen.findByText('Buy a book')
+    const dialog = await openDialog(user, 'Flow app')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(dialog).toHaveAccessibleDescription(/Delete “Flow app” and its 3 tasks\? Its file moves to the deleted folder inside your Flow folder, so it can be restored\./)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    const cancel = within(dialog).getByRole('button', { name: 'Cancel' })
+    expect(cancel).toHaveFocus()
+    await user.tab()
+    expect(within(dialog).getByRole('button', { name: 'Delete' })).toHaveFocus()
+    await user.tab()
+    expect(cancel).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(within(dialog).getByRole('button', { name: 'Delete' })).toHaveFocus()
+  })
+
+  it('Cancel, Escape and a backdrop click keep everything; focus returns to ⋯', async () => {
+    const { store, user } = setup(withDay())
+    await screen.findByText('Buy a book')
+    const before = { ...store.files }
+    const more = sidebar().getByRole('button', { name: 'Project menu for Learn Spanish' })
+    await user.click(within(await openDialog(user, 'Learn Spanish')).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(more).toHaveFocus()
+    await openDialog(user, 'Learn Spanish')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(more).toHaveFocus()
+    await openDialog(user, 'Learn Spanish')
+    await user.keyboard('w') // app shortcuts do not fire behind the dialog
+    expect(screen.getByRole('region', { name: 'To do' })).toBeInTheDocument()
+    await user.click(screen.getByTestId('modal-backdrop'))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.getByText('Buy a book')).toBeInTheDocument()
+    expect(store.files).toEqual(before)
+  })
+
+  it('Delete moves the file to deleted/, removes cards and sidebar entry, keeps days, clears the focus', async () => {
+    const { store, user } = setup(withDay())
+    await screen.findByText('Buy a book')
+    await user.click(sidebar().getByRole('button', { name: 'Flow app' }))
+    const original = store.files['projects/flow-app.md']
+    await user.click(within(await openDialog(user, 'Flow app')).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(sidebar().queryByRole('button', { name: 'Flow app' })).not.toBeInTheDocument())
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(sidebar().getByRole('button', { name: 'All projects' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText('Set up Tauri')).not.toBeInTheDocument()
+    expect(screen.queryByText('Write spec')).not.toBeInTheDocument()
+    expect(screen.getByText('Buy a book')).toBeInTheDocument()
+    expect(store.files['projects/flow-app.md']).toBeUndefined()
+    expect(store.files['deleted/flow-app-2026-11-03.md']).toBe(original)
+    expect(store.files['days/2026-11-02.md']).toBe(DAY)
+    expect(store.files['inbox.md']).toContain('Look into podcasts')
+    // Later saves do not bring the file back.
+    await user.click(sidebar().getByRole('button', { name: 'Project menu for Learn Spanish' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Archive' }))
+    await waitFor(() => expect(store.files['projects/learn-spanish.md']).toContain('status: archived'))
+    expect(store.files['projects/flow-app.md']).toBeUndefined()
+  })
+
+  it('a hidden project can be deleted from the Hidden list', async () => {
+    const { store, user } = setup()
+    await screen.findByText('Buy a book')
+    await user.click(sidebar().getByRole('button', { name: 'Project menu for Learn Spanish' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Pause' }))
+    await user.click(sidebar().getByRole('button', { name: 'Hidden (1)' }))
+    const list = within(screen.getByRole('list', { name: 'Hidden projects' }))
+    await user.click(list.getByRole('button', { name: 'Delete Learn Spanish…' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete project?' })
+    expect(dialog).toHaveAccessibleDescription(/its 1 task\?/)
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(store.files['projects/learn-spanish.md']).toBeUndefined())
+    expect(store.files['deleted/learn-spanish-2026-11-03.md']).toContain('status: paused')
+    expect(sidebar().queryByRole('button', { name: /^Hidden/ })).not.toBeInTheDocument()
+  })
+
+  it('a failed move keeps the project and logs one line, no extra pop-up', async () => {
+    const files = seed()
+    const store = new MemoryFileStore(files)
+    const write = store.write.bind(store)
+    store.write = async (p, t) => { if (p.startsWith('deleted/')) throw new Error('disk full'); return write(p, t) }
+    render(<App store={store} settings={new MemorySettings()} now={() => NOW} />)
+    const user = userEvent.setup()
+    await screen.findByText('Buy a book')
+    await user.click(within(await openDialog(user, 'Learn Spanish')).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(store.files['flow-issues.log']).toContain('projects/learn-spanish.md  not deleted: disk full'))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(sidebar().getByRole('button', { name: 'Learn Spanish' })).toBeInTheDocument()
+    expect(store.files['projects/learn-spanish.md']).toBe(files['projects/learn-spanish.md'])
+  })
+})

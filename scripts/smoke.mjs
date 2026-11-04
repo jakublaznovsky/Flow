@@ -220,6 +220,25 @@ try {
   }
   console.log('ok: Weekly review steps')
 
+  // --- Delete a project: create one, delete it via the confirmation dialog ---
+  {
+    const nav = page.getByRole('navigation', { name: 'Sidebar' })
+    const name = 'Smoke test project'
+    await nav.getByRole('button', { name: '+ New project' }).click()
+    await nav.getByRole('textbox', { name: 'Project name' }).fill(name)
+    await page.keyboard.press('Enter')
+    await nav.getByRole('button', { name, exact: true }).waitFor({ timeout: 3000 })
+    await nav.getByRole('button', { name: `Project menu for ${name}` }).click()
+    await page.getByRole('menuitem', { name: 'Delete…' }).click()
+    const dialog = page.getByRole('alertdialog', { name: 'Delete project?' })
+    await dialog.waitFor({ timeout: 3000 })
+    if (process.env.FLOW_DELETE_SHOT) await page.screenshot({ path: process.env.FLOW_DELETE_SHOT })
+    await dialog.getByRole('button', { name: 'Delete', exact: true }).click()
+    await nav.getByRole('button', { name, exact: true }).waitFor({ state: 'detached', timeout: 3000 })
+    if (await dialog.count()) fail('delete dialog still open')
+    else console.log(`ok: "${name}" created and deleted via the dialog`)
+  }
+
   // --- Settings: API key field ---
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByLabel('Claude API key').waitFor({ timeout: 3000 })

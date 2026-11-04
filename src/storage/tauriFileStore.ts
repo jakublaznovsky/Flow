@@ -1,4 +1,4 @@
-import { exists, mkdir, readDir, readTextFile, rename, watch, writeTextFile } from '@tauri-apps/plugin-fs'
+import { exists, mkdir, readDir, readTextFile, remove, rename, watch, writeTextFile } from '@tauri-apps/plugin-fs'
 import type { FileStore } from './fileStore'
 
 const join = (root: string, rel: string) => `${root.replace(/[\\/]+$/, '')}/${rel}`
@@ -46,6 +46,12 @@ export class TauriFileStore implements FileStore {
     await mkdir(abs.slice(0, abs.lastIndexOf('/')), { recursive: true })
     const prev = (await exists(abs)) ? await readTextFile(abs) : ''
     await writeTextFile(abs, prev + text)
+  }
+
+  async remove(path: string): Promise<void> {
+    const abs = join(this.root, path)
+    if (await exists(abs)) await remove(abs)
+    this.lastWritten.delete(path)
   }
 
   async watch(onChange: (paths: string[]) => void): Promise<() => void> {

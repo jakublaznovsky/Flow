@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { addDecision, createProject, updateProject } from './projects'
+import { addDecision, createProject, deleteProject, updateProject } from './projects'
 import { emptyFlow, type FlowData } from './types'
 
 function sample(): FlowData {
@@ -103,5 +103,39 @@ describe('addDecision', () => {
   it('does nothing for blank text or unknown project', () => {
     expect(addDecision(sample(), 'flow-app', '   ', T)).toEqual({ data: sample(), changed: [] })
     expect(addDecision(sample(), 'nope', 'x', T).changed).toEqual([])
+  })
+})
+
+describe('deleteProject', () => {
+  function withHistory(): FlowData {
+    const d = structuredClone(sample()) as FlowData
+    d.projects['flow-app'].tasks = [{ id: 't1', title: 'One', status: 'done', created: T, done: T, extra: {} }]
+    d.projects.other = { ...d.projects['flow-app'], slug: 'other', title: 'Other', tasks: [] }
+    d.inbox.items = [{ id: 'i1', text: 'keep', created: T, extra: {} }]
+    d.days[T] = { date: T, planned: ['flow-app/t1'], done: [{ ref: 'flow-app/t1', title: 'One', project: 'Flow app', extra: {} }],
+      focus: [{ ref: 'flow-app/t1', title: 'One', project: 'Flow app', minutes: 5, extra: {} }], body: '', extra: {} }
+    return Object.freeze(d)
+  }
+  it('removes the project; inbox and day history are untouched; nothing is written', () => {
+    const d = withHistory()
+    const r = deleteProject(d, 'flow-app')
+    expect(r.data.projects['flow-app']).toBeUndefined()
+    expect(r.data.projects.other).toBe(d.projects.other)
+    expect(r.data.inbox).toBe(d.inbox)
+    expect(r.data.days).toBe(d.days)
+    expect(r.path).toBe('projects/flow-app.md')
+    expect(r.changed).toEqual([])
+  })
+  it('works for a skipped (unreadable) project file', () => {
+    const d = { ...withHistory(), skipped: ['projects/broken.md', 'days/2026-11-01.md'] }
+    const r = deleteProject(d, 'broken')
+    expect(r.path).toBe('projects/broken.md')
+    expect(r.data.skipped).toEqual(['days/2026-11-01.md'])
+  })
+  it('is a no-op for an unknown slug', () => {
+    const d = withHistory()
+    const r = deleteProject(d, 'nope')
+    expect(r.data).toBe(d)
+    expect(r.path).toBeUndefined()
   })
 })
