@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { boardColumns, searchCards, type Card as CardData, type ColumnId } from '../model/board'
 import { promoteInboxItem } from '../model/inbox'
-import { createProject, updateProject } from '../model/projects'
-import { projectProgress } from '../model/stats'
+import { addDecision, createProject, updateProject } from '../model/projects'
+import { doneOn, projectProgress, weekDates } from '../model/stats'
 import { moveTask } from '../model/tasks'
 import type { FileStore } from '../storage/fileStore'
 import BoardView from './BoardView'
+import NotesPanel from './NotesPanel'
+import ProjectHeader from './ProjectHeader'
 import ProjectPicker from './ProjectPicker'
 import SearchBox from './SearchBox'
 import Sidebar, { type View } from './Sidebar'
@@ -112,6 +114,7 @@ export default function Board({ store, settings, now, onReady }: Props) {
   const [query, setQuery] = useState('')
   const promotion = usePromotion(flow, query)
   const [view, setViewState] = useState<View>('board')
+  const [notesOpen, setNotesOpen] = useState(false)
   const [addRequest, setAddRequest] = useState(false)
   const clearAddRequest = useCallback(() => setAddRequest(false), [])
   const searchRef = useRef<HTMLInputElement>(null)
@@ -160,6 +163,12 @@ export default function Board({ store, settings, now, onReady }: Props) {
     if (slug) remember(slug)
     return slug
   }
+  const focused = filter ? data.projects[filter] : undefined
+  const showHeader = view === 'board' && !!focused
+  const showNotes = showHeader && notesOpen
+  const doneThisWeek = focused
+    ? weekDates(today).reduce((n, date) => n + doneOn(data, date).filter((e) => e.ref.startsWith(`${focused.slug}/`)).length, 0)
+    : 0
   const onSearch = (q: string) => {
     setQuery(q)
     if (q.trim() && view !== 'board') setView('board')
@@ -180,10 +189,23 @@ export default function Board({ store, settings, now, onReady }: Props) {
       />
       <main className="main">
         <div className="topbar">
-          <div className="header-slot" />
+          <div className="header-slot">
+            {showHeader && focused && (
+              <ProjectHeader
+                project={focused}
+                done={progress[focused.slug]?.done ?? projectProgress(data, focused.slug, today).done}
+                total={progress[focused.slug]?.total ?? projectProgress(data, focused.slug, today).total}
+                doneThisWeek={doneThisWeek}
+                notesOpen={showNotes}
+                onToggleNotes={() => setNotesOpen((o) => !o)}
+                onGoal={(goal) => apply((d) => updateProject(d, focused.slug, { goal }))}
+              />
+            )}
+          </div>
           <SearchBox ref={searchRef} value={query} onChange={onSearch} />
         </div>
         <div className="focus-slot" />
+        <div className="content">
         <div className="view">
           {view === 'board' ? (
             <BoardView
@@ -198,6 +220,16 @@ export default function Board({ store, settings, now, onReady }: Props) {
           ) : (
             <section className="progress-view" aria-label="Progress"><h2>Progress</h2></section>
           )}
+        </div>
+        {showNotes && focused && (
+          <NotesPanel
+            key={focused.slug}
+            body={focused.body}
+            onSaveBody={(body) => apply((d) => updateProject(d, focused.slug, { body }))}
+            onAddDecision={(text) => apply((d) => addDecision(d, focused.slug, text, today))}
+            onClose={() => setNotesOpen(false)}
+          />
+        )}
         </div>
       </main>
     </div>
