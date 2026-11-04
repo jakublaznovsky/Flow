@@ -123,7 +123,7 @@ function DraggableDone({ entry, date }: { entry: DoneEntry; date: ISODate }) {
   )
 }
 
-function DayColumn({ day, today, movable }: { day: WeekDay; today: ISODate; movable: (ref: string) => boolean }) {
+function DayColumn({ day, today, movable }: { day: WeekDay; today: ISODate; movable: (ref: string, date: ISODate) => boolean }) {
   const past = day.date < today
   const isToday = day.date === today
   const { setNodeRef, isOver } = useDroppable({ id: `day-${day.date}` })
@@ -139,7 +139,7 @@ function DayColumn({ day, today, movable }: { day: WeekDay; today: ISODate; mova
       <ul className="week-cards">
         {day.scheduled.map((c) => <WeekCard key={c.key} card={c} />)}
         {day.inToday.map((c) => <InTodayItem key={`today-${c.key}`} card={c} />)}
-        {day.done.map((e, i) => movable(e.ref)
+        {day.done.map((e, i) => movable(e.ref, day.date)
           ? <DraggableDone key={`done-${e.ref}-${i}`} entry={e} date={day.date} />
           : <li key={`done-${e.ref}-${i}`} className="week-done is-done"><DoneFace title={e.title} /></li>)}
       </ul>
@@ -172,9 +172,11 @@ export default function WeekView({ flow }: { flow: Flow }) {
 
   const start = addDays(weekStart(today), 7 * offset)
   const plan = weekPlan(data, start, filter, today)
-  const movable = (ref: string) => {
+  // A done entry drags only while its task still exists in an active project and is done that day
+  // (a stale snapshot, e.g. after an external edit, stays static).
+  const movable = (ref: string, date: ISODate) => {
     const found = findTask(data, ref)
-    return !!found && found.project.status === 'active'
+    return !!found && found.project.status === 'active' && found.task.status === 'done' && found.task.done === date
   }
 
   const onDragStart = (e: DragStartEvent) => setDragging((e.active.data.current as DragItem | undefined) ?? null)

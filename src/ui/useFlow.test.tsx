@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { addInboxItem } from '../model/inbox'
-import { addTask } from '../model/tasks'
+import { addTask, editTask } from '../model/tasks'
 import { MemoryFileStore } from '../storage/fileStore'
 import { MemorySettings } from './settings'
 import { useFlow } from './useFlow'
@@ -56,5 +56,41 @@ describe('useFlow saving', () => {
     expect(maxInFlight).toBe(1)
     expect(store.files['projects/a.md']).toContain('One')
     expect(store.files['projects/a.md']).toContain('Two')
+  })
+})
+
+describe('useFlow removeProject', () => {
+  it('a write for the project queued during the delete does not recreate its file', async () => {
+    const store = new MemoryFileStore(seed())
+    const hook = await harness(store)
+    act(() => hook.result.current.apply((d) => addTask(d, 'a', 'First', 'todo', T)))
+    // While the file is being moved, the project is edited: that write is queued behind the delete.
+    const remove = store.remove.bind(store)
+    store.remove = async (p) => {
+      act(() => hook.result.current.apply((d) => editTask(d, 'a/t1', { title: 'Renamed' }, T)))
+      await remove(p)
+    }
+    let done: Promise<boolean> = Promise.resolve(false)
+    act(() => { done = hook.result.current.removeProject('a') })
+    expect(await done).toBe(true)
+    act(() => hook.result.current.apply((d) => addInboxItem(d, 'Later', T)))
+    await waitFor(() => expect(store.files['inbox.md']).toContain('Later'))
+    expect(store.files['projects/a.md']).toBeUndefined()
+    expect(store.files[`deleted/a-${T}.md`]).toContain('First')
+    expect(hook.result.current.data!.projects.a).toBeUndefined()
+  })
+
+  it('a settings failure after a successful move still reports success', async () => {
+    const store = new MemoryFileStore(seed())
+    const settings = new MemorySettings()
+    const hook = renderHook(() => useFlow(store, settings, () => NOW))
+    await waitFor(() => expect(hook.result.current.data).not.toBeNull())
+    act(() => hook.result.current.remember('a'))
+    settings.get = async () => { throw new Error('store broken') }
+    let done: Promise<boolean> = Promise.resolve(false)
+    act(() => { done = hook.result.current.removeProject('a') })
+    expect(await done).toBe(true)
+    await waitFor(() => expect(hook.result.current.data!.projects.a).toBeUndefined())
+    expect(hook.result.current.lastProject).toBeNull()
   })
 })

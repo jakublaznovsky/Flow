@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import App from '../App'
@@ -202,6 +202,37 @@ describe('Delete project', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(screen.getByText('Buy a book')).toBeInTheDocument()
     expect(store.files).toEqual(before)
+  })
+
+  it('focus cannot escape the dialog: clicking its text keeps keys inside', async () => {
+    const { store, user } = setup()
+    await screen.findByText('Buy a book')
+    const before = { ...store.files }
+    const more = sidebar().getByRole('button', { name: 'Project menu for Learn Spanish' })
+    const dialog = await openDialog(user, 'Learn Spanish')
+    await user.click(within(dialog).getByText(/Its file moves to the deleted folder/))
+    expect(dialog.contains(document.activeElement)).toBe(true)
+    await user.click(within(dialog).getByRole('heading', { name: 'Delete project?' }))
+    expect(dialog.contains(document.activeElement)).toBe(true)
+    await user.keyboard('n')
+    expect(screen.queryByRole('textbox', { name: 'New task' })).not.toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(more).toHaveFocus()
+    expect(store.files).toEqual(before)
+  })
+
+  it('focus moved outside the dialog is pulled back to Cancel; Shift+Tab stays inside', async () => {
+    const { user } = setup()
+    await screen.findByText('Buy a book')
+    const dialog = await openDialog(user, 'Learn Spanish')
+    act(() => sidebar().getByRole('button', { name: 'Board' }).focus())
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus()
+    act(() => (document.activeElement as HTMLElement).blur())
+    await user.keyboard('{Shift>}{Tab}{/Shift}')
+    expect(dialog.contains(document.activeElement)).toBe(true)
+    await user.keyboard('w')
+    expect(screen.getByRole('region', { name: 'To do' })).toBeInTheDocument()
   })
 
   it('Delete moves the file to deleted/, removes cards and sidebar entry, keeps days, clears the focus', async () => {

@@ -136,7 +136,11 @@ export function useFlow(store: FileStore, settings: Settings, now: () => Date = 
       setData(next)
       setFilter((f) => (f === slug ? null : f))
       setLastProject((l) => (l === slug ? null : l))
-      if ((await settings.get<string>('lastProject')) === slug) await settings.set('lastProject', null)
+      try {
+        if ((await settings.get<string>('lastProject')) === slug) await settings.set('lastProject', null)
+      } catch {
+        // The move succeeded; a settings hiccup only leaves a stale default project behind.
+      }
       return true
     })
     saving.current = run.then(() => undefined, () => undefined)

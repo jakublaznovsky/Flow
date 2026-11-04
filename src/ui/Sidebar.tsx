@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Project, ProjectStatus } from '../model/types'
 import { PROJECT_COLORS } from '../model/ids'
@@ -85,25 +85,44 @@ function GearIcon() {
 function DeleteDialog({ project, onConfirm, onCancel }: { project: Project; onConfirm: () => void; onCancel: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
-  useEffect(() => { cancelRef.current?.focus() }, [])
+  const cancelCb = useRef(onCancel)
+  cancelCb.current = onCancel
+
+  useEffect(() => {
+    cancelRef.current?.focus()
+    // Capture phase on window: runs before the app's shortcuts and any other key handler.
+    const onKey = (e: KeyboardEvent) => {
+      e.stopPropagation()
+      if (e.key === 'Escape') { e.preventDefault(); cancelCb.current(); return }
+      if (e.key !== 'Tab') return
+      e.preventDefault()
+      const items = [...(ref.current?.querySelectorAll<HTMLElement>('button') ?? [])]
+      if (items.length === 0) return
+      const i = items.indexOf(document.activeElement as HTMLElement)
+      const next = i === -1 ? (e.shiftKey ? items.length - 1 : 0)
+        : e.shiftKey ? (i === 0 ? items.length - 1 : i - 1) : (i === items.length - 1 ? 0 : i + 1)
+      items[next].focus()
+    }
+    // Focus that lands outside the dialog comes back to Cancel.
+    const onFocusIn = (e: FocusEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) cancelRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKey, true)
+    document.addEventListener('focusin', onFocusIn)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      document.removeEventListener('focusin', onFocusIn)
+    }
+  }, [])
+
   const n = project.tasks.length
-  const onKeyDown = (e: ReactKeyboardEvent) => {
-    // Keep keys (Escape, app shortcuts) inside the dialog.
-    e.stopPropagation()
-    if (e.key === 'Escape') { e.preventDefault(); onCancel(); return }
-    if (e.key !== 'Tab') return
-    const items = [...(ref.current?.querySelectorAll<HTMLElement>('button') ?? [])]
-    if (items.length === 0) return
-    const i = items.indexOf(document.activeElement as HTMLElement)
-    const next = e.shiftKey ? (i <= 0 ? items.length - 1 : i - 1) : (i === items.length - 1 ? 0 : i + 1)
-    e.preventDefault()
-    items[next].focus()
-  }
   return createPortal(
     <div className="modal-backdrop" data-testid="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}>
       <div
         ref={ref} className="modal" role="alertdialog" aria-modal="true"
-        aria-labelledby="delete-project-title" aria-describedby="delete-project-text" onKeyDown={onKeyDown}
+        aria-labelledby="delete-project-title" aria-describedby="delete-project-text"
+        // Clicking the title or text must not move focus out of the dialog (to <body>).
+        onMouseDown={(e) => { if (!(e.target as Element).closest('button')) e.preventDefault() }}
       >
         <h2 id="delete-project-title">Delete project?</h2>
         <p id="delete-project-text">
@@ -192,15 +211,22 @@ export default function Sidebar({ view, onView, projects, hidden, progress, filt
   }
   const stopAdding = () => { setAdding(false); setNewTitle('') }
   const askDelete = (p: Project) => { setMenu(null); setDeleting(p) }
+  // Where focus goes once the dialog has closed (focusing earlier would be pulled back into it).
+  const refocus = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (deleting || !refocus.current) return
+    refocus.current.focus()
+    refocus.current = null
+  }, [deleting])
   const cancelDelete = () => {
-    if (deleting) (menuButtons.current.get(deleting.slug) ?? hiddenDeleteButtons.current.get(deleting.slug))?.focus()
+    if (deleting) refocus.current = menuButtons.current.get(deleting.slug) ?? hiddenDeleteButtons.current.get(deleting.slug) ?? null
     setDeleting(null)
   }
   const confirmDelete = () => {
     if (!deleting) return
     onDelete(deleting.slug)
+    refocus.current = allButton.current
     setDeleting(null)
-    allButton.current?.focus()
   }
 
   return (

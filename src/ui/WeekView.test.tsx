@@ -315,6 +315,19 @@ describe('Week view', () => {
     expect(gone).not.toHaveAttribute('role')
   })
 
+  it('a done entry whose task is no longer done that day is not draggable', async () => {
+    const files = seed()
+    // External edit: t3 reopened, its snapshot left behind on Monday.
+    files['projects/flow-app.md'] = files['projects/flow-app.md'].replace('status: done\n    created: 2026-11-01\n    done: 2026-11-02', 'status: todo\n    created: 2026-11-01')
+    files['projects/learn-spanish.md'] = project('Learn Spanish', '#30a46c', task('t1', 'Buy a book', 'todo') + task('t2', 'Read', 'done', '    done: 2026-11-02\n'))
+    files['days/2026-11-03.md'] = '---\ndate: 2026-11-03\nplanned: []\ndone:\n  - ref: learn-spanish/t2\n    title: Read\n    project: Learn Spanish\n---\n'
+    const { view } = await open(files)
+    const stale = within(view.getByRole('region', { name: 'Mon 2 Nov' })).getByText('Pick a name').closest('li')!
+    expect(stale).not.toHaveAttribute('aria-roledescription')
+    const otherDay = within(view.getByRole('region', { name: 'Tue 3 Nov' })).getByText('Read').closest('li')!
+    expect(otherDay).not.toHaveAttribute('aria-roledescription')
+  })
+
   it('respects the project filter', async () => {
     const { user, view } = await open()
     await user.click(within(screen.getByRole('navigation', { name: 'Sidebar' })).getByRole('button', { name: 'Learn Spanish' }))
