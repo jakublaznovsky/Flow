@@ -83,6 +83,11 @@ done:
   - ref: flow-app/t2
     title: Set up Tauri project
     project: Flow app
+focus:
+  - ref: flow-app/t2
+    title: Set up Tauri project
+    project: Flow app
+    minutes: 25
 ---
 Optional free-text note.
 \`\`\`
@@ -90,6 +95,9 @@ Optional free-text note.
 - planned: refs of tasks moved into Today on this date (appended; no duplicates).
 - done: a snapshot of each completed task (ref plus title and project title at that
   moment), so the day's record stays readable if the task is later renamed or deleted.
+- focus: one entry per finished or stopped focus session (ref, title and project snapshot,
+  minutes as a whole number). Sessions shorter than 1 minute are not logged. The key is
+  omitted when there are none.
 - A day file is created only when something happens that day.
 
 ## Example prompts

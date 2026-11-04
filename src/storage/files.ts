@@ -1,4 +1,4 @@
-import type { Day, DoneEntry, Extra, ISODate, Inbox, InboxItem, Project, ProjectStatus, Task, TaskStatus } from '../model/types'
+import type { Day, DoneEntry, Extra, FocusEntry, ISODate, Inbox, InboxItem, Project, ProjectStatus, Task, TaskStatus } from '../model/types'
 import { nextInboxId, nextTaskId, pickColor } from '../model/ids'
 import { joinFrontmatter, splitFrontmatter } from './frontmatter'
 
@@ -143,10 +143,26 @@ export function parseDay(date: ISODate, text: string): Day {
       extra: pickExtra(raw, ['ref', 'title', 'project']),
     }
   })
-  return { date, planned, done, body, extra: pickExtra(data, ['date', 'planned', 'done']) }
+  const focus = list(data.focus, 'focus').map((raw): FocusEntry => {
+    if (!isObj(raw)) throw new Error('focus entry must be a mapping')
+    if (!present(raw.ref)) throw new Error('focus entry is missing ref')
+    const minutes = raw.minutes
+    if (typeof minutes !== 'number' || !Number.isInteger(minutes) || minutes < 0) {
+      throw new Error('focus entry minutes must be a non-negative integer')
+    }
+    return {
+      ref: str(raw.ref), title: str(raw.title ?? ''), project: str(raw.project ?? ''), minutes,
+      extra: pickExtra(raw, ['ref', 'title', 'project', 'minutes']),
+    }
+  })
+  return { date, planned, done, focus, body, extra: pickExtra(data, ['date', 'planned', 'done', 'focus']) }
 }
 
 export function serializeDay(d: Day): string {
   const done = d.done.map((e) => ({ ref: e.ref, title: e.title, project: e.project, ...e.extra }))
-  return joinFrontmatter({ date: d.date, planned: d.planned, done, ...d.extra }, d.body)
+  const o: Obj = { date: d.date, planned: d.planned, done }
+  if (d.focus.length > 0) {
+    o.focus = d.focus.map((e) => ({ ref: e.ref, title: e.title, project: e.project, minutes: e.minutes, ...e.extra }))
+  }
+  return joinFrontmatter({ ...o, ...d.extra }, d.body)
 }

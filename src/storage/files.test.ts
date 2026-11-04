@@ -184,3 +184,36 @@ describe('status parsing', () => {
     expect(p.tasks[0].status).toBe('done')
   })
 })
+
+describe('day focus log', () => {
+  const FOCUS_DAY = `---
+date: 2026-11-04
+planned: []
+done: []
+focus:
+  - ref: flow-app/t2
+    title: Set up Tauri project
+    project: Flow app
+    minutes: 25
+    mood: good
+---
+`
+  it('parses and round-trips focus entries including extra keys', () => {
+    const day = parseDay('2026-11-04', FOCUS_DAY)
+    expect(day.focus).toEqual([
+      { ref: 'flow-app/t2', title: 'Set up Tauri project', project: 'Flow app', minutes: 25, extra: { mood: 'good' } },
+    ])
+    expect(parseDay('2026-11-04', serializeDay(day))).toEqual(day)
+    expect(serializeDay(day)).toContain('mood: good')
+  })
+  it('has an empty focus list and no focus key when absent', () => {
+    const day = parseDay('2026-11-04', '---\ndate: 2026-11-04\nplanned: []\ndone: []\n---\n')
+    expect(day.focus).toEqual([])
+    expect(serializeDay(day)).not.toContain('focus')
+    expect(day.extra).toEqual({})
+  })
+  it.each(['25.5', '-3', 'abc', '"25"', 'null'])('rejects minutes %s', (m) => {
+    const text = `---\ndate: 2026-11-04\nfocus:\n  - ref: a/t1\n    title: x\n    project: A\n    minutes: ${m}\n---\n`
+    expect(() => parseDay('2026-11-04', text)).toThrow()
+  })
+})

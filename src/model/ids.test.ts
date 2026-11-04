@@ -45,8 +45,8 @@ describe('nextTaskIdFor', () => {
     const d = emptyFlow()
     d.projects.a = { slug: 'a', title: 'A', status: 'active', color: '#000', created: '2026-11-01',
       tasks: [{ id: 't2', title: 'x', status: 'todo', created: '2026-11-01', extra: {} }], body: '', extra: {} }
-    d.days['2026-11-01'] = { date: '2026-11-01', planned: ['a/t4', 'b/t9'], done: [], body: '', extra: {} }
-    d.days['2026-11-02'] = { date: '2026-11-02', planned: [], body: '', extra: {},
+    d.days['2026-11-01'] = { date: '2026-11-01', planned: ['a/t4', 'b/t9'], done: [], focus: [], body: '', extra: {} }
+    d.days['2026-11-02'] = { date: '2026-11-02', planned: [], focus: [], body: '', extra: {},
       done: [{ ref: 'a/t6', title: 'gone', project: 'A', extra: {} }, { ref: 'ab/t20', title: 'other', project: 'AB', extra: {} }] }
     expect(nextTaskIdFor(d, 'a')).toBe('t7')
     expect(nextTaskIdFor(d, 'b')).toBe('t10')

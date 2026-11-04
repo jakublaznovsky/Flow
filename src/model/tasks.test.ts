@@ -51,7 +51,7 @@ describe('addTask', () => {
     const t = r.data.projects['flow-app'].tasks[2]
     expect(t.status).toBe('today')
     expect(t.planned).toBe(T)
-    expect(r.data.days[T]).toEqual({ date: T, planned: ['flow-app/t3'], done: [], body: '', extra: {} })
+    expect(r.data.days[T]).toEqual({ date: T, planned: ['flow-app/t3'], done: [], focus: [], body: '', extra: {} })
     expect(r.changed).toEqual(['projects/flow-app.md', 'days/2026-11-04.md'])
   })
   it('ignores unknown slug and empty titles', () => {

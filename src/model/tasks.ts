@@ -27,7 +27,7 @@ function withParts(d: FlowData, project: Project | undefined, days: Record<ISODa
   }
 }
 
-const emptyDay = (date: ISODate): Day => ({ date, planned: [], done: [], body: '', extra: {} })
+const emptyDay = (date: ISODate): Day => ({ date, planned: [], done: [], focus: [], body: '', extra: {} })
 const cloneDay = (d: FlowData, date: ISODate): Day => (d.days[date] ? structuredClone(d.days[date]) : emptyDay(date))
 
 function planOn(day: Day, ref: string) {

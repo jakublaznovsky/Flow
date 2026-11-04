@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createProject, updateProject } from './projects'
+import { addDecision, createProject, updateProject } from './projects'
 import { emptyFlow, type FlowData } from './types'
 
 function sample(): FlowData {
@@ -52,5 +52,56 @@ describe('updateProject', () => {
   it('unknown slug is a no-op', () => {
     const d = sample()
     expect(updateProject(d, 'nope', { title: 'x' })).toEqual({ data: d, changed: [] })
+  })
+})
+
+const withBody = (body: string, goal?: string): FlowData => {
+  const d = structuredClone(sample()) as FlowData
+  d.projects['flow-app'].body = body
+  if (goal !== undefined) d.projects['flow-app'].goal = goal
+  return Object.freeze(d)
+}
+
+describe('updateProject goal and body', () => {
+  it('sets the goal', () => {
+    const r = updateProject(sample(), 'flow-app', { goal: 'Ship it' })
+    expect(r.data.projects['flow-app'].goal).toBe('Ship it')
+    expect(r.changed).toEqual(['projects/flow-app.md'])
+  })
+  it('removes the goal when empty', () => {
+    const r = updateProject(withBody('x', 'old'), 'flow-app', { goal: '' })
+    expect('goal' in r.data.projects['flow-app']).toBe(false)
+    expect(r.changed).toEqual(['projects/flow-app.md'])
+  })
+  it('replaces the body', () => {
+    const r = updateProject(sample(), 'flow-app', { body: 'new notes\n' })
+    expect(r.data.projects['flow-app'].body).toBe('new notes\n')
+  })
+})
+
+describe('addDecision', () => {
+  const body = (d: FlowData) => d.projects['flow-app'].body
+  it('appends after the last decision line of the section', () => {
+    const r = addDecision(withBody('Notes\n\n## Decisions\n- 2026-11-01: a\n- 2026-11-02: b\n\n## Other\ntext\n'), 'flow-app', '  c  ', T)
+    expect(body(r.data)).toBe('Notes\n\n## Decisions\n- 2026-11-01: a\n- 2026-11-02: b\n- 2026-11-04: c\n\n## Other\ntext\n')
+    expect(r.changed).toEqual(['projects/flow-app.md'])
+  })
+  it('inserts right after the heading when the section is empty', () => {
+    const r = addDecision(withBody('Notes\n\n## Decisions\n\n## Other\n'), 'flow-app', 'c', T)
+    expect(body(r.data)).toBe('Notes\n\n## Decisions\n- 2026-11-04: c\n\n## Other\n')
+  })
+  it('inserts after the heading when the section is last and empty', () => {
+    const r = addDecision(withBody('Notes\n\n## Decisions\n'), 'flow-app', 'c', T)
+    expect(body(r.data)).toBe('Notes\n\n## Decisions\n- 2026-11-04: c\n')
+  })
+  it('creates the section at the end when missing', () => {
+    expect(body(addDecision(withBody('Notes'), 'flow-app', 'c', T).data)).toBe('Notes\n\n## Decisions\n- 2026-11-04: c\n')
+    expect(body(addDecision(withBody('Notes\n'), 'flow-app', 'c', T).data)).toBe('Notes\n\n## Decisions\n- 2026-11-04: c\n')
+    expect(body(addDecision(withBody('Notes\n\n'), 'flow-app', 'c', T).data)).toBe('Notes\n\n## Decisions\n- 2026-11-04: c\n')
+    expect(body(addDecision(withBody(''), 'flow-app', 'c', T).data)).toBe('## Decisions\n- 2026-11-04: c\n')
+  })
+  it('does nothing for blank text or unknown project', () => {
+    expect(addDecision(sample(), 'flow-app', '   ', T)).toEqual({ data: sample(), changed: [] })
+    expect(addDecision(sample(), 'nope', 'x', T).changed).toEqual([])
   })
 })
