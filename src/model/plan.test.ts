@@ -25,11 +25,15 @@ describe('planSuggestions', () => {
     expect(c.changed).toEqual(['projects/alpha.md'])
   })
 
-  it('moves a Today task back to To do with tomorrow as its date', () => {
-    const c = planSuggestions(sample(), [{ ref: 'alpha/t2', title: 'Fix bug', project: 'Alpha', first_step: 'x' }], TODAY)
+  it('leaves a task already in Today where it is and counts it as planned', () => {
+    const d = sample()
+    const c = planSuggestions(d, [{ ref: 'alpha/t2', title: 'Fix bug', project: 'Alpha', first_step: 'x' }], TODAY)
     const task = c.data.projects.alpha.tasks.find((x) => x.id === 't2')!
-    expect(task.status).toBe('todo')
-    expect(task.scheduled).toBe('2026-11-05')
+    expect(task.status).toBe('today')
+    expect(task.scheduled).toBeUndefined()
+    expect(c.data).toBe(d)
+    expect(c.changed).toEqual([])
+    expect(c.added).toEqual([true])
   })
 
   it('creates a new task in the project matched by title, with its first step, scheduled for tomorrow', () => {
