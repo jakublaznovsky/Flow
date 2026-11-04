@@ -71,6 +71,12 @@ function DayColumn({ day, today }: { day: WeekDay; today: ISODate }) {
       <header><h3>{p.weekday} {p.day}</h3></header>
       <ul className="week-cards">
         {day.scheduled.map((c) => <WeekCard key={c.key} card={c} />)}
+        {day.inToday.map((c) => (
+          <li key={`today-${c.key}`} className="week-in-today" style={{ '--project': c.color ?? 'var(--border-strong)' } as CSSProperties}>
+            <span className="week-in-today-title">{c.title}</span>
+            <span className="week-in-today-label">In Today</span>
+          </li>
+        ))}
         {day.done.map((e, i) => (
           <li key={`done-${e.ref}-${i}`} className="week-done is-done">
             <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 6.2l2.3 2.3 4.7-4.9" /></svg>
@@ -106,7 +112,7 @@ export default function WeekView({ flow }: { flow: Flow }) {
   if (!data) return null
 
   const start = addDays(weekStart(today), 7 * offset)
-  const plan = weekPlan(data, start, filter)
+  const plan = weekPlan(data, start, filter, today)
   const cards = [...plan.unscheduled, ...plan.days.flatMap((d) => d.scheduled)]
 
   const onDragStart = (e: DragStartEvent) => setDragging(cards.find((c) => c.key === String(e.active.id)) ?? null)

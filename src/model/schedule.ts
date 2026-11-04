@@ -50,17 +50,25 @@ export function promoteScheduled(d: FlowData, today: ISODate): Change {
   return { data, changed }
 }
 
-export interface WeekDay { date: ISODate; scheduled: Card[]; done: DoneEntry[] }
+/** `inToday`: tasks in the Today column, listed on today's day only (empty on other days). */
+export interface WeekDay { date: ISODate; scheduled: Card[]; inToday: Card[]; done: DoneEntry[] }
 
-/** The 7 days from `weekStartDate` with scheduled To do tasks and completed entries, plus unscheduled To do tasks. */
-export function weekPlan(d: FlowData, weekStartDate: ISODate, filter: string | null): { days: WeekDay[]; unscheduled: Card[] } {
+/**
+ * The 7 days from `weekStartDate` with scheduled To do tasks and completed entries, plus unscheduled
+ * To do tasks. When `today` is given and falls in the week, its day also lists the Today tasks.
+ */
+export function weekPlan(
+  d: FlowData, weekStartDate: ISODate, filter: string | null, today?: ISODate,
+): { days: WeekDay[]; unscheduled: Card[] } {
   const dates = Array.from({ length: 7 }, (_, i) => addDays(weekStartDate, i))
   const byDate = new Map<ISODate, Card[]>(dates.map((date) => [date, []]))
   const unscheduled: Card[] = []
+  const inToday: Card[] = []
   for (const project of Object.values(d.projects)) {
     if (project.status !== 'active') continue
     if (filter !== null && project.slug !== filter) continue
     for (const t of project.tasks) {
+      if (t.status === 'today') inToday.push(taskCard(project, t))
       if (t.status !== 'todo') continue
       if (t.scheduled === undefined) unscheduled.push(taskCard(project, t))
       else byDate.get(t.scheduled)?.push(taskCard(project, t))
@@ -68,7 +76,12 @@ export function weekPlan(d: FlowData, weekStartDate: ISODate, filter: string | n
   }
   const inFilter = (e: DoneEntry) => filter === null || e.ref.startsWith(`${filter}/`)
   return {
-    days: dates.map((date) => ({ date, scheduled: sortCards(byDate.get(date)!, undefined), done: doneOn(d, date).filter(inFilter) })),
+    days: dates.map((date) => ({
+      date,
+      scheduled: sortCards(byDate.get(date)!, undefined),
+      inToday: date === today ? sortCards(inToday, undefined) : [],
+      done: doneOn(d, date).filter(inFilter),
+    })),
     unscheduled: sortCards(unscheduled, undefined),
   }
 }

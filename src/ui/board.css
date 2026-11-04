@@ -483,6 +483,16 @@ input.quick-capture, input.quick-capture:focus {
 }
 .week-done svg { flex: none; margin-top: 2px; color: var(--accent); opacity: 0.8; }
 .week-done span { min-width: 0; text-decoration: line-through; text-decoration-color: var(--text-faint); }
+/* Today tasks on today's day: read-only and muted; they are already on the board's Today column. */
+.week-in-today {
+  --project: var(--border-strong);
+  display: flex; flex-direction: column; gap: 1px; padding: 5px 8px 5px 11px; font-size: 12.5px; line-height: 1.35;
+  color: var(--text-muted); background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border: 1px dashed var(--border-strong); border-radius: var(--radius-md);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--project) 55%, transparent); overflow-wrap: break-word;
+}
+.week-in-today-title { min-width: 0; }
+.week-in-today-label { font-size: 11px; color: var(--accent-text); }
 
 /* ---------- Weekly review ---------- */
 .review-view { flex: 1; min-height: 0; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: var(--space-4) 2px; }

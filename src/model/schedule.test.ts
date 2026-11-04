@@ -129,6 +129,13 @@ describe('weekPlan', () => {
     expect(w.days[1].done.map((e) => e.ref)).toEqual(['a/t4', 'b/t9'])
     expect(w.unscheduled.map((c) => c.key)).toEqual(['a/t6', 'a/t1', 'b/t2'])
   })
+  it("lists Today tasks on today's day only, respecting the filter", () => {
+    const w = weekPlan(sample(), MON, null, T)
+    expect(w.days[2].inToday.map((c) => c.key)).toEqual(['a/t3'])
+    expect(w.days.filter((x) => x.date !== T).every((x) => x.inToday.length === 0)).toBe(true)
+    expect(weekPlan(sample(), MON, 'b', T).days[2].inToday).toEqual([])
+    expect(weekPlan(sample(), '2026-11-09', null, T).days.every((x) => x.inToday.length === 0)).toBe(true)
+  })
   it('respects the project filter for scheduled, done and unscheduled', () => {
     const w = weekPlan(sample(), MON, 'b')
     expect(w.days[4].scheduled.map((c) => c.key)).toEqual(['b/t1'])

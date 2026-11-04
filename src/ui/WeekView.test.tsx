@@ -213,6 +213,20 @@ describe('Week view', () => {
     expect(view.getByRole('heading', { name: 'Week of 2 Nov – 8 Nov 2026' })).toBeInTheDocument()
   })
 
+  it("today's column also shows what is in Today, muted and labelled", async () => {
+    const files = seed()
+    files['projects/learn-spanish.md'] = project('Learn Spanish', '#30a46c', task('t1', 'Buy a book', 'todo') + task('t2', 'Practise verbs', 'today', '    planned: 2026-11-04\n'))
+    const { user, view } = await open(files)
+    const wed = within(view.getByRole('region', { name: 'Wed 4 Nov' }))
+    const item = wed.getByText('Practise verbs').closest('li')!
+    expect(item).toHaveClass('week-in-today')
+    expect(within(item).getByText('In Today')).toBeInTheDocument()
+    expect(within(view.getByRole('region', { name: 'Thu 5 Nov' })).queryByText('Practise verbs')).not.toBeInTheDocument()
+    expect(within(view.getByRole('region', { name: 'Unscheduled' })).queryByText('Practise verbs')).not.toBeInTheDocument()
+    await user.click(within(screen.getByRole('navigation', { name: 'Sidebar' })).getByRole('button', { name: 'Flow app' }))
+    expect(view.queryByText('Practise verbs')).not.toBeInTheDocument()
+  })
+
   it('respects the project filter', async () => {
     const { user, view } = await open()
     await user.click(within(screen.getByRole('navigation', { name: 'Sidebar' })).getByRole('button', { name: 'Learn Spanish' }))

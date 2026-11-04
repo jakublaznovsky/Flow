@@ -259,7 +259,7 @@ describe('Board', () => {
       const store = new MemoryFileStore(seed())
       const user = userEvent.setup()
       const view = render(<App store={store} settings={settings} now={() => NOW} />)
-      await screen.findByRole('region', { name: 'Week', exact: true })
+      await screen.findByRole('region', { name: 'Week' })
       if (key === 's') await user.click(screen.getByRole('button', { name: 'Settings' }))
       else await user.keyboard('r')
       await screen.findByRole('region', { name: key === 's' ? 'Settings' : 'Weekly review' })
