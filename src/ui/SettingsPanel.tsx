@@ -24,7 +24,9 @@ export default function SettingsPanel({
   hasKey, model, onSaveKey, onRemoveKey, onModel, hiddenColumns = [], onColumnVisible, shortcut,
 }: Props) {
   const [draft, setDraft] = useState('')
-  const visibleCount = COLUMNS.length - COLUMNS.filter(({ id }) => hiddenColumns.includes(id)).length
+  // Only the four columns count for "one stays visible"; the Done bar can always be turned off.
+  const columns = COLUMNS.filter(({ id }) => id !== 'done')
+  const visibleCount = columns.length - columns.filter(({ id }) => hiddenColumns.includes(id)).length
   return (
     <section className="settings-view" aria-label="Settings">
       <div className="settings-card">
@@ -64,7 +66,7 @@ export default function SettingsPanel({
         <fieldset className="settings-columns" aria-label="Board columns">
           {COLUMNS.map(({ id, title }) => {
             const visible = !hiddenColumns.includes(id)
-            const last = visible && visibleCount === 1
+            const last = id !== 'done' && visible && visibleCount === 1
             return (
               <label key={id} className="settings-check" title={last ? 'At least one column stays visible' : undefined}>
                 <input

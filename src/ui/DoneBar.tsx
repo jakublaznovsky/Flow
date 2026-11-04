@@ -21,7 +21,7 @@ export default function DoneBar({ keys, open, onToggle, children }: Props) {
       className={`done-bar${open ? ' is-open' : ''}${isOver ? ' is-over' : ''}`}
     >
       <h2 className="done-bar-head">
-        <button type="button" className="done-bar-toggle" aria-expanded={open} aria-controls="done-bar-cards" onClick={onToggle}>
+        <button type="button" className="done-bar-toggle" aria-expanded={open} aria-controls={open ? 'done-bar-cards' : undefined} onClick={onToggle}>
           <svg className="done-bar-chevron" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 3l3 3-3 3" /></svg>
           Done today <span className="done-bar-count">({keys.length})</span>
         </button>

@@ -146,10 +146,21 @@ try {
   // --- Done bar: drop a card on it (open, then collapsed); its checkbox reopens a card ---
   {
     await page.waitForTimeout(100) // dnd-kit ignores clicks for 50 ms after a drag
+    // Picked up from the empty space beside a step (not its title): the card itself moves.
     const verbs = col('Today').locator('li.card', { hasText: 'Learn the 50 most common verbs' })
-    await drag(page, verbs, doneBar)
+    const row = verbs.locator('ul.steps > li').nth(1)
+    const text = await row.locator('.step-text').boundingBox()
+    const rb = await row.boundingBox()
+    const sx = text.x + text.width + (rb.x + rb.width - 24 - (text.x + text.width)) / 2, sy = rb.y + rb.height / 2
+    const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.className, [sx, sy])
+    if (hit && /step-(text|del|grip)/.test(hit)) fail(`expected empty row space at the start point, got .${hit}`)
+    const bar = await doneBar.boundingBox()
+    await page.mouse.move(sx, sy)
+    await page.mouse.down()
+    await page.mouse.move(bar.x + bar.width / 2, bar.y + bar.height / 2, { steps: 12 })
+    await page.mouse.up()
     await doneBar.getByText('Learn the 50 most common verbs').waitFor({ timeout: 3000 })
-    console.log('ok: a Today card dropped on the open Done bar is done')
+    console.log('ok: a Today card dragged from the space beside a step and dropped on the open Done bar is done')
     const before = await doneCount()
     await page.waitForTimeout(100)
     await doneToggle.click()

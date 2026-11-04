@@ -47,8 +47,11 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   `DoneBar` (region "Done", heading/toggle "Done today (N)", aria-expanded), a drop target open or
   closed; open shows compact done cards (checkbox, title, pill, tag; no checklist).
 - v0.2.6 cards: no chevron, no "Next:" line, no first-step line; a task card always shows its
-  checklist between the title row (title + `n/m` pill) and the footer (project tag tinted ~15% with
-  a dot, day chip, calendar). Light theme: warm paper/linen, amber accent (`--accent`, darker
+  checklist between the title row (title + `n/m` pill) and the footer. Only the checklist's controls
+  (grip, step checkbox, step text, ×, edit/Add step inputs) stop pointer-down; empty row space drags
+  the card. Informational text uses `--text-muted` (≥ 4.5:1); `--text-faint` is for placeholders,
+  icons and grips only. Footer: project tag tinted ~15% with
+  a dot, day chip, calendar. Light theme: warm paper/linen, amber accent (`--accent`, darker
   `--accent-strong` for filled buttons, `--accent-text`), sage `--success*` for done/checks/heatmap.
 - Never write a file that failed to parse; it is skipped and recorded in `Flow/flow-issues.log`.
 - No warnings, nags or pop-ups in the UI; problems go only to the issue log. One owner exception:
@@ -102,9 +105,9 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   never from a React effect (StrictMode would register → unregister → register), via
   `registerShortcut` (`src/shortcut.ts`): unregister first, then register, serialized. Failures go
   only to the issue log; Settings shows one muted status line (none in the browser).
-- `hiddenColumns` (array of ColumnId) in local app settings hides board columns; never all five,
-  never in the Flow folder. Hidden columns' data and promotion are unchanged. Hiding `done` hides
-  the Done bar.
+- `hiddenColumns` (array of ColumnId) in local app settings hides board columns; never all four
+  real columns (the Done bar does not count and can be hidden on its own), never in the Flow
+  folder. Hidden columns' data and promotion are unchanged. Hiding `done` hides the Done bar.
 - `doneBarOpen` and `weekTrayOpen` (booleans, default true) in local app settings remember whether
   the Done bar and the Week view's Unscheduled drawer (full width, above the days) are open.
 - Browser seed data in `src/main.tsx` is generated relative to today's local date.

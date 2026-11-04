@@ -156,7 +156,7 @@ function Tray({ cards, open, onToggle }: { cards: CardData[]; open: boolean; onT
   return (
     <section ref={setNodeRef} aria-label="Unscheduled" className={`week-tray${open ? ' is-open' : ''}${isOver ? ' is-over' : ''}`}>
       <h3 className="week-tray-head">
-        <button type="button" className="week-tray-toggle" aria-expanded={open} aria-controls="week-tray-cards" onClick={onToggle}>
+        <button type="button" className="week-tray-toggle" aria-expanded={open} aria-controls={open ? 'week-tray-cards' : undefined} onClick={onToggle}>
           <svg className="week-tray-chevron" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 3l3 3-3 3" /></svg>
           Unscheduled <span className="count">{cards.length}</span>
         </button>

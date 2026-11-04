@@ -2,7 +2,7 @@
 .app { min-height: 100vh; padding: var(--space-8); display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); }
 .app h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
 .app > button { background: var(--accent-strong); color: var(--on-accent); border: 0; border-radius: var(--radius-md); padding: 8px 14px; font-weight: 500; }
-.app.loading { align-items: center; justify-content: center; color: var(--text-faint); }
+.app.loading { align-items: center; justify-content: center; color: var(--text-muted); }
 
 /* ---------- Shell: sidebar + main ---------- */
 .shell { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); height: 100vh; overflow: hidden; }
@@ -75,7 +75,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 
 .section-label {
   padding: var(--space-6) 10px var(--space-2); font-size: 11px; font-weight: 600;
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint);
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted);
 }
 .projects { display: flex; flex-direction: column; gap: 2px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
@@ -128,7 +128,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 .hidden-list { list-style: none; margin: 0 0 var(--space-1); padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .hidden-list li { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 32px; font-size: 13px; color: var(--text-muted); }
 .hidden-list .dot { opacity: 0.6; }
-.hidden-list .status { font-size: 11.5px; color: var(--text-faint); }
+.hidden-list .status { font-size: 11.5px; color: var(--text-muted); }
 .link-btn {
   margin-left: auto; flex: none; background: none; border: 0; padding: 2px 6px; border-radius: var(--radius-sm);
   color: var(--accent-text); font-size: 12px; font-weight: 500;
@@ -155,12 +155,12 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 .new-project { padding: 2px 4px; }
 
 .sidebar-foot { margin-top: auto; padding-top: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); }
-.sidebar-hint { padding: 0 10px var(--space-1); font-size: 12px; color: var(--text-faint); }
+.sidebar-hint { padding: 0 10px var(--space-1); font-size: 12px; color: var(--text-muted); }
 .sidebar-hint kbd { color: var(--text-muted); }
 
 /* ---------- Search ---------- */
 .search { position: relative; width: 280px; flex: none; margin-left: auto; }
-.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-faint); pointer-events: none; }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); z-index: 1; color: var(--text-faint); pointer-events: none; }
 .search input[type='search'] { height: 34px; padding-left: 32px; padding-right: 30px; background: var(--surface); border-color: var(--border); }
 .search kbd { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); pointer-events: none; }
 
@@ -195,7 +195,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
   list-style: none; margin: 0; padding: 4px 4px 2px; display: flex; gap: var(--space-2);
   overflow-x: auto; overflow-y: hidden; scrollbar-width: thin;
 }
-.done-cards > .card { flex: 0 0 224px; }
+.done-cards > .card { flex: 0 0 auto; max-width: 340px; }
 .done-empty { padding: 6px 4px; font-size: 12.5px; color: var(--text-muted); }
 .column header { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-2) var(--space-3); }
 .column h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
@@ -214,7 +214,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 .empty {
   display: grid; place-items: center; min-height: 64px; padding: var(--space-3);
   border: 1.5px dashed var(--border-strong); border-radius: var(--radius-md);
-  color: var(--text-faint); font-size: 13px; text-align: center;
+  color: var(--text-muted); font-size: 13px; text-align: center;
 }
 .column-foot { padding: var(--space-1) var(--space-1) 0; }
 
@@ -231,9 +231,13 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 .card.is-dragging { opacity: 0.35; box-shadow: none; }
 .card.is-overlay { cursor: grabbing; box-shadow: inset 3px 0 0 var(--project), var(--shadow-lg); pointer-events: none; }
 .card.is-done .card-title { text-decoration: line-through; color: var(--text-muted); }
-.card.is-compact { padding: 8px 10px 8px 12px; align-items: flex-start; }
-.card.is-compact .card-title { font-size: 13px; }
-.card.is-compact .tag { margin-top: 4px; font-size: 12px; padding: 2px 9px 2px 7px; }
+.card.is-compact { padding: 6px 10px 6px 12px; align-items: center; }
+/* Done bar cards: title and tag share one line when they fit. */
+.card.is-compact .card-body { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+.card.is-compact .card-head { align-self: auto; max-width: 100%; }
+.card.is-compact .card-title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card.is-compact .card-meta { align-self: auto; margin: 0; }
+.card.is-compact .tag { margin-top: 0; font-size: 12px; padding: 2px 9px 2px 7px; }
 .card.is-compact .tag::before { width: 7px; height: 7px; }
 .card.is-done { background: color-mix(in srgb, var(--surface) 70%, transparent); box-shadow: inset 3px 0 0 var(--project); }
 .card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
@@ -302,7 +306,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
   transition: background var(--dur) var(--ease);
 }
 .goal:hover { background: var(--surface-hover); }
-.goal.is-empty { color: var(--text-faint); }
+.goal.is-empty { color: var(--text-muted); }
 .goal-input { height: 28px; max-width: 420px; }
 .project-stats { display: flex; align-items: center; gap: var(--space-4); flex: none; font-size: 13px; color: var(--text-muted); }
 .project-progress { display: flex; align-items: center; gap: var(--space-2); }
@@ -348,7 +352,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
   padding: var(--space-8) var(--space-6);
 }
 .notes-editor h2 { margin: 0; font-size: 18px; font-weight: 600; }
-.notes-path { margin: 2px 0 var(--space-5); font-size: 12px; color: var(--text-faint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.notes-path { margin: 2px 0 var(--space-5); font-size: 12px; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .notes-status { margin: 0 0 var(--space-3); font-size: 12px; color: var(--text-muted); }
 .notes-editor textarea {
   flex: 1; min-height: 320px; resize: none; border: 0; outline: none; background: transparent;
@@ -373,14 +377,14 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 .week-day li { font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
 .week-focus { margin-top: var(--space-1); }
 .heat-months, .heat-grid { display: grid; grid-template-columns: repeat(53, minmax(0, 1fr)); gap: 2px; }
-.heat-months { font-size: 10px; color: var(--text-faint); height: 14px; margin-bottom: 2px; }
+.heat-months { font-size: 10px; color: var(--text-muted); height: 14px; margin-bottom: 2px; }
 .heat-months span { white-space: nowrap; overflow: visible; }
 .heat-grid { grid-template-rows: repeat(7, auto); grid-auto-flow: column; }
 .heat-cell { aspect-ratio: 1; border-radius: 2px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--border); }
 .heat-cell.future { background: transparent; box-shadow: none; }
-.heat-cell.level-1 { background: color-mix(in srgb, var(--success) 28%, var(--surface)); box-shadow: none; }
-.heat-cell.level-2 { background: color-mix(in srgb, var(--success) 52%, var(--surface)); box-shadow: none; }
-.heat-cell.level-3 { background: color-mix(in srgb, var(--success) 76%, var(--surface)); box-shadow: none; }
+.heat-cell.level-1 { background: color-mix(in srgb, var(--success) 40%, var(--surface)); box-shadow: none; }
+.heat-cell.level-2 { background: color-mix(in srgb, var(--success) 60%, var(--surface)); box-shadow: none; }
+.heat-cell.level-3 { background: color-mix(in srgb, var(--success) 80%, var(--surface)); box-shadow: none; }
 .heat-cell.level-4 { background: var(--success-strong); box-shadow: none; }
 .proj-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-4); }
 .proj-head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: 6px; }
@@ -470,7 +474,7 @@ input.quick-capture, input.quick-capture:focus {
 .plan-date:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 /* Always-open checklist under the title; step checkboxes line up with the title text and each
    grip sits in the indent under the task's own checkbox. */
-.checklist { align-self: stretch; min-width: 0; margin-top: 3px; cursor: default; display: flex; flex-direction: column; gap: 3px; }
+.checklist { align-self: stretch; min-width: 0; margin-top: 3px; cursor: grab; display: flex; flex-direction: column; gap: 3px; }
 .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .steps li { display: flex; align-items: center; gap: 8px; min-height: 24px; }
 /* Grip handle sits in the checklist's left indent, so step checkboxes stay aligned under the title. */
@@ -493,7 +497,7 @@ input.quick-capture, input.quick-capture:focus {
 .steps li.is-dragging-step .step-grip { opacity: 1; cursor: grabbing; color: var(--text); }
 .steps li input[type='checkbox'] { margin: 0; width: 16px; height: 16px; }
 .step-text {
-  flex: 1; min-width: 0; background: none; border: 0; padding: 0; text-align: left; font: inherit; font-size: 13px;
+  flex: 0 1 auto; min-width: 0; background: none; border: 0; padding: 0; text-align: left; font: inherit; font-size: 13px;
   color: var(--text); overflow-wrap: break-word; cursor: text;
 }
 .steps li.is-ticked .step-text { color: var(--text-muted); text-decoration: line-through; }
@@ -501,11 +505,14 @@ input.quick-capture, input.quick-capture:focus {
 /* Compact "Add step": a quiet single-line field that firms up on hover and focus. */
 .checklist .step-add {
   width: 100%; flex: none; height: 26px; font-size: 12.5px; padding: 2px 7px 2px 23px; margin-left: -1px;
-  /* A small "+" where a step's checkbox would be, so the placeholder lines up with step text. */
-  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%239c9286' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M6 2.5v7M2.5 6h7'/%3E%3C/svg%3E") 3px center / 11px no-repeat;
+  background: transparent;
   border: 1px dashed transparent; border-radius: var(--radius-sm);
   transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
+/* A small "+" (currentColor) where a step's checkbox would be, so the placeholder lines up with step text. */
+.step-add-wrap { position: relative; display: block; }
+.step-add-icon { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); z-index: 1; color: var(--text-faint); pointer-events: none; }
+.step-add-wrap:focus-within .step-add-icon { color: var(--text-muted); }
 .card:hover .checklist .step-add { border-color: var(--border-strong); }
 .checklist .step-add:focus { border-style: solid; background-color: var(--surface); }
 /* Drag preview: steps without grips. */
@@ -513,7 +520,7 @@ input.quick-capture, input.quick-capture:focus {
 .steps-static li { min-height: 22px; }
 .steps-static .step-text { cursor: inherit; }
 .step-del {
-  background: none; border: 0; padding: 0 4px; font-size: 15px; line-height: 1; color: var(--text-faint);
+  margin-left: auto; flex: none; background: none; border: 0; padding: 0 4px; font-size: 15px; line-height: 1; color: var(--text-faint);
   border-radius: 3px; cursor: pointer; opacity: 0;
 }
 .steps li:hover .step-del, .steps li:focus-within .step-del { opacity: 1; }
@@ -614,7 +621,7 @@ input.quick-capture, input.quick-capture:focus {
 /* ---------- Weekly review ---------- */
 .review-view { flex: 1; min-height: 0; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: var(--space-4) 2px; }
 .review-card { width: 100%; max-width: 720px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: var(--space-5) var(--space-6); }
-.review-steps { list-style: none; margin: 0 0 var(--space-5); padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: 12px; color: var(--text-faint); }
+.review-steps { list-style: none; margin: 0 0 var(--space-5); padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: 12px; color: var(--text-muted); }
 .review-steps li { display: flex; align-items: center; gap: 6px; }
 .review-step-no { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border-strong); font-size: 11px; }
 .review-steps .is-past { color: var(--text-muted); }

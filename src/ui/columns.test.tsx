@@ -63,23 +63,29 @@ describe('Board columns setting', () => {
     expect(store.files['inbox.md']).toContain('Look into podcasts')
   })
 
-  it('ignores unknown ids and never hides all five', () => {
+  it('ignores unknown ids and never hides all four columns (the Done bar does not count)', () => {
     expect(cleanHiddenColumns(['done', 'nope', 'todo'])).toEqual(['todo', 'done'])
-    expect(cleanHiddenColumns(['inbox', 'todo', 'tomorrow', 'today', 'done'])).toEqual([])
+    expect(cleanHiddenColumns(['inbox', 'todo', 'tomorrow', 'today', 'done'])).toEqual(['done'])
+    expect(cleanHiddenColumns(['inbox', 'todo', 'tomorrow', 'today'])).toEqual([])
     expect(cleanHiddenColumns('todo')).toEqual([])
   })
 
-  it('disables the last checked box with a calm title', async () => {
+  it('disables the last checked column box with a calm title; Done stays free', async () => {
     const { user } = await setup()
     const group = await openSettings(user)
-    for (const n of ['Parking lot', 'To do', 'Today', 'Tomorrow']) await user.click(group.getByRole('checkbox', { name: n }))
+    for (const n of ['Parking lot', 'To do', 'Today']) await user.click(group.getByRole('checkbox', { name: n }))
+    const tomorrow = group.getByRole('checkbox', { name: 'Tomorrow' })
     const done = group.getByRole('checkbox', { name: 'Done' })
-    expect(done).toBeChecked()
-    expect(done).toBeDisabled()
-    expect(done).toHaveAttribute('title', 'At least one column stays visible')
-    await user.click(group.getByRole('checkbox', { name: 'Today' }))
+    expect(tomorrow).toBeChecked()
+    expect(tomorrow).toBeDisabled()
+    expect(tomorrow).toHaveAttribute('title', 'At least one column stays visible')
     expect(done).toBeEnabled()
-    expect(done).not.toHaveAttribute('title')
+    await user.click(done)
+    expect(done).not.toBeChecked()
+    expect(tomorrow).toBeDisabled()
+    await user.click(group.getByRole('checkbox', { name: 'Today' }))
+    expect(tomorrow).toBeEnabled()
+    expect(tomorrow).not.toHaveAttribute('title')
   })
 
   it('"n" does nothing while To do is hidden, and opens its form once shown again', async () => {

@@ -38,6 +38,9 @@ interface Props {
   compact?: boolean
 }
 
+/** Pointer-down on a checklist control stays there: the card's drag never sees it. */
+const keepPointer = { onPointerDown: (e: { stopPropagation(): void }) => e.stopPropagation() }
+
 const reduceMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 /** Steps only move up and down inside their own list. */
 const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 })
@@ -69,6 +72,8 @@ function StepRow({ id, text, ticked, onKeyDown, handleRef, children }: {
     <li ref={setNodeRef} className={cls} style={style}>
       <button
         type="button" className="step-grip" {...attributes} {...listeners} aria-label={`Reorder step ${text}`}
+        // The step's own sensor runs first; then the event stops, so the board never sees step drags.
+        onPointerDown={(e) => { listeners?.onPointerDown?.(e); e.stopPropagation() }}
         ref={(el) => { setActivatorNodeRef(el); handleRef(el) }} onKeyDown={onKeyDown}
       >
         <svg viewBox="0 0 8 12" width="8" height="12" aria-hidden="true" fill="currentColor">
@@ -118,8 +123,8 @@ function Checklist({ steps, api }: { steps: Step[]; api: NonNullable<Props['step
     move(i, to)
   }
   return (
-    // Stop pointer-down here so the card's drag listeners never see clicks inside the checklist.
-    <div className="checklist" onPointerDown={(e) => e.stopPropagation()}>
+    // Only the controls keep their pointer-down; empty space in and between rows drags the card.
+    <div className="checklist">
       {steps.length > 0 && (
         <DndContext
           sensors={sensors} collisionDetection={closestCenter} modifiers={[verticalOnly]}
@@ -132,10 +137,10 @@ function Checklist({ steps, api }: { steps: Step[]; api: NonNullable<Props['step
                   key={ids[i]} id={ids[i]} text={st.text} ticked={st.done}
                   onKeyDown={onHandleKey(i)} handleRef={(el) => { handles.current[i] = el }}
                 >
-                  <input type="checkbox" aria-label={editIdx === i ? `Done: ${st.text}` : st.text} checked={st.done} onChange={() => api.onToggle(i)} />
+                  <input type="checkbox" {...keepPointer} aria-label={editIdx === i ? `Done: ${st.text}` : st.text} checked={st.done} onChange={() => api.onToggle(i)} />
                   {editIdx === i ? (
                     <input
-                      autoFocus className="step-edit" aria-label="Edit step" value={editText}
+                      autoFocus className="step-edit" aria-label="Edit step" value={editText} {...keepPointer}
                       onChange={(e) => setEditText(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') { e.preventDefault(); commitEdit() }
@@ -144,24 +149,27 @@ function Checklist({ steps, api }: { steps: Step[]; api: NonNullable<Props['step
                       onBlur={commitEdit}
                     />
                   ) : (
-                    <button type="button" className="step-text" onClick={() => { setEditText(st.text); setEditIdx(i) }}>{st.text}</button>
+                    <button type="button" className="step-text" {...keepPointer} onClick={() => { setEditText(st.text); setEditIdx(i) }}>{st.text}</button>
                   )}
-                  <button type="button" className="step-del" aria-label={`Delete step ${st.text}`} onClick={() => api.onDelete(i)}>×</button>
+                  <button type="button" className="step-del" {...keepPointer} aria-label={`Delete step ${st.text}`} onClick={() => api.onDelete(i)}>×</button>
                 </StepRow>
               ))}
             </ul>
           </SortableContext>
         </DndContext>
       )}
-      <input
-        className="step-add" aria-label="Add step" placeholder="Add step" value={adding}
-        onChange={(e) => setAdding(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key !== 'Enter') return
-          e.preventDefault()
-          if (adding.trim()) { api.onAdd(adding); setAdding('') }
-        }}
-      />
+      <span className="step-add-wrap">
+        <svg className="step-add-icon" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M6 2.5v7M2.5 6h7" /></svg>
+        <input
+          className="step-add" aria-label="Add step" placeholder="Add step" value={adding} {...keepPointer}
+          onChange={(e) => setAdding(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return
+            e.preventDefault()
+            if (adding.trim()) { api.onAdd(adding); setAdding('') }
+          }}
+        />
+      </span>
     </div>
   )
 }

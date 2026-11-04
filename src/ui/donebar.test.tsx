@@ -58,8 +58,11 @@ describe('Done bar', () => {
 
   it('collapses to its header (still the Done region) and remembers that in local settings', async () => {
     const { bar, toggle, user, settings, store } = await setup()
+    expect(document.getElementById(toggle().getAttribute('aria-controls')!)).toHaveClass('done-cards')
     await user.click(toggle())
     expect(toggle()).toHaveAttribute('aria-expanded', 'false')
+    // Collapsed: no aria-controls pointing at a list that is not there.
+    expect(toggle()).not.toHaveAttribute('aria-controls')
     expect(bar().queryByText('Old win')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Done today (1)' })).toBeInTheDocument()
     await waitFor(async () => expect(await settings.get('doneBarOpen')).toBe(false))

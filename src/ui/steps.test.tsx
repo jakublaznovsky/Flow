@@ -114,13 +114,41 @@ describe('card checklist', () => {
     expect(file()).toContain('Run init')
   })
 
-  it('interacting with the checklist does not start a drag or open the editor', async () => {
-    const { card } = await setup()
-    const box = within(card('Set up Tauri')).getByRole('checkbox', { name: 'Run init' })
-    fireEvent.pointerDown(box, { button: 0, clientX: 0, clientY: 0, isPrimary: true })
-    fireEvent.pointerMove(document, { clientX: 40, clientY: 40 })
+  /** Press at `el`, move 40px; returns whether the card started a drag (then lets the drag end). */
+  async function pressAndMove(el: Element, li: () => HTMLElement) {
+    const cardEl = li() // the drag overlay repeats the title while dragging, so keep the element
+    fireEvent.pointerDown(el, { button: 0, clientX: 0, clientY: 0, isPrimary: true })
+    fireEvent.pointerMove(document, { clientX: 0, clientY: 40 })
     await act(async () => {})
-    expect(card('Set up Tauri')).not.toHaveClass('is-dragging')
+    const dragging = cardEl.classList.contains('is-dragging')
+    fireEvent.pointerUp(document)
+    await act(async () => {})
+    // dnd-kit swallows clicks for 50 ms after a drag; let that guard expire.
+    await act(() => new Promise((r) => setTimeout(r, 80)))
+    return dragging
+  }
+
+  it('the checklist controls never start a card drag or open the editor', async () => {
+    const { card } = await setup()
+    const li = () => card('Set up Tauri')
+    const c = () => within(li())
+    const controls = [
+      () => c().getByRole('checkbox', { name: 'Run init' }),
+      () => c().getByText('Run init'),
+      () => c().getByRole('button', { name: 'Delete step Run init' }),
+      () => c().getByRole('textbox', { name: 'Add step' }),
+      () => c().getByRole('button', { name: 'Reorder step Run init' }),
+    ]
+    for (const control of controls) expect(await pressAndMove(control(), li)).toBe(false)
+    expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
+  })
+
+  it('empty space in a step row and between rows drags the card', async () => {
+    const { card } = await setup()
+    const li = () => card('Set up Tauri')
+    const row = () => within(li()).getByText('Run init').closest('li') as HTMLElement
+    expect(await pressAndMove(row(), li)).toBe(true)
+    expect(await pressAndMove(li().querySelector('.checklist') as HTMLElement, li)).toBe(true)
     expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
   })
 })

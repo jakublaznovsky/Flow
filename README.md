@@ -81,7 +81,7 @@ a key you can still press **Copy AI review** and paste the text into any AI your
 
 - **Board columns:** tick the columns you want on the board (Parking lot, To do, Today, Tomorrow,
   Done — unticking Done hides the Done bar). Hidden columns keep their cards; the others share the
-  width. One always stays. The choice, and whether the Done bar and the Week view's Unscheduled
+  width. One of the four columns always stays. The choice, and whether the Done bar and the Week view's Unscheduled
   drawer are open, is kept in Flow's own settings on this computer, not in your Flow folder.
 - **Quick capture:** in the desktop app, Settings shows whether Ctrl+Shift+Space is working. If
   another app already uses that shortcut, it says so there (details in `flow-issues.log`).

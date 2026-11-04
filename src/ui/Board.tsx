@@ -173,11 +173,17 @@ function useAiSettings(settings: Settings) {
 
 const COLUMN_IDS: readonly ColumnId[] = ['inbox', 'todo', 'today', 'tomorrow', 'done']
 
-/** Stored `hiddenColumns`, cleaned: known ids only, and never all five (one column always stays visible). */
+/** The four real board columns; the Done bar is hidden or shown on its own. */
+export const BOARD_COLUMN_IDS: readonly ColumnId[] = COLUMN_IDS.filter((id) => id !== 'done')
+
+/**
+ * Stored `hiddenColumns`, cleaned: known ids only, and never all four columns (one always stays
+ * visible; the Done bar does not count, so it can be hidden on its own).
+ */
 export function cleanHiddenColumns(v: unknown): ColumnId[] {
   if (!Array.isArray(v)) return []
   const hidden = COLUMN_IDS.filter((id) => v.includes(id))
-  return hidden.length === COLUMN_IDS.length ? [] : hidden
+  return BOARD_COLUMN_IDS.every((id) => hidden.includes(id)) ? hidden.filter((id) => !BOARD_COLUMN_IDS.includes(id)) : hidden
 }
 
 /** Which board columns are hidden, from local settings (never the Flow folder). */
