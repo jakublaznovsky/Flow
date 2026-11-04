@@ -42,9 +42,11 @@ interface Props {
   /** Start a focus session on a Today task; `focusRef` marks the card currently in focus. */
   onFocus?: (ref: string, title: string) => void
   focusRef?: string | null
+  /** Columns turned off in Settings; their cards are untouched, just not shown. */
+  hidden?: readonly ColumnId[]
 }
 
-export default function BoardView({ flow, query, picker, onDrop, createProject, addRequest, onAddHandled, onFocus, focusRef }: Props) {
+export default function BoardView({ flow, query, picker, onDrop, createProject, addRequest, onAddHandled, onFocus, focusRef, hidden = [] }: Props) {
   const { data, today, filter, order, lastProject, remember, apply } = flow
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   // The card being dragged is drawn in a DragOverlay (fixed position, above all columns) so it is
@@ -55,8 +57,9 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
   const active = Object.values(data.projects).filter((p) => p.status === 'active')
   const projects = active.map((p) => ({ slug: p.slug, title: p.title }))
   const cols = searchCards(boardColumns(data, today, filter, order), query)
+  const shown = COLUMNS.filter(({ id }) => !hidden.includes(id))
   const columnOf = (key: string): ColumnId | undefined =>
-    COLUMNS.find(({ id }) => cols[id].some((c) => c.key === key))?.id
+    shown.find(({ id }) => cols[id].some((c) => c.key === key))?.id
 
   const onDragStart = (e: DragStartEvent) => {
     const key = String(e.active.id)
@@ -70,7 +73,7 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
     const cardKey = String(e.active.id)
     const from = columnOf(cardKey)
     const overId = String(e.over.id)
-    const overCol = COLUMNS.find(({ id }) => id === overId)?.id ?? columnOf(overId)
+    const overCol = shown.find(({ id }) => id === overId)?.id ?? columnOf(overId)
     if (!from || !overCol) return
     const overIdx = cols[overCol].findIndex((c) => c.key === overId)
     const index = overIdx >= 0 ? overIdx : cols[overCol].length
@@ -132,7 +135,7 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
       )}
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
         <div className="columns">
-          {COLUMNS.map(({ id, title, empty }) => (
+          {shown.map(({ id, title, empty }) => (
             <Column
               key={id}
               id={id}

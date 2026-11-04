@@ -32,6 +32,7 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   `WeeklyReview`, `SettingsPanel`; plus `Sidebar`, `ProjectHeader`, `NotesPanel`, `PlanMenu` (calendar
   menu on To do/Tomorrow/Today cards: scheduleTask), `FocusBar` +
   `useFocus`, `SearchBox`, `AiPanel`; tokens and themes in `theme.css`, styles in `board.css`.
+- `src/shortcut.ts` idempotent global-shortcut registration (injected plugin functions).
 - `src/main.tsx` picks the shell: browser or Tauri (main window / capture window).
 - All app logic is TypeScript; Rust (`src-tauri`) only registers plugins.
 
@@ -62,5 +63,12 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 - The Claude API key and model live in local app settings only, never in the Flow folder. AI
   buttons send data only on press; errors show as one calm line in the AI panel.
 - Dev-only `?fakeAi=1` (browser dev) swaps in a canned Claude client; never in production builds.
-- Shortcuts (`/ n b w p o r`) fire only when no input, textarea or select has focus.
+- Shortcuts (`/ n b w p o r`) fire only when no input, textarea or select has focus. `n` is a
+  no-op while To do is hidden.
+- The global quick-capture shortcut is registered once per app run in `renderTauri` (main.tsx),
+  never from a React effect (StrictMode would register → unregister → register), via
+  `registerShortcut` (`src/shortcut.ts`): unregister first, then register, serialized. Failures go
+  only to the issue log; Settings shows one muted status line (none in the browser).
+- `hiddenColumns` (array of ColumnId) in local app settings hides board columns; never all five,
+  never in the Flow folder. Hidden columns' data and promotion are unchanged.
 - Browser seed data in `src/main.tsx` is generated relative to today's local date.

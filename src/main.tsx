@@ -9,6 +9,7 @@ import { logIssue } from './storage/flowRepo'
 import type { BoardApi } from './ui/Board'
 import { MemoryFileStore, type FileStore } from './storage/fileStore'
 import { MemorySettings } from './ui/settings'
+import { registerShortcut, type ShortcutStatus } from './shortcut'
 
 // Browser dev: in-memory store seeded with example data, relative to today's local date.
 const q = (v: string) => JSON.stringify(v)
@@ -128,17 +129,29 @@ async function renderTauri() {
   ])
   const settings = new TauriSettings()
   const SHORTCUT = 'CommandOrControl+Shift+Space'
+  const SHORTCUT_LABEL = /Mac/i.test(navigator.userAgent) ? 'Cmd+Shift+Space' : 'Ctrl+Shift+Space'
 
-  // Registered by App once it is ready: global shortcut shows the capture window, captured text lands in the inbox.
-  const makeOnReady = (store: FileStore) => (board: BoardApi) => {
+  // Registered once per app run, outside React (StrictMode would register → unregister → register).
+  // The global shortcut shows and focuses the capture window; only failures reach the issue log.
+  const registerQuickCapture = (store: FileStore) => registerShortcut(
+    {
+      register: (acc, handler) => register(acc, (ev) => { if (ev.state === 'Pressed') handler() }),
+      unregister: (acc) => unregister(acc),
+    },
+    SHORTCUT,
+    () => {
+      void Window.getByLabel('capture').then(async (cap) => {
+        await cap?.show()
+        await cap?.setFocus()
+      }).catch(() => {})
+    },
+    (reason) => { void logIssue(store, 'shortcut', reason) },
+  )
+
+  // App's onReady only listens for captured text, which lands in the inbox.
+  const onReady = (board: BoardApi) => {
     let un: (() => void) | undefined
     let cancelled = false
-    void register(SHORTCUT, async (ev) => {
-      if (ev.state !== 'Pressed') return
-      const cap = await Window.getByLabel('capture')
-      await cap?.show()
-      await cap?.setFocus()
-    }).catch((e) => { void logIssue(store, 'shortcut', `could not register ${SHORTCUT}: ${e instanceof Error ? e.message : String(e)}`) })
     void listen<string>('flow:capture', (ev) => board.apply((d) => addInboxItem(d, ev.payload, board.today()))).then((f) => {
       if (cancelled) f()
       else un = f
@@ -146,7 +159,6 @@ async function renderTauri() {
     return () => {
       cancelled = true
       un?.()
-      void unregister(SHORTCUT).catch(() => {})
     }
   }
 
@@ -159,11 +171,14 @@ async function renderTauri() {
   const folder = await settings.get<string>('folder')
   const showApp = (dir: string) => {
     const store = new TauriFileStore(dir)
-    createRoot(rootEl).render(
+    const root = createRoot(rootEl)
+    const renderApp = (shortcut?: ShortcutStatus) => root.render(
       <StrictMode>
-        <App store={store} settings={settings} onReady={makeOnReady(store)} />
+        <App store={store} settings={settings} onReady={onReady} shortcut={shortcut} />
       </StrictMode>,
     )
+    renderApp()
+    void registerQuickCapture(store).then((ok) => renderApp({ ok, label: SHORTCUT_LABEL }))
   }
 
   // An out-of-$HOME folder loses its runtime scope grant on restart; fall back to setup then.

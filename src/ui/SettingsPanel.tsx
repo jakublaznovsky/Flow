@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { AI_MODELS, type AiModel } from '../ai/claude'
+import type { ColumnId } from '../model/board'
+import type { ShortcutStatus } from '../shortcut'
+import { COLUMNS } from './BoardView'
 
 interface Props {
   hasKey: boolean
@@ -7,11 +10,21 @@ interface Props {
   onSaveKey: (key: string) => void
   onRemoveKey: () => void
   onModel: (model: AiModel) => void
+  hiddenColumns?: readonly ColumnId[]
+  onColumnVisible?: (id: ColumnId, visible: boolean) => void
+  /** Quick-capture shortcut state (Tauri only); no line when omitted. */
+  shortcut?: ShortcutStatus
 }
 
-/** Settings view: the owner's Claude API key and model. The key is never shown again once saved. */
-export default function SettingsPanel({ hasKey, model, onSaveKey, onRemoveKey, onModel }: Props) {
+/**
+ * Settings view: the owner's Claude API key and model (the key is never shown again once saved),
+ * which board columns are shown, and whether the quick-capture shortcut is available.
+ */
+export default function SettingsPanel({
+  hasKey, model, onSaveKey, onRemoveKey, onModel, hiddenColumns = [], onColumnVisible, shortcut,
+}: Props) {
   const [draft, setDraft] = useState('')
+  const visibleCount = COLUMNS.length - COLUMNS.filter(({ id }) => hiddenColumns.includes(id)).length
   return (
     <section className="settings-view" aria-label="Settings">
       <div className="settings-card">
@@ -47,6 +60,32 @@ export default function SettingsPanel({ hasKey, model, onSaveKey, onRemoveKey, o
           Your key stays on this computer, in Flow's own settings, never in your Flow folder. Pressing an AI button
           sends the Flow data in that request (recent days, tasks, projects and notes) to Anthropic.
         </p>
+        <h3 className="settings-section">Board columns</h3>
+        <fieldset className="settings-columns" aria-label="Board columns">
+          {COLUMNS.map(({ id, title }) => {
+            const visible = !hiddenColumns.includes(id)
+            const last = visible && visibleCount === 1
+            return (
+              <label key={id} className="settings-check" title={last ? 'At least one column stays visible' : undefined}>
+                <input
+                  type="checkbox"
+                  checked={visible}
+                  disabled={last}
+                  title={last ? 'At least one column stays visible' : undefined}
+                  onChange={(e) => onColumnVisible?.(id, e.target.checked)}
+                />
+                {title}
+              </label>
+            )
+          })}
+        </fieldset>
+        {shortcut && (
+          <p className="settings-status settings-shortcut">
+            {shortcut.ok
+              ? `Quick capture: ${shortcut.label}`
+              : "Quick capture shortcut isn't available — another app may be using it."}
+          </p>
+        )}
       </div>
     </section>
   )

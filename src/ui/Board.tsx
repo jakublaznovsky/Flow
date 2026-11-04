@@ -16,6 +16,7 @@ import AiPanel, { AiActions, type AiKind } from './AiPanel'
 import SettingsPanel from './SettingsPanel'
 import { typingTarget } from './typing'
 import type { FileStore } from '../storage/fileStore'
+import type { ShortcutStatus } from '../shortcut'
 import FocusBar from './FocusBar'
 import { nextStep } from '../model/steps'
 import BoardView from './BoardView'
@@ -44,6 +45,8 @@ interface Props {
   onReady?: (api: BoardApi) => void | (() => void)
   /** Claude client for an API key; defaults to the real SDK client. */
   ai?: (apiKey: string) => AiClient
+  /** Quick-capture shortcut state for the Settings status line (Tauri only). */
+  shortcut?: ShortcutStatus
 }
 
 /** Columns an inbox item can be promoted into (Tomorrow = To do planned for tomorrow). */
@@ -166,7 +169,40 @@ function useAiSettings(settings: Settings) {
   return { apiKey, model, saveKey, removeKey, setModel }
 }
 
-export default function Board({ store, settings, now, onReady, ai }: Props) {
+const COLUMN_IDS: readonly ColumnId[] = ['inbox', 'todo', 'tomorrow', 'today', 'done']
+
+/** Stored `hiddenColumns`, cleaned: known ids only, and never all five (one column always stays visible). */
+export function cleanHiddenColumns(v: unknown): ColumnId[] {
+  if (!Array.isArray(v)) return []
+  const hidden = COLUMN_IDS.filter((id) => v.includes(id))
+  return hidden.length === COLUMN_IDS.length ? [] : hidden
+}
+
+/** Which board columns are hidden, from local settings (never the Flow folder). */
+function useHiddenColumns(settings: Settings) {
+  const [hidden, setHidden] = useState<ColumnId[]>([])
+  const chosen = useRef(false)
+  useEffect(() => {
+    let cancelled = false
+    void settings.get<unknown>('hiddenColumns').then((v) => {
+      if (!cancelled && !chosen.current) setHidden(cleanHiddenColumns(v))
+    })
+    return () => { cancelled = true }
+  }, [settings])
+  const hiddenRef = useRef(hidden)
+  hiddenRef.current = hidden
+  const setVisible = useCallback((id: ColumnId, visible: boolean) => {
+    chosen.current = true
+    const cur = hiddenRef.current
+    const next = cleanHiddenColumns(visible ? cur.filter((c) => c !== id) : [...cur, id])
+    hiddenRef.current = next
+    setHidden(next)
+    void settings.set('hiddenColumns', next)
+  }, [settings])
+  return { hidden, setVisible }
+}
+
+export default function Board({ store, settings, now, onReady, ai, shortcut }: Props) {
   const flow = useFlow(store, settings, now)
   const { data, today, filter, setFilter, remember, apply } = flow
   const todayRef = useRef(today)
@@ -183,6 +219,8 @@ export default function Board({ store, settings, now, onReady, ai }: Props) {
   const searchRef = useRef<HTMLInputElement>(null)
   const viewChosen = useRef(false)
   const aiSettings = useAiSettings(settings)
+  const columns = useHiddenColumns(settings)
+  const todoVisible = !columns.hidden.includes('todo')
   const aiClient = useMemo(() => (aiSettings.apiKey ? (ai ?? createAiClient)(aiSettings.apiKey) : null), [ai, aiSettings.apiKey])
   const [aiRun, setAiRun] = useState<{ id: number; kind: AiKind; prompt: string } | null>(null)
 
@@ -208,7 +246,7 @@ export default function Board({ store, settings, now, onReady, ai }: Props) {
       if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return
       if (typingTarget(document.activeElement)) return
       if (e.key === '/') { e.preventDefault(); searchRef.current?.focus() }
-      else if (e.key === 'n') { e.preventDefault(); setView('board'); setAddRequest(true) }
+      else if (e.key === 'n') { if (!todoVisible) return; e.preventDefault(); setView('board'); setAddRequest(true) }
       else if (e.key === 'b') { e.preventDefault(); setView('board') }
       else if (e.key === 'p') { e.preventDefault(); setView('progress') }
       else if (e.key === 'o') { e.preventDefault(); setView('notes') }
@@ -217,7 +255,7 @@ export default function Board({ store, settings, now, onReady, ai }: Props) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [setView])
+  }, [setView, todoVisible])
 
   if (!data) return <div className="app loading"><span className="brand-name">Flow</span></div>
 
@@ -310,6 +348,7 @@ export default function Board({ store, settings, now, onReady, ai }: Props) {
               onAddHandled={clearAddRequest}
               onFocus={(ref, title) => focus.start(ref, title)}
               focusRef={focus.state?.finished ? null : focus.state?.ref}
+              hidden={columns.hidden}
             />
           ) : view === 'week' ? (
             <WeekView flow={flow} />
@@ -319,7 +358,8 @@ export default function Board({ store, settings, now, onReady, ai }: Props) {
             <WeeklyReview data={data} today={today} apply={apply} onFinish={() => setView('board')} aiSlot={aiActions(true)} />
           ) : view === 'settings' ? (
             <SettingsPanel hasKey={!!aiSettings.apiKey} model={aiSettings.model}
-              onSaveKey={aiSettings.saveKey} onRemoveKey={aiSettings.removeKey} onModel={aiSettings.setModel} />
+              onSaveKey={aiSettings.saveKey} onRemoveKey={aiSettings.removeKey} onModel={aiSettings.setModel}
+              hiddenColumns={columns.hidden} onColumnVisible={columns.setVisible} shortcut={shortcut} />
           ) : (
             <ProgressView data={data} today={today} apply={apply} aiSlot={aiActions(true)} />
           )}

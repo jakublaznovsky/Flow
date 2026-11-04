@@ -161,6 +161,25 @@ try {
   await page.getByLabel('Claude API key').waitFor({ timeout: 3000 })
   console.log('ok: Settings shows the API key field')
 
+  // --- Settings: hide two board columns; the other three share the width ---
+  {
+    const group = page.getByRole('group', { name: 'Board columns' })
+    for (const name of ['Parking lot', 'Tomorrow']) await group.getByRole('checkbox', { name, exact: true }).uncheck()
+    await key(page, 'b')
+    await col('Today').getByRole('heading', { name: 'Today' }).waitFor({ timeout: 3000 })
+    const { names, widths, scroll } = await page.evaluate(() => ({
+      names: [...document.querySelectorAll('.column h2')].map((h) => h.textContent),
+      widths: [...document.querySelectorAll('.column')].map((c) => Math.round(c.getBoundingClientRect().width)),
+      scroll: document.documentElement.scrollWidth - window.innerWidth,
+    }))
+    if (names.join() !== 'To do,Today,Done') fail(`visible columns: ${names.join(', ')}`)
+    else if (scroll > 0 || widths.some((w) => w < 300)) fail(`three columns do not share the width: ${widths.join(', ')}`)
+    else console.log(`ok: hidden columns; three share the width (${widths.join(', ')} px)`)
+    if (process.env.FLOW_COLUMNS_SHOT) await page.screenshot({ path: process.env.FLOW_COLUMNS_SHOT })
+    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    for (const name of ['Parking lot', 'Tomorrow']) await group.getByRole('checkbox', { name, exact: true }).check()
+  }
+
   // --- Dark board screenshot ---
   const dark = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 2, colorScheme: 'dark' })
   await dark.goto(url)

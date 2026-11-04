@@ -72,6 +72,14 @@ projects with goals and open tasks, and your general notes (cut to 2,000 charact
 kept in Flow's own settings on this computer and is never written into your Flow folder. Without
 a key you can still press **Copy AI review** and paste the text into any AI yourself.
 
+## Settings
+
+- **Board columns:** tick the columns you want on the board (Parking lot, To do, Tomorrow, Today,
+  Done). Hidden columns keep their cards; the others share the width. One column always stays.
+  The choice is kept in Flow's own settings on this computer, not in your Flow folder.
+- **Quick capture:** in the desktop app, Settings shows whether Ctrl+Shift+Space is working. If
+  another app already uses that shortcut, it says so there (details in `flow-issues.log`).
+
 ## Install on Windows (no setup needed)
 
 1. Open the [Releases page](https://github.com/jakublaznovsky/Flow/releases/latest).
@@ -123,7 +131,8 @@ views, but these only work in the real desktop app:
 
 - **Quick capture window:** press Ctrl+Shift+Space (Cmd+Shift+Space on Mac) from any app. A
   small window should appear; type a thought, press Enter, and it should land in the Parking
-  lot. Escape closes it.
+  lot. Escape closes it. Settings should read "Quick capture: Ctrl+Shift+Space"; if it says the
+  shortcut isn't available, another app holds it (see `flow-issues.log`).
 - **Choosing the folder:** on first launch pick a folder; close and reopen Flow and check it
   remembers the folder and shows your data.
 - **Editing in a text editor:** with Flow open, edit a project file in the data folder with
