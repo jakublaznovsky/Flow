@@ -132,7 +132,7 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
       <div className="card-body">
         <button className="card-title" onClick={open}>{card.title}</button>
         {card.firstStep && <div className="step">{card.firstStep}</div>}
-        {next && <div className="step next-step">Next: {next}</div>}
+        {next && !showSteps && <div className="step next-step">Next: {next}</div>}
         {card.projectTitle && <span className="tag">{card.projectTitle}</span>}
         {(inFocus || (onFocus && column === 'today' && card.kind === 'task')) && (
           <div className="focus-row">

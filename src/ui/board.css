@@ -373,7 +373,7 @@ input.quick-capture, input.quick-capture:focus {
 .focus-row { display: flex; align-items: center; gap: var(--space-2); margin-top: 4px; }
 .card-focus {
   background: none; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
-  padding: 1px 8px; font-size: 12px; color: var(--text-muted); opacity: 0;
+  padding: 1px 8px; font-size: 12px; color: var(--text-muted); opacity: 0.55;
   transition: opacity var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 .card:hover .card-focus, .card:focus-within .card-focus, .card-focus:focus-visible { opacity: 1; }
@@ -391,7 +391,7 @@ input.quick-capture, input.quick-capture:focus {
 .steps-toggle {
   display: grid; place-items: center; width: 22px; height: 22px; padding: 0; background: none; border: 0;
   border-radius: var(--radius-sm, 4px); color: var(--text-faint); cursor: pointer;
-  opacity: 0; transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+  opacity: 0.45; transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
 .card:hover .steps-toggle, .card:focus-within .steps-toggle, .steps-toggle[aria-expanded='true'], .steps-toggle:focus-visible { opacity: 1; }
 .steps-toggle[aria-expanded='true'] { transform: rotate(180deg); }
