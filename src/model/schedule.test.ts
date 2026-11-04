@@ -89,15 +89,20 @@ describe('scheduleTask', () => {
 })
 
 describe('promoteScheduled', () => {
-  it('moves every To do task scheduled on or before today into Today, clearing the field', () => {
+  it('moves every due To do task of an active project into Today, clearing the field', () => {
     const c = promoteScheduled(sample(), '2026-11-06')
-    for (const ref of ['a/t2', 'a/t5', 'b/t1', 'c/t1']) {
+    for (const ref of ['a/t2', 'a/t5', 'b/t1']) {
       expect(get(c.data, ref)).toMatchObject({ status: 'today', planned: '2026-11-06' })
       expect(get(c.data, ref).scheduled).toBeUndefined()
     }
     expect(get(c.data, 'a/t1').status).toBe('todo')
-    expect(c.data.days['2026-11-06'].planned).toEqual(['a/t2', 'a/t5', 'b/t1', 'c/t1'])
-    expect(c.changed.sort()).toEqual(['days/2026-11-06.md', 'projects/a.md', 'projects/b.md', 'projects/c.md'])
+    expect(c.data.days['2026-11-06'].planned).toEqual(['a/t2', 'a/t5', 'b/t1'])
+    expect(c.changed.sort()).toEqual(['days/2026-11-06.md', 'projects/a.md', 'projects/b.md'])
+  })
+  it('leaves due tasks of paused projects waiting with their date', () => {
+    const c = promoteScheduled(sample(), '2026-11-06')
+    expect(get(c.data, 'c/t1')).toMatchObject({ status: 'todo', scheduled: '2026-11-06' })
+    expect(c.changed).not.toContain('projects/c.md')
   })
   it('only promotes what is due', () => {
     const c = promoteScheduled(sample(), T)

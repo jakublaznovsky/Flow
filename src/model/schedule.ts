@@ -31,11 +31,15 @@ export function scheduleTask(d: FlowData, ref: string, date: ISODate | null, tod
   return { data: set.data, changed: merge(moved.changed, set.changed) }
 }
 
-/** Every To do task scheduled on or before today moves to Today and loses its date; one Change. */
+/**
+ * Every To do task of an active project scheduled on or before today moves to Today and loses
+ * its date; one Change. Tasks of paused/done/archived projects keep waiting with their date.
+ */
 export function promoteScheduled(d: FlowData, today: ISODate): Change {
   let data = d
   let changed: string[] = []
   for (const project of Object.values(d.projects)) {
+    if (project.status !== 'active') continue
     for (const t of project.tasks) {
       if (t.status !== 'todo' || t.scheduled === undefined || t.scheduled > today) continue
       const c = scheduleTask(data, `${project.slug}/${t.id}`, today, today)

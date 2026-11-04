@@ -113,11 +113,12 @@ export function useFlow(store: FileStore, settings: Settings, now: () => Date = 
     })
   }, [store])
 
-  // Tasks planned for a day show up in Today by themselves: once loaded and whenever the date changes.
-  const loaded = data !== null
+  // Tasks planned for a day show up in Today by themselves: after load, when the date changes, and
+  // whenever the data changes (external edits, a project made active again). Loop-safe: when
+  // nothing is due the Change is empty and apply returns without setting state.
   useEffect(() => {
-    if (loaded) apply((d) => promoteScheduled(d, today))
-  }, [loaded, today, apply])
+    if (data) apply((d) => promoteScheduled(d, today))
+  }, [data, today, apply])
 
   return { data, today, filter, setFilter, order, setOrder, lastProject, remember, apply }
 }

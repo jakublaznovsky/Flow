@@ -1,4 +1,5 @@
 import type { Day, DoneEntry, Extra, FocusEntry, ISODate, Inbox, InboxItem, Notes, Project, ProjectStatus, Step, Task, TaskStatus } from '../model/types'
+import { localDate } from '../model/dates'
 import { nextInboxId, nextTaskId, pickColor } from '../model/ids'
 import { joinFrontmatter, splitFrontmatter } from './frontmatter'
 
@@ -58,7 +59,11 @@ const TASK_KNOWN = ['id', 'title', 'status', 'first_step', 'created', 'planned',
 /** Optional strict date: absent → undefined; anything but a YYYY-MM-DD string fails the file. */
 function optDate(v: unknown, what: string): ISODate | undefined {
   if (v === undefined || v === null) return undefined
-  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new Error(`${what} must be a date like 2026-11-06`)
+  const bad = () => new Error(`${what} must be a date like 2026-11-06`)
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw bad()
+  // Reject impossible calendar dates (2026-02-30, 2026-13-45): they must survive a local round trip.
+  const [y, m, d] = v.split('-').map(Number)
+  if (localDate(new Date(y, m - 1, d)) !== v) throw bad()
   return v
 }
 

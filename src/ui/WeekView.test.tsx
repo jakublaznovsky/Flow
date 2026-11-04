@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { MemoryFileStore } from '../storage/fileStore'
 import { MemorySettings } from './settings'
+import { updateProject } from '../model/projects'
 import { useFlow } from './useFlow'
 import { handleWeekDrop } from './WeekView'
 
@@ -70,6 +71,39 @@ describe('promotion of scheduled tasks', () => {
     const { writes } = await harness()
     await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
     expect(writes).toEqual({})
+  })
+
+  it('leaves a past-due task of a paused project alone on load', async () => {
+    const files = seed()
+    files['projects/paused.md'] = project('Paused', '#999', task('t1', 'Later', 'todo', '    scheduled: 2026-11-03\n'))
+      .replace('status: active', 'status: paused')
+    const { store, writes } = await harness(files)
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+    expect(writes).toEqual({})
+    expect(store.files['projects/paused.md']).toContain('scheduled: 2026-11-03')
+  })
+
+  it('promotes a past-due task brought in by an external edit, written once', async () => {
+    const { store, writes, hook } = await harness()
+    const external = project('Learn Spanish', '#30a46c', task('t1', 'Buy a book', 'todo', '    scheduled: 2026-11-02\n'))
+    act(() => store.externalWrite('projects/learn-spanish.md', external))
+    await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('status: today'))
+    expect(taskOf(store, 'projects/learn-spanish.md', 't1')).not.toContain('scheduled')
+    expect(hook.result.current.data!.projects['learn-spanish'].tasks[0].status).toBe('today')
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+    expect(writes['projects/learn-spanish.md']).toBe(1)
+  })
+
+  it('promotes past-due tasks when a paused project is made active again', async () => {
+    const files = seed()
+    files['projects/paused.md'] = project('Paused', '#999', task('t1', 'Later', 'todo', '    scheduled: 2026-11-03\n'))
+      .replace('status: active', 'status: paused')
+    const { store, hook } = await harness(files)
+    act(() => hook.result.current.apply((d) => updateProject(d, 'paused', { status: 'active' })))
+    await waitFor(() => expect(taskOf(store, 'projects/paused.md', 't1')).toContain('status: today'))
+    expect(taskOf(store, 'projects/paused.md', 't1')).not.toContain('scheduled')
+    expect(store.files['projects/paused.md']).toContain('status: active')
+    expect(store.files[`days/${T}.md`]).toContain('paused/t1')
   })
 
   it('promotes when the date changes at midnight', async () => {

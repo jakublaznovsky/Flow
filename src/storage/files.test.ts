@@ -287,12 +287,15 @@ describe('task scheduled date', () => {
     expect(serializeProject(p)).toContain('scheduled: 2026-11-06')
     expect(parseProject('p', serializeProject(p), today)).toEqual(p)
   })
+  it('accepts a leap day', () => {
+    expect(parseProject('p', withTask('    scheduled: 2028-02-29\n'), today).tasks[0].scheduled).toBe('2028-02-29')
+  })
   it('omits scheduled when absent', () => {
     const p = parseProject('p', withTask(''), today)
     expect(p.tasks[0].scheduled).toBeUndefined()
     expect(serializeProject(p)).not.toContain('scheduled')
   })
-  it.each([['tomorrow'], ['2026-11-6'], ['20261106'], ['[2026-11-06]'], ['{a: 1}'], ['12']])('rejects a bad scheduled value (%s)', (bad) => {
+  it.each([['tomorrow'], ['2026-11-6'], ['20261106'], ['[2026-11-06]'], ['{a: 1}'], ['12'], ['2026-13-45'], ['2026-02-30'], ['2026-00-10']])('rejects a bad scheduled value (%s)', (bad) => {
     expect(() => parseProject('p', withTask(`    scheduled: ${bad}\n`), today)).toThrow()
   })
 })
