@@ -6,3 +6,21 @@ const pad = (n: number) => String(n).padStart(2, '0')
 export function localDate(d: Date = new Date()): ISODate {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
+
+function parse(date: ISODate): [number, number, number] {
+  const [y, m, d] = date.split('-').map(Number)
+  return [y, m, d]
+}
+
+/** Add n calendar days (negative allowed). Built from y/m/d so DST cannot shift the result. */
+export function addDays(date: ISODate, n: number): ISODate {
+  const [y, m, d] = parse(date)
+  return localDate(new Date(y, m - 1, d + n))
+}
+
+/** Monday of the week containing the date. */
+export function weekStart(date: ISODate): ISODate {
+  const [y, m, d] = parse(date)
+  const dow = new Date(y, m - 1, d).getDay() // 0 = Sunday
+  return addDays(date, -((dow + 6) % 7))
+}
