@@ -106,6 +106,7 @@ function NextWeek({ data, week, apply }: { data: FlowData; week: string; apply: 
   const focus = review?.focusProject && data.projects[review.focusProject]?.status === 'active' ? review.focusProject : ''
   const [draft, setDraft] = useState(review?.intention ?? '')
   const editing = useRef(false)
+  const dirty = useRef(false) // only a typed change is saved; otherwise an outside edit wins
   const stored = review?.intention ?? ''
   useEffect(() => { if (!editing.current) setDraft(stored) }, [stored])
   const pick = (slug: string) => apply((d) => saveReview(d, week, { focusProject: slug === '' ? null : slug }))
@@ -130,9 +131,14 @@ function NextWeek({ data, week, apply }: { data: FlowData; week: string; apply: 
           aria-label="Intention"
           placeholder="One line: what matters most next week?"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => { dirty.current = true; setDraft(e.target.value) }}
           onFocus={() => { editing.current = true }}
-          onBlur={() => { editing.current = false; apply((d) => saveReview(d, week, { intention: draft })) }}
+          onBlur={() => {
+            editing.current = false
+            if (!dirty.current) { setDraft(stored); return }
+            dirty.current = false
+            apply((d) => saveReview(d, week, { intention: draft }))
+          }}
         />
       </label>
     </>
@@ -143,6 +149,7 @@ function Reflect({ data, today, week, apply, aiSlot }: { data: FlowData; today: 
   const stored = data.reviews[week]?.body ?? ''
   const [draft, setDraft] = useState(stored)
   const editing = useRef(false)
+  const dirty = useRef(false) // only a typed change is saved; otherwise an outside edit wins
   useEffect(() => { if (!editing.current) setDraft(stored) }, [stored])
   const { copied, fallback, copy } = useCopyText(() => buildReviewPrompt(data, today))
   return (
@@ -153,9 +160,14 @@ function Reflect({ data, today, week, apply, aiSlot }: { data: FlowData; today: 
         aria-label="Reflection"
         placeholder="What went well? What got in the way? Anything to remember."
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => { dirty.current = true; setDraft(e.target.value) }}
         onFocus={() => { editing.current = true }}
-        onBlur={() => { editing.current = false; apply((d) => saveReview(d, week, { body: draft })) }}
+        onBlur={() => {
+          editing.current = false
+          if (!dirty.current) { setDraft(stored); return }
+          dirty.current = false
+          apply((d) => saveReview(d, week, { body: draft }))
+        }}
       />
       <div className="review-ai">
         <button type="button" className="btn" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy AI review'}</button>

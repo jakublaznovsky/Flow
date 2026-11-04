@@ -94,6 +94,18 @@ describe('Project header', () => {
     expect(area).toHaveValue('From outside typing')
   })
 
+  it('blur without typing keeps an outside body change made while focused', async () => {
+    const { user, api, store } = await setup()
+    await focusProject(user, 'Flow app')
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Notes' }))
+    const area = screen.getByRole('textbox', { name: 'Project notes' })
+    await user.click(area)
+    act(() => api().apply((d) => updateProject(d, 'flow-app', { body: 'From outside' })))
+    await user.tab()
+    await waitFor(() => expect(area).toHaveValue('From outside'))
+    await waitFor(() => expect(store.files['projects/flow-app.md']).toContain('From outside'))
+  })
+
   it('stays open when switching project and closes when focus clears', async () => {
     const { user } = await setup()
     await focusProject(user, 'Flow app')

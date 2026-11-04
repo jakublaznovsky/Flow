@@ -117,4 +117,15 @@ describe('NotesView', () => {
     act(() => store.externalWrite('notes.md', 'second'))
     await waitFor(() => expect(view.getByRole('textbox', { name: 'Notes text' })).toHaveValue('second'))
   })
+  it('blur without typing keeps an outside change that arrived while focused', async () => {
+    const { store, user } = await setup({ ...seed(), 'notes.md': 'first' })
+    const view = within(await openNotes(user))
+    const area = view.getByRole('textbox', { name: 'Notes text' })
+    await user.click(area)
+    await act(async () => { store.externalWrite('notes.md', 'second'); await new Promise((r) => setTimeout(r, 50)) })
+    expect(area).toHaveValue('first') // never overwrite the editor while it has focus
+    await user.tab()
+    await waitFor(() => expect(area).toHaveValue('second'))
+    expect(store.files['notes.md']).toBe('second')
+  })
 })

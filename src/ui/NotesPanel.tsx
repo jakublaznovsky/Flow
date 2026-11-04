@@ -12,12 +12,19 @@ export default function NotesPanel({ body, onSaveBody, onAddDecision, onClose }:
   const [draft, setDraft] = useState(body)
   const [decision, setDecision] = useState('')
   const editing = useRef(false)
+  /** Set once the owner types; only then may a save overwrite the file (an outside edit wins otherwise). */
+  const dirty = useRef(false)
   const areaRef = useRef<HTMLTextAreaElement>(null)
 
   // Follow outside changes, but never overwrite what is being typed.
   useEffect(() => { if (!editing.current) setDraft(body) }, [body])
 
-  const save = () => { if (draft !== body) onSaveBody(draft) }
+  const save = () => {
+    const wasDirty = dirty.current
+    dirty.current = false
+    if (!wasDirty) setDraft(body)
+    else if (draft !== body) onSaveBody(draft)
+  }
   const close = () => { if (editing.current) save(); onClose() }
   const closeRef = useRef(close)
   closeRef.current = close
@@ -39,7 +46,7 @@ export default function NotesPanel({ body, onSaveBody, onAddDecision, onClose }:
         aria-label="Project notes"
         placeholder="Notes for this project"
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => { dirty.current = true; setDraft(e.target.value) }}
         onFocus={() => { editing.current = true }}
         onBlur={() => { editing.current = false; save() }}
       />

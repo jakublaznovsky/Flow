@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { setDayNote } from '../model/notes-day'
 import { buildReviewPrompt } from '../model/review'
 import { doneOn, focusMinutesOn, heatmap, projectProgress, weekDates } from '../model/stats'
@@ -19,6 +19,9 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 function TodayNote({ body, today, apply }: { body: string; today: string; apply: Props['apply'] }) {
   const [text, setText] = useState(body)
   const [focused, setFocused] = useState(false)
+  /** Only a typed change is saved, to the day the editing started on. */
+  const dirty = useRef(false)
+  const startedOn = useRef(today)
   // Follow outside changes (reload, date change) unless the owner is typing.
   useEffect(() => { if (!focused) setText(body) }, [body, focused])
   return (
@@ -27,9 +30,15 @@ function TodayNote({ body, today, apply }: { body: string; today: string; apply:
       aria-label="Today's note"
       placeholder="What happened today? Anything to remember."
       value={text}
-      onFocus={() => setFocused(true)}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() => { setFocused(false); apply((d) => setDayNote(d, today, text)) }}
+      onFocus={() => { startedOn.current = today; setFocused(true) }}
+      onChange={(e) => { dirty.current = true; setText(e.target.value) }}
+      onBlur={() => {
+        setFocused(false)
+        if (!dirty.current) return
+        dirty.current = false
+        const date = startedOn.current
+        apply((d) => setDayNote(d, date, text))
+      }}
     />
   )
 }

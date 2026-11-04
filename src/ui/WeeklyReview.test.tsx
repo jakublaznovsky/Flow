@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
@@ -184,5 +184,23 @@ describe('WeeklyReview', () => {
     expect(screen.getByRole('textbox', { name: 'Intention' })).toHaveValue('Ship')
     await next(user)
     expect(screen.getByRole('textbox', { name: 'Reflection' })).toHaveValue('Notes so far\n')
+  })
+  it('blur without typing keeps an outside change to the reflection and intention', async () => {
+    const before = '---\nweek: 2026-W45\nintention: Ship\n---\nNotes so far\n'
+    const after = '---\nweek: 2026-W45\nintention: Rest\n---\nEdited elsewhere\n'
+    const { store, user } = await setup({ ...seed(), [REVIEW]: before })
+    await open(user); await next(user); await next(user)
+    const intention = screen.getByRole('textbox', { name: 'Intention' })
+    await user.click(intention)
+    await act(async () => { store.externalWrite(REVIEW, after); await new Promise((r) => setTimeout(r, 50)) })
+    await user.tab()
+    await waitFor(() => expect(intention).toHaveValue('Rest'))
+    await next(user)
+    const box = screen.getByRole('textbox', { name: 'Reflection' })
+    await user.click(box)
+    await act(async () => { store.externalWrite(REVIEW, before); await new Promise((r) => setTimeout(r, 50)) })
+    await user.tab()
+    await waitFor(() => expect(box).toHaveValue('Notes so far\n'))
+    expect(store.files[REVIEW]).toBe(before)
   })
 })

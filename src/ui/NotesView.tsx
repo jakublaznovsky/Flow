@@ -25,11 +25,16 @@ export default function NotesView({ data, apply, initial }: Props) {
 
   const [draft, setDraft] = useState(body)
   const editing = useRef(false)
+  /** Set once the owner types; only then may a save overwrite the file (an outside edit wins otherwise). */
+  const dirty = useRef(false)
 
   // Follow outside changes (and the switch to another item), but never overwrite what is being typed.
   useEffect(() => { if (!editing.current) setDraft(body) }, [body, selected])
 
   const save = () => {
+    const wasDirty = dirty.current
+    dirty.current = false
+    if (!wasDirty) { setDraft(body); return }
     if (unreadable || draft === body) return
     if (project) apply((d) => updateProject(d, project.slug, { body: draft }))
     else apply((d) => setNotes(d, draft))
@@ -68,7 +73,7 @@ export default function NotesView({ data, apply, initial }: Props) {
             placeholder="Write anything…"
             readOnly={unreadable}
             value={unreadable ? '' : draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => { dirty.current = true; setDraft(e.target.value) }}
             onFocus={() => { editing.current = true }}
             onBlur={() => { editing.current = false; save() }}
           />

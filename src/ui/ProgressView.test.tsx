@@ -78,6 +78,35 @@ describe('ProgressView', () => {
     expect(text).toContain('Ship it')
   })
 
+  it("blur without typing keeps an outside change to today's note", async () => {
+    const { store, user, view } = await setup()
+    const note = view.getByRole('textbox', { name: "Today's note" })
+    await user.click(note)
+    const external = seed()['days/2026-11-04.md'].replace('earlier note', 'written elsewhere')
+    await act(async () => { store.externalWrite('days/2026-11-04.md', external); await new Promise((r) => setTimeout(r, 50)) })
+    await user.tab()
+    await waitFor(() => expect(note).toHaveValue('written elsewhere\n'))
+    expect(store.files['days/2026-11-04.md']).toBe(external)
+  })
+
+  it('saves the note to the day it was started on, even after midnight', async () => {
+    let now = new Date(2026, 10, 4, 23, 59, 30)
+    const store = new MemoryFileStore(seed())
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<App store={store} settings={new MemorySettings()} now={() => now} />)
+    await screen.findByRole('heading', { name: 'To do' })
+    await user.keyboard('p')
+    const note = await screen.findByRole('textbox', { name: "Today's note" })
+    await user.click(note)
+    await user.type(note, ' late')
+    now = new Date(2026, 10, 5, 0, 0, 30)
+    act(() => { vi.advanceTimersByTime(60_000) })
+    await user.tab()
+    await waitFor(() => expect(store.files['days/2026-11-04.md']).toContain('earlier note\n late'))
+    expect(store.files['days/2026-11-05.md']).toBeUndefined()
+  })
+
   it('does not create a day file for an empty note', async () => {
     const files = seed(); delete files['days/2026-11-04.md']
     const { store, user, view } = await setup(files)
