@@ -42,3 +42,13 @@ export function boardColumns(
   for (const id of Object.keys(cols) as ColumnId[]) cols[id] = sortCards(cols[id], order[id])
   return cols
 }
+
+/** Cards whose title, first step or project title contains `query` (trimmed, case-insensitive). */
+export function searchCards(cols: Record<ColumnId, Card[]>, query: string): Record<ColumnId, Card[]> {
+  const q = query.trim().toLowerCase()
+  if (!q) return cols
+  const hit = (c: Card) => [c.title, c.firstStep, c.projectTitle].some((s) => s?.toLowerCase().includes(q))
+  const out = { ...cols }
+  for (const id of Object.keys(out) as ColumnId[]) out[id] = out[id].filter(hit)
+  return out
+}

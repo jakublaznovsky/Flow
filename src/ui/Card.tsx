@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import type { Card as CardData, ColumnId } from '../model/board'
 
@@ -16,7 +16,8 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
   const { setNodeRef, listeners, transform, transition, isDragging } = useSortable({
     id: card.key, data: { column }, disabled: editing,
   })
-  const dragStyle = { transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined, transition, opacity: isDragging ? 0.5 : undefined }
+  const stripe = { '--project': card.color ?? 'var(--border-strong)' } as CSSProperties
+  const dragStyle = { ...stripe, transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined, transition, opacity: isDragging ? 0.5 : undefined }
   const [title, setTitle] = useState(card.title)
   const [step, setStep] = useState(card.firstStep ?? '')
   const [project, setProject] = useState(card.projectSlug ?? '')
@@ -44,7 +45,7 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
             </>
           )}
           <div className="row">
-            <button type="submit">Save</button>
+            <button type="submit" className="primary">Save</button>
             <button type="button" className="danger" onClick={onDelete}>Delete</button>
           </div>
         </form>
@@ -53,7 +54,7 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
   }
   return (
     <li
-      className={`card${column === 'done' ? ' is-done' : ''}`}
+      className={`card${column === 'done' ? ' is-done' : ''}${card.kind === 'inbox' ? ' is-inbox' : ''}${isDragging ? ' is-dragging' : ''}`}
       ref={setNodeRef}
       style={dragStyle}
       {...listeners}
@@ -68,10 +69,8 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
       )}
       <div className="card-body">
         <button className="card-title" onClick={open}>{card.title}</button>
-        {card.projectTitle && (
-          <span className="tag" style={{ background: card.color }}>{card.projectTitle}</span>
-        )}
         {card.firstStep && <div className="step">{card.firstStep}</div>}
+        {card.projectTitle && <span className="tag">{card.projectTitle}</span>}
       </div>
     </li>
   )

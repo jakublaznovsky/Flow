@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface Props {
   label: string
@@ -9,16 +9,27 @@ interface Props {
   defaultProject: string | null
   onAdd: (title: string, slug: string | null) => void
   onCreateProject: (title: string) => string
+  /** When true, opens the input (or focuses it when already open) and calls onOpenHandled. */
+  openRequest?: boolean
+  onOpenHandled?: () => void
 }
 
 /** "+" button that expands into an inline input. */
-export default function AddCard({ label, placeholder, needProject, pickProject, projects, defaultProject, onAdd, onCreateProject }: Props) {
+export default function AddCard({ label, placeholder, needProject, pickProject, projects, defaultProject, onAdd, onCreateProject, openRequest, onOpenHandled }: Props) {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [created, setCreated] = useState<string | null>(null)
   const [slug, setSlug] = useState<string | null>(null)
   const askProject = needProject && created === null
   const showSelect = pickProject && !needProject && projects.length > 1
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!openRequest) return
+    setOpen(true)
+    inputRef.current?.focus()
+    onOpenHandled?.()
+  }, [openRequest, onOpenHandled])
 
   const close = () => { setOpen(false); setText(''); setCreated(null); setSlug(null) }
 
@@ -35,11 +46,16 @@ export default function AddCard({ label, placeholder, needProject, pickProject, 
   }
 
   if (!open) {
-    return <button className="add-btn" aria-label={label} onClick={() => setOpen(true)}>+</button>
+    return (
+      <button className="add-btn" aria-label={label} onClick={() => setOpen(true)}>
+        <span aria-hidden="true">+</span> Add
+      </button>
+    )
   }
   return (
     <form className="add-form" onSubmit={(e) => { e.preventDefault(); submit() }}>
       <input
+        ref={inputRef}
         autoFocus
         aria-label={askProject ? 'Project title' : placeholder}
         placeholder={askProject ? 'First, name a project' : placeholder}
@@ -52,7 +68,7 @@ export default function AddCard({ label, placeholder, needProject, pickProject, 
           {projects.map((p) => <option key={p.slug} value={p.slug}>{p.title}</option>)}
         </select>
       )}
-      <button type="submit" aria-label={askProject ? 'Create project' : 'Add'}>{askProject ? 'Create' : 'Add'}</button>
+      <button type="submit" className="primary" aria-label={askProject ? 'Create project' : 'Add'}>{askProject ? 'Create' : 'Add'}</button>
     </form>
   )
 }

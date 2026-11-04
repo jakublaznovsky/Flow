@@ -75,6 +75,13 @@ describe('handleDrop', () => {
       expect((await settings.get<Record<string, string[]>>('columnOrder'))?.todo).toEqual(['flow-app/t3', 'learn-spanish/t1']))
   })
 
+  it('reordering under a search keeps cards the search hides in place', async () => {
+    const { ctx, hook } = await harness()
+    // 'h' matches "Third" and "Learn Spanish" (project title) but not "Set up Tauri".
+    act(() => handleDrop({ cardKey: 'learn-spanish/t1', from: 'todo', to: 'todo', index: 0 }, { ...ctx(), query: 'h' }))
+    expect(hook.result.current.flow.order.todo).toEqual(['flow-app/t1', 'learn-spanish/t1', 'flow-app/t3'])
+  })
+
   it('rejects an inbox drop on To do when there is no active project', async () => {
     const files = seed()
     files['projects/flow-app.md'] = files['projects/flow-app.md'].replace('status: active', 'status: paused')

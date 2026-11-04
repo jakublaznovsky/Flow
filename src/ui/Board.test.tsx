@@ -62,38 +62,6 @@ describe('Board', () => {
     expect(col('Today').getByText('Write spec')).toBeInTheDocument()
   })
 
-  it('filters by project chip', async () => {
-    const { user } = setup()
-    await screen.findByText('Buy a book')
-    await user.click(screen.getByRole('button', { name: 'Flow app' }))
-    expect(screen.queryByText('Buy a book')).not.toBeInTheDocument()
-    expect(screen.getByText('Set up Tauri')).toBeInTheDocument()
-  })
-
-  it('archiving a project via the chip menu removes its cards', async () => {
-    const { store, user } = setup()
-    await screen.findByText('Buy a book')
-    fireEvent.contextMenu(screen.getByRole('button', { name: 'Learn Spanish' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Archive' }))
-    expect(screen.queryByText('Buy a book')).not.toBeInTheDocument()
-    await waitFor(() => expect(store.files['projects/learn-spanish.md']).toContain('archived'))
-  })
-
-  it('a hidden project can be made active again from the Hidden chip', async () => {
-    const { store, user } = setup()
-    await screen.findByText('Buy a book')
-    expect(screen.queryByRole('button', { name: /^Hidden/ })).not.toBeInTheDocument()
-    fireEvent.contextMenu(screen.getByRole('button', { name: 'Learn Spanish' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Pause' }))
-    await user.click(screen.getByRole('button', { name: 'Hidden (1)' }))
-    const list = within(screen.getByRole('list', { name: 'Hidden projects' }))
-    expect(list.getByText('Learn Spanish')).toBeInTheDocument()
-    await user.click(list.getByRole('button', { name: 'Make active' }))
-    expect(await screen.findByText('Buy a book')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Hidden/ })).not.toBeInTheDocument()
-    await waitFor(() => expect(store.files['projects/learn-spanish.md']).toContain('status: active'))
-  })
-
   it('edits a card inline and deletes it', async () => {
     const { user } = setup()
     await user.click(await screen.findByRole('button', { name: 'Set up Tauri' }))
@@ -127,15 +95,6 @@ describe('Board', () => {
     await user.type(screen.getByRole('textbox', { name: 'New task' }), 'Tidy desk{Enter}')
     expect(await col('To do').findByText('Tidy desk')).toBeInTheDocument()
     await waitFor(() => expect(store.files['projects/home.md']).toContain('Tidy desk'))
-  })
-
-  it('creates a project with + Project', async () => {
-    const { store, user } = setup()
-    await screen.findByText('Set up Tauri')
-    await user.click(screen.getByRole('button', { name: '+ Project' }))
-    await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Garden{Enter}')
-    expect(screen.getByRole('button', { name: 'Garden' })).toBeInTheDocument()
-    await waitFor(() => expect(store.files['projects/garden.md']).toBeDefined())
   })
 
   it('Done empties after midnight and the 60s tick', async () => {
@@ -201,5 +160,102 @@ describe('Board', () => {
     expect(screen.queryByRole('combobox', { name: 'Project for new task' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Add to To do' }))
     expect(screen.getByRole('combobox', { name: 'Project for new task' })).toBeInTheDocument()
+  })
+
+  it('search filters cards by title, first step or project; Escape clears it', async () => {
+    const { user } = setup()
+    await screen.findByText('Buy a book')
+    const search = screen.getByRole('searchbox', { name: 'Search' })
+    await user.type(search, 'BOOK')
+    expect(screen.getByText('Buy a book')).toBeInTheDocument()
+    expect(screen.queryByText('Set up Tauri')).not.toBeInTheDocument()
+    expect(screen.queryByText('Look into podcasts')).not.toBeInTheDocument()
+    await user.clear(search)
+    await user.type(search, 'flow app')
+    expect(screen.getByText('Set up Tauri')).toBeInTheDocument()
+    expect(screen.getByText('Write spec')).toBeInTheDocument()
+    expect(screen.queryByText('Buy a book')).not.toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(search).toHaveValue('')
+    expect(screen.getByText('Buy a book')).toBeInTheDocument()
+    expect(screen.getByText('Look into podcasts')).toBeInTheDocument()
+  })
+
+  it('"/" focuses the search box without typing into it', async () => {
+    const { user } = setup()
+    await screen.findByText('Buy a book')
+    await user.keyboard('/')
+    const search = screen.getByRole('searchbox', { name: 'Search' })
+    expect(search).toHaveFocus()
+    expect(search).toHaveValue('')
+  })
+
+  it('"n" opens the New task input in To do', async () => {
+    const { store, user } = setup()
+    await screen.findByText('Buy a book')
+    await user.keyboard('n')
+    const input = col('To do').getByRole('textbox', { name: 'New task' })
+    expect(input).toHaveFocus()
+    expect(input).toHaveValue('')
+    await user.keyboard('Plan sprint{Enter}')
+    expect(await col('To do').findByText('Plan sprint')).toBeInTheDocument()
+    await waitFor(() => expect(store.files['projects/flow-app.md']).toContain('Plan sprint'))
+  })
+
+  it('"p" and "b" switch between the Progress and Board views', async () => {
+    const { user } = setup()
+    await screen.findByText('Buy a book')
+    await user.keyboard('p')
+    expect(screen.getByRole('region', { name: 'Progress' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'To do' })).not.toBeInTheDocument()
+    await user.keyboard('b')
+    expect(screen.getByRole('region', { name: 'To do' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Progress' })).not.toBeInTheDocument()
+  })
+
+  it('shortcut keys typed inside a text field do nothing', async () => {
+    const { user } = setup()
+    await screen.findByText('Buy a book')
+    await user.click(screen.getByRole('button', { name: 'Add to Parking lot' }))
+    const thought = screen.getByRole('textbox', { name: 'Capture a thought' })
+    await user.type(thought, 'nbp/')
+    expect(thought).toHaveValue('nbp/')
+    expect(thought).toHaveFocus()
+    expect(screen.queryByRole('textbox', { name: 'New task' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Progress' })).not.toBeInTheDocument()
+    const search = screen.getByRole('searchbox', { name: 'Search' })
+    await user.type(search, 'n')
+    expect(search).toHaveValue('n')
+    expect(screen.queryByRole('textbox', { name: 'New task' })).not.toBeInTheDocument()
+  })
+
+  it('shortcuts still work while a card checkbox has focus', async () => {
+    const { user } = setup()
+    await screen.findByText('Write spec')
+    const box = screen.getByRole('checkbox', { name: 'Done: Write spec' })
+    act(() => box.focus())
+    expect(box).toHaveFocus()
+    await user.keyboard('p')
+    expect(screen.getByRole('region', { name: 'Progress' })).toBeInTheDocument()
+  })
+
+  it('persists the view in settings and restores it', async () => {
+    const settings = new MemorySettings()
+    const store = new MemoryFileStore(seed())
+    const user = userEvent.setup()
+    const view = render(<App store={store} settings={settings} now={() => NOW} />)
+    await screen.findByText('Buy a book')
+    await user.keyboard('p')
+    await waitFor(async () => expect(await settings.get('view')).toBe('progress'))
+    view.unmount()
+    render(<App store={store} settings={settings} now={() => NOW} />)
+    expect(await screen.findByRole('region', { name: 'Progress' })).toBeInTheDocument()
+  })
+
+  it('column headers show the card count', async () => {
+    setup()
+    await screen.findByText('Buy a book')
+    expect(col('To do').getByText('2', { selector: '.count' })).toBeInTheDocument()
+    expect(col('Today').getByText('1', { selector: '.count' })).toBeInTheDocument()
   })
 })

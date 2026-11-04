@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { boardColumns } from './board'
+import { boardColumns, searchCards } from './board'
 import { emptyFlow, type FlowData, type Task } from './types'
 
 const T = '2026-11-04'
@@ -68,5 +68,27 @@ describe('boardColumns', () => {
     expect(keys(c.todo)).toEqual(['learn-spanish/t1', 'flow-app/t1'])
     const i = boardColumns(sample(), T, null, { inbox: ['inbox/i1'] })
     expect(keys(i.inbox)).toEqual(['inbox/i1', 'inbox/i2'])
+  })
+})
+
+describe('searchCards', () => {
+  const cols = () => boardColumns(sample(), T, null, {})
+  it('matches title, first step and project title, case-insensitive', () => {
+    expect(keys(searchCards(cols(), 'SPEC').todo)).toEqual(['flow-app/t1'])
+    expect(keys(searchCards(cols(), 'open DOC').todo)).toEqual(['flow-app/t1'])
+    const byProject = searchCards(cols(), 'spanish')
+    expect(keys(byProject.todo)).toEqual(['learn-spanish/t1'])
+    expect(byProject.today).toEqual([])
+    expect(keys(searchCards(cols(), 'idea a').inbox)).toEqual(['inbox/i2'])
+  })
+  it('trims the query; an empty query returns the columns unchanged', () => {
+    const c = cols()
+    expect(searchCards(c, '')).toBe(c)
+    expect(searchCards(c, '   ')).toBe(c)
+    expect(keys(searchCards(c, '  ship ').done)).toEqual(['flow-app/t3'])
+  })
+  it('keeps column order', () => {
+    const c = boardColumns(sample(), T, null, { todo: ['learn-spanish/t1'] })
+    expect(keys(searchCards(c, 'e').todo)).toEqual(['learn-spanish/t1', 'flow-app/t1'])
   })
 })

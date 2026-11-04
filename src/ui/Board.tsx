@@ -1,43 +1,38 @@
-import { useEffect, useRef, useState } from 'react'
-import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
-import { boardColumns, type Card as CardData, type ColumnId } from '../model/board'
-import { addInboxItem, deleteInboxItem, editInboxItem, promoteInboxItem } from '../model/inbox'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { boardColumns, searchCards, type Card as CardData, type ColumnId } from '../model/board'
+import { promoteInboxItem } from '../model/inbox'
 import { createProject, updateProject } from '../model/projects'
-import { addTask, changeTaskProject, deleteTask, editTask, moveTask } from '../model/tasks'
+import { projectProgress } from '../model/stats'
+import { moveTask } from '../model/tasks'
 import type { FileStore } from '../storage/fileStore'
-import AddCard from './AddCard'
-import Card from './Card'
-import Column from './Column'
-import ProjectBar from './ProjectBar'
+import BoardView from './BoardView'
 import ProjectPicker from './ProjectPicker'
+import SearchBox from './SearchBox'
+import Sidebar, { type View } from './Sidebar'
 import type { Settings } from './settings'
 import { useFlow } from './useFlow'
+import './theme.css'
 import './board.css'
 
 /** Handle for host shells (Tauri) to push changes into the board. Returns an optional cleanup. */
 export interface BoardApi { apply: ReturnType<typeof useFlow>['apply']; today: () => string }
 interface Props { store: FileStore; settings: Settings; now?: () => Date; onReady?: (api: BoardApi) => void | (() => void) }
 
-const COLUMNS: { id: ColumnId; title: string }[] = [
-  { id: 'inbox', title: 'Parking lot' },
-  { id: 'todo', title: 'To do' },
-  { id: 'today', title: 'Today' },
-  { id: 'done', title: 'Done' },
-]
-
 export interface DropContext {
   flow: ReturnType<typeof useFlow>
   openPicker(itemId: string, to: 'todo' | 'today', index?: number): void
+  /** Active search text; drop indexes are positions among the cards it leaves visible. */
+  query?: string
 }
 
 /**
- * Store the column order after a drop. `index` is a position among the visible (filtered) cards;
- * the order is built from all cards so cards hidden by the project filter keep their place.
+ * Store the column order after a drop. `index` is a position among the visible (filtered and
+ * searched) cards; the order is built from all cards so hidden cards keep their place.
  */
-function reorder(flow: ReturnType<typeof useFlow>, cardKey: string, from: ColumnId, to: ColumnId, index: number, insertKey = cardKey) {
+function reorder(flow: ReturnType<typeof useFlow>, cardKey: string, from: ColumnId, to: ColumnId, index: number, insertKey = cardKey, query = '') {
   if (!flow.data) return
   const all = boardColumns(flow.data, flow.today, null, flow.order)
-  const visible = boardColumns(flow.data, flow.today, flow.filter, flow.order)
+  const visible = searchCards(boardColumns(flow.data, flow.today, flow.filter, flow.order), query)
   const others = (cards: CardData[]) => cards.map((c) => c.key).filter((k) => k !== cardKey && k !== insertKey)
   const keys = others(all[to])
   const shown = others(visible[to])
@@ -54,22 +49,22 @@ export function handleDrop(
   args: { cardKey: string; from: ColumnId; to: ColumnId; index: number }, ctx: DropContext,
 ): void {
   const { cardKey, from, to, index } = args
-  const { flow } = ctx
+  const { flow, query } = ctx
   if (!flow.data) return
   if (from === 'inbox') {
     const hasProject = Object.values(flow.data.projects).some((p) => p.status === 'active')
-    if (to === 'inbox') reorder(flow, cardKey, from, to, index)
+    if (to === 'inbox') reorder(flow, cardKey, from, to, index, cardKey, query)
     // With no active project there is nothing to pick, so the drop is rejected.
     else if ((to === 'todo' || to === 'today') && hasProject) ctx.openPicker(cardKey.slice('inbox/'.length), to, index)
     return
   }
   if (to === 'inbox') return
   if (to !== from) flow.apply((d) => moveTask(d, cardKey, to, flow.today))
-  reorder(flow, cardKey, from, to, index)
+  reorder(flow, cardKey, from, to, index, cardKey, query)
 }
 
 /** Picker state and the promotion it performs once a project is chosen. */
-export function usePromotion(flow: ReturnType<typeof useFlow>) {
+export function usePromotion(flow: ReturnType<typeof useFlow>, query = '') {
   const [pending, setPending] = useState<{ itemId: string; to: 'todo' | 'today'; index: number } | null>(null)
   const openPicker = (itemId: string, to: 'todo' | 'today', index = Number.MAX_SAFE_INTEGER) =>
     setPending({ itemId, to, index })
@@ -85,7 +80,7 @@ export function usePromotion(flow: ReturnType<typeof useFlow>) {
     })
     if (newKey) {
       flow.remember(slug)
-      reorder(flow, `inbox/${pending.itemId}`, 'inbox', pending.to, pending.index, newKey)
+      reorder(flow, `inbox/${pending.itemId}`, 'inbox', pending.to, pending.index, newKey, query)
     }
     setPending(null)
   }
@@ -98,41 +93,63 @@ export function usePromotion(flow: ReturnType<typeof useFlow>) {
   return { openPicker, picker, pendingTo: pending?.to ?? null }
 }
 
+const isView = (v: unknown): v is View => v === 'board' || v === 'progress'
+
+const NON_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color'])
+
+/** True while focus is in a text field (typed letters belong to it, not to shortcuts). */
+function typingTarget(el: Element | null): boolean {
+  if (el instanceof HTMLInputElement) return !NON_TEXT_INPUTS.has(el.type)
+  return el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || (el instanceof HTMLElement && el.isContentEditable)
+}
+
 export default function Board({ store, settings, now, onReady }: Props) {
   const flow = useFlow(store, settings, now)
-  const { data, today, filter, setFilter, order, lastProject, remember, apply } = flow
+  const { data, today, filter, setFilter, remember, apply } = flow
   const todayRef = useRef(today)
   todayRef.current = today
   useEffect(() => onReady?.({ apply, today: () => todayRef.current }), [onReady, apply])
-  const promotion = usePromotion(flow)
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
-  if (!data) return <div className="app"><h1>Flow</h1></div>
+  const [query, setQuery] = useState('')
+  const promotion = usePromotion(flow, query)
+  const [view, setViewState] = useState<View>('board')
+  const [addRequest, setAddRequest] = useState(false)
+  const clearAddRequest = useCallback(() => setAddRequest(false), [])
+  const searchRef = useRef<HTMLInputElement>(null)
+  const viewChosen = useRef(false)
 
-  const active = Object.values(data.projects).filter((p) => p.status === 'active')
-  const projects = active.map((p) => ({ slug: p.slug, title: p.title }))
-  const cols = boardColumns(data, today, filter, order)
-  const columnOf = (key: string): ColumnId | undefined =>
-    COLUMNS.find(({ id }) => cols[id].some((c) => c.key === key))?.id
+  useEffect(() => {
+    let cancelled = false
+    void settings.get<unknown>('view').then((v) => {
+      if (!cancelled && !viewChosen.current && isView(v)) setViewState(v)
+    })
+    return () => { cancelled = true }
+  }, [settings])
 
-  const onDragEnd = (e: DragEndEvent) => {
-    if (!e.over) return
-    const cardKey = String(e.active.id)
-    const from = columnOf(cardKey)
-    const overId = String(e.over.id)
-    const overCol = COLUMNS.find(({ id }) => id === overId)?.id ?? columnOf(overId)
-    if (!from || !overCol) return
-    const overIdx = cols[overCol].findIndex((c) => c.key === overId)
-    const index = overIdx >= 0 ? overIdx : cols[overCol].length
-    handleDrop({ cardKey, from, to: overCol, index }, { flow, openPicker: promotion.openPicker })
-  }
-  const defaultProject =
-    filter ?? (lastProject && active.some((p) => p.slug === lastProject) ? lastProject : null) ?? active[0]?.slug ?? null
+  const setView = useCallback((v: View) => {
+    viewChosen.current = true
+    setViewState(v)
+    void settings.set('view', v)
+  }, [settings])
 
-  const addTaskTo = (status: 'todo' | 'today') => (title: string, slug: string | null) => {
-    if (!slug) return
-    remember(slug)
-    apply((d) => addTask(d, slug, title, status, today))
-  }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return
+      if (typingTarget(document.activeElement)) return
+      if (e.key === '/') { e.preventDefault(); searchRef.current?.focus() }
+      else if (e.key === 'n') { e.preventDefault(); setView('board'); setAddRequest(true) }
+      else if (e.key === 'b') { e.preventDefault(); setView('board') }
+      else if (e.key === 'p') { e.preventDefault(); setView('progress') }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [setView])
+
+  if (!data) return <div className="app loading"><span className="brand-name">Flow</span></div>
+
+  const all = Object.values(data.projects)
+  const active = all.filter((p) => p.status === 'active')
+  const progress = Object.fromEntries(active.map((p) => [p.slug, projectProgress(data, p.slug, today)]))
+
   const createProjectNamed = (title: string): string => {
     let slug = ''
     apply((d) => {
@@ -143,77 +160,46 @@ export default function Board({ store, settings, now, onReady }: Props) {
     if (slug) remember(slug)
     return slug
   }
-  const saveCard = (card: CardData, patch: { title: string; firstStep: string; project: string }) => {
-    if (card.kind === 'inbox') {
-      apply((d) => editInboxItem(d, card.key.slice('inbox/'.length), patch.title))
-      return
-    }
-    // One apply (one save) for the edit and the optional project change.
-    apply((d) => {
-      const edited = editTask(d, card.key, { title: patch.title, firstStep: patch.firstStep }, today)
-      if (!patch.project || patch.project === card.projectSlug) return edited
-      const moved = changeTaskProject(edited.data, card.key, patch.project)
-      return { data: moved.data, changed: [...new Set([...edited.changed, ...moved.changed])] }
-    })
-  }
-  const deleteCard = (card: CardData) => {
-    if (card.kind === 'inbox') apply((d) => deleteInboxItem(d, card.key.slice('inbox/'.length)))
-    else apply((d) => deleteTask(d, card.key))
+  const onSearch = (q: string) => {
+    setQuery(q)
+    if (q.trim() && view !== 'board') setView('board')
   }
 
   return (
-    <div className="app">
-      <header className="top">
-        <h1>Flow</h1>
-        <ProjectBar
-          projects={active}
-          hidden={Object.values(data.projects).filter((p) => p.status !== 'active')}
-          filter={filter}
-          onFilter={setFilter}
-          onCreate={(t) => { const s = createProjectNamed(t); if (s) setFilter(null) }}
-          onUpdate={(slug, patch) => apply((d) => updateProject(d, slug, patch))}
-        />
-      </header>
-      {promotion.picker && <div className="picker-wrap">{promotion.picker}</div>}
-      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-      <main className="columns">
-        {COLUMNS.map(({ id, title }) => (
-          <Column
-            key={id}
-            id={id}
-            keys={cols[id].map((c) => c.key)}
-            title={title}
-            hint={id === 'today' && cols.today.length === 0 ? 'pick up to 3' : undefined}
-            footer={id === 'done' ? undefined : (
-              <AddCard
-                label={`Add to ${title}`}
-                placeholder={id === 'inbox' ? 'Capture a thought' : 'New task'}
-                needProject={id !== 'inbox' && active.length === 0}
-                pickProject={id !== 'inbox'}
-                projects={projects}
-                defaultProject={defaultProject}
-                onAdd={id === 'inbox'
-                  ? (text) => apply((d) => addInboxItem(d, text, today))
-                  : addTaskTo(id)}
-                onCreateProject={createProjectNamed}
-              />
-            )}
-          >
-            {cols[id].map((card) => (
-              <Card
-                key={card.key}
-                card={card}
-                column={id}
-                projects={projects}
-                onToggle={() => apply((d) => moveTask(d, card.key, id === 'done' ? 'today' : 'done', today))}
-                onSave={(patch) => saveCard(card, patch)}
-                onDelete={() => deleteCard(card)}
-              />
-            ))}
-          </Column>
-        ))}
+    <div className="shell">
+      <Sidebar
+        view={view}
+        onView={setView}
+        projects={active}
+        hidden={all.filter((p) => p.status !== 'active')}
+        progress={progress}
+        filter={filter}
+        onFilter={setFilter}
+        onCreate={(t) => { const s = createProjectNamed(t); if (s) setFilter(null) }}
+        onUpdate={(slug, patch) => apply((d) => updateProject(d, slug, patch))}
+      />
+      <main className="main">
+        <div className="topbar">
+          <div className="header-slot" />
+          <SearchBox ref={searchRef} value={query} onChange={onSearch} />
+        </div>
+        <div className="focus-slot" />
+        <div className="view">
+          {view === 'board' ? (
+            <BoardView
+              flow={flow}
+              query={query}
+              picker={promotion.picker}
+              onDrop={(args) => handleDrop(args, { flow, openPicker: promotion.openPicker, query })}
+              createProject={createProjectNamed}
+              addRequest={addRequest}
+              onAddHandled={clearAddRequest}
+            />
+          ) : (
+            <section className="progress-view" aria-label="Progress"><h2>Progress</h2></section>
+          )}
+        </div>
       </main>
-      </DndContext>
     </div>
   )
 }
