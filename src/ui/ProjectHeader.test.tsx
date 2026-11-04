@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import App from '../App'
@@ -34,13 +34,13 @@ const focusProject = (user: ReturnType<typeof userEvent.setup>, name: string) =>
 describe('Project header', () => {
   it('appears only when a project is focused', async () => {
     const { user } = await setup()
-    expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('main')).queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument()
     await focusProject(user, 'Flow app')
     expect(screen.getByRole('heading', { name: 'Flow app' })).toBeInTheDocument()
     expect(screen.getByText('1 of 2 done')).toBeInTheDocument()
     expect(screen.getByText('Done this week: 1')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'All projects' }))
-    expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('main')).queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument()
   })
 
   it('edits the goal and writes it to the project file; Escape cancels', async () => {
@@ -58,7 +58,7 @@ describe('Project header', () => {
   it('opens the notes panel, saves the body on blur and closes with Escape', async () => {
     const { store, user } = await setup()
     await focusProject(user, 'Flow app')
-    const toggle = screen.getByRole('button', { name: 'Notes' })
+    const toggle = within(screen.getByRole('main')).getByRole('button', { name: 'Notes' })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     await user.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
@@ -75,7 +75,7 @@ describe('Project header', () => {
   it('adds a decision under ## Decisions', async () => {
     const { store, user } = await setup()
     await focusProject(user, 'Flow app')
-    await user.click(screen.getByRole('button', { name: 'Notes' }))
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Notes' }))
     await user.type(screen.getByRole('textbox', { name: 'Add decision' }), 'Use Tauri{Enter}')
     await waitFor(() => expect(store.files['projects/flow-app.md']).toContain('## Decisions\n- 2026-11-04: Use Tauri'))
     expect(screen.getByRole('textbox', { name: 'Add decision' })).toHaveValue('')
@@ -84,7 +84,7 @@ describe('Project header', () => {
   it('reflects external body changes only while the textarea is not being edited', async () => {
     const { user, api } = await setup()
     await focusProject(user, 'Flow app')
-    await user.click(screen.getByRole('button', { name: 'Notes' }))
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Notes' }))
     const area = screen.getByRole('textbox', { name: 'Project notes' })
     act(() => api().apply((d) => updateProject(d, 'flow-app', { body: 'From outside' })))
     await waitFor(() => expect(area).toHaveValue('From outside'))
@@ -97,7 +97,7 @@ describe('Project header', () => {
   it('stays open when switching project and closes when focus clears', async () => {
     const { user } = await setup()
     await focusProject(user, 'Flow app')
-    await user.click(screen.getByRole('button', { name: 'Notes' }))
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Notes' }))
     await focusProject(user, 'Other')
     expect(screen.getByRole('complementary', { name: 'Project notes' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Project notes' })).toHaveValue('')

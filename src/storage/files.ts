@@ -1,4 +1,4 @@
-import type { Day, DoneEntry, Extra, FocusEntry, ISODate, Inbox, InboxItem, Project, ProjectStatus, Task, TaskStatus } from '../model/types'
+import type { Day, DoneEntry, Extra, FocusEntry, ISODate, Inbox, InboxItem, Notes, Project, ProjectStatus, Task, TaskStatus } from '../model/types'
 import { nextInboxId, nextTaskId, pickColor } from '../model/ids'
 import { joinFrontmatter, splitFrontmatter } from './frontmatter'
 
@@ -165,4 +165,16 @@ export function serializeDay(d: Day): string {
     o.focus = d.focus.map((e) => ({ ref: e.ref, title: e.title, project: e.project, minutes: e.minutes, ...e.extra }))
   }
   return joinFrontmatter({ ...o, ...d.extra }, d.body)
+}
+
+/** notes.md: free Markdown; optional frontmatter is kept untouched as `extra`. */
+export function parseNotes(text: string): Notes {
+  const { data, body } = splitFrontmatter(text)
+  return { body, extra: { ...data } }
+}
+
+export function serializeNotes(n: Notes): string {
+  // Plain text when there is no frontmatter, unless the text itself opens with a `---` line.
+  if (Object.keys(n.extra).length === 0 && !/^(?:\uFEFF)?(?:[ \t\r]*\n)*---[ \t\r]*(?:\n|$)/.test(n.body)) return n.body
+  return joinFrontmatter(n.extra, n.body)
 }

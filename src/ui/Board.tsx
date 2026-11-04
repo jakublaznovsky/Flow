@@ -10,6 +10,7 @@ import FocusBar from './FocusBar'
 import BoardView from './BoardView'
 import ProgressView from './ProgressView'
 import NotesPanel from './NotesPanel'
+import NotesView from './NotesView'
 import ProjectHeader from './ProjectHeader'
 import ProjectPicker from './ProjectPicker'
 import SearchBox from './SearchBox'
@@ -99,7 +100,7 @@ export function usePromotion(flow: ReturnType<typeof useFlow>, query = '') {
   return { openPicker, picker, pendingTo: pending?.to ?? null }
 }
 
-const isView = (v: unknown): v is View => v === 'board' || v === 'progress'
+const isView = (v: unknown): v is View => v === 'board' || v === 'progress' || v === 'notes'
 
 const NON_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color'])
 
@@ -148,6 +149,7 @@ export default function Board({ store, settings, now, onReady }: Props) {
       else if (e.key === 'n') { e.preventDefault(); setView('board'); setAddRequest(true) }
       else if (e.key === 'b') { e.preventDefault(); setView('board') }
       else if (e.key === 'p') { e.preventDefault(); setView('progress') }
+      else if (e.key === 'o') { e.preventDefault(); setView('notes') }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -230,6 +232,8 @@ export default function Board({ store, settings, now, onReady }: Props) {
               onFocus={(ref, title) => focus.start(ref, title)}
               focusRef={focus.state?.finished ? null : focus.state?.ref}
             />
+          ) : view === 'notes' ? (
+            <NotesView data={data} apply={apply} initial={filter} />
           ) : (
             <ProgressView data={data} today={today} apply={apply} />
           )}

@@ -67,3 +67,31 @@ describe('buildReviewPrompt', () => {
     expect(p).not.toContain('Beta')
   })
 })
+
+describe('buildReviewPrompt general notes', () => {
+  it('has no General notes section when notes are empty or blank', () => {
+    expect(buildReviewPrompt(sample(), TODAY)).not.toContain('General notes')
+    const d = sample()
+    d.notes.body = '  \n'
+    expect(buildReviewPrompt(d, TODAY)).not.toContain('General notes')
+  })
+  it('appends the notes under ## General notes', () => {
+    const d = sample()
+    d.notes.body = 'Remember the thing\n'
+    const p = buildReviewPrompt(d, TODAY)
+    expect(p).toContain('## General notes\n\nRemember the thing')
+    expect(p.indexOf('## General notes')).toBeGreaterThan(p.indexOf('## Active projects'))
+  })
+  it('truncates to 2,000 characters with an ellipsis', () => {
+    const d = sample()
+    d.notes.body = 'a'.repeat(2500)
+    const p = buildReviewPrompt(d, TODAY)
+    expect(p).toContain('a'.repeat(2000) + '…')
+    expect(p).not.toContain('a'.repeat(2001))
+  })
+  it('does not add an ellipsis at exactly 2,000 characters', () => {
+    const d = sample()
+    d.notes.body = 'a'.repeat(2000)
+    expect(buildReviewPrompt(d, TODAY)).not.toContain('…')
+  })
+})

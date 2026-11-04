@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Project, ProjectStatus } from '../model/types'
 import { PROJECT_COLORS } from '../model/ids'
 
-export type View = 'board' | 'progress'
+export type View = 'board' | 'progress' | 'notes'
 type Patch = { title?: string; color?: string; status?: ProjectStatus }
 
 interface Props {
@@ -33,6 +33,15 @@ function ProgressIcon() {
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
       <path d="M2 13.5h12" />
       <path d="M4 11V8M8 11V4.5M12 11V6.5" />
+    </svg>
+  )
+}
+
+function NotesIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3.5 1.75h6.25L12.5 4.5v9.75h-9z" />
+      <path d="M5.5 7.5h5M5.5 10.25h5" />
     </svg>
   )
 }
@@ -116,6 +125,9 @@ export default function Sidebar({ view, onView, projects, hidden, progress, filt
         </button>
         <button className="nav-item" aria-pressed={view === 'progress'} onClick={() => onView('progress')}>
           <ProgressIcon /><span>Progress</span><kbd aria-hidden="true">P</kbd>
+        </button>
+        <button className="nav-item" aria-pressed={view === 'notes'} onClick={() => onView('notes')}>
+          <NotesIcon /><span>Notes</span><kbd aria-hidden="true">O</kbd>
         </button>
       </div>
 

@@ -1,6 +1,6 @@
 import type { FileStore } from './fileStore'
-import { parseDay, parseInbox, parseProject, serializeDay, serializeInbox, serializeProject } from './files'
-import { emptyFlow, INBOX_PATH, type FlowData, type ISODate } from '../model/types'
+import { parseDay, parseInbox, parseNotes, parseProject, serializeDay, serializeInbox, serializeNotes, serializeProject } from './files'
+import { emptyFlow, INBOX_PATH, NOTES_PATH, type FlowData, type ISODate } from '../model/types'
 
 const LOG_PATH = 'flow-issues.log'
 const PROJECT_RE = /^projects\/([^/]+)\.md$/
@@ -18,6 +18,7 @@ can read and edit these files; Flow picks up changes.
 Flow/
   README.md            # this file (written by Flow on first run)
   inbox.md             # parking lot
+  notes.md             # general notes (created the first time you write some)
   projects/
     <slug>.md          # one file per project
   days/
@@ -73,6 +74,13 @@ items:
 
 Items have no project. An item becomes a task when it is assigned to a project.
 
+## General notes: notes.md
+
+Plain Markdown, written in the Notes view of Flow. The file is created the first time
+you save general notes; if it is missing, the notes are simply empty. Optional YAML
+frontmatter is kept as it is. Notes for a single project live in the body of that
+project's file (projects/<slug>.md).
+
 ## Day file: days/YYYY-MM-DD.md
 
 \`\`\`markdown
@@ -126,10 +134,12 @@ const reasonOf = (e: unknown) => (e instanceof Error ? e.message : String(e)).re
 type Parsed =
   | { kind: 'project'; slug: string; value: FlowData['projects'][string] }
   | { kind: 'inbox'; value: FlowData['inbox'] }
+  | { kind: 'notes'; value: FlowData['notes'] }
   | { kind: 'day'; date: ISODate; value: FlowData['days'][string] }
 
-function classify(path: string): { kind: 'project'; slug: string } | { kind: 'inbox' } | { kind: 'day'; date: ISODate } | null {
+function classify(path: string): { kind: 'project'; slug: string } | { kind: 'inbox' } | { kind: 'notes' } | { kind: 'day'; date: ISODate } | null {
   if (path === INBOX_PATH) return { kind: 'inbox' }
+  if (path === NOTES_PATH) return { kind: 'notes' }
   const p = PROJECT_RE.exec(path)
   if (p) return { kind: 'project', slug: p[1] }
   const d = DAY_RE.exec(path)
@@ -141,19 +151,21 @@ function parsePath(path: string, text: string, today: ISODate): Parsed | null {
   const c = classify(path)
   if (!c) return null
   if (c.kind === 'inbox') return { kind: 'inbox', value: parseInbox(text, today) }
+  if (c.kind === 'notes') return { kind: 'notes', value: parseNotes(text) }
   if (c.kind === 'project') return { kind: 'project', slug: c.slug, value: parseProject(c.slug, text, today) }
   return { kind: 'day', date: c.date, value: parseDay(c.date, text) }
 }
 
 function apply(d: FlowData, p: Parsed): void {
   if (p.kind === 'inbox') d.inbox = p.value
+  else if (p.kind === 'notes') d.notes = p.value
   else if (p.kind === 'project') d.projects[p.slug] = p.value
   else d.days[p.date] = p.value
 }
 
 export async function loadFlow(store: FileStore, today: ISODate): Promise<FlowData> {
   const d = emptyFlow()
-  const paths = [INBOX_PATH]
+  const paths = [INBOX_PATH, NOTES_PATH]
   for (const n of await store.list('projects')) if (n.endsWith('.md')) paths.push(`projects/${n}`)
   for (const n of await store.list('days')) if (DAY_RE.test(`days/${n}`)) paths.push(`days/${n}`)
   for (const path of paths) {
@@ -187,6 +199,7 @@ export async function reloadPaths(store: FileStore, d: FlowData, paths: string[]
       next.skipped = next.skipped.filter((s) => s !== path)
       if (c.kind === 'project') delete next.projects[c.slug]
       else if (c.kind === 'day') delete next.days[c.date]
+      else if (c.kind === 'notes') next.notes = emptyFlow().notes
       else next.inbox = emptyFlow().inbox
       continue
     }
@@ -206,6 +219,7 @@ function serializePath(d: FlowData, path: string): string | null {
   const c = classify(path)
   if (!c) return null
   if (c.kind === 'inbox') return serializeInbox(d.inbox)
+  if (c.kind === 'notes') return serializeNotes(d.notes)
   if (c.kind === 'project') return d.projects[c.slug] ? serializeProject(d.projects[c.slug]) : null
   return d.days[c.date] ? serializeDay(d.days[c.date]) : null
 }

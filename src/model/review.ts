@@ -7,6 +7,8 @@ const INSTRUCTIONS =
   'Give me honest but kind feedback: what went well, and what got in the way. ' +
   'Then suggest a realistic plan for the next 3 days, with at most 3 tasks per day, chosen from my open tasks.'
 
+const NOTES_LIMIT = 2000
+
 export function buildReviewPrompt(d: FlowData, today: ISODate): string {
   const out: string[] = [INSTRUCTIONS, '', '## Last 7 days', '']
   for (let i = 6; i >= 0; i--) {
@@ -42,6 +44,10 @@ export function buildReviewPrompt(d: FlowData, today: ISODate): string {
       for (const t of open) out.push(`- [${t.status}] ${t.title}`)
     }
     out.push('')
+  }
+  const notes = d.notes.body.trim()
+  if (notes !== '') {
+    out.push('## General notes', '', notes.length > NOTES_LIMIT ? notes.slice(0, NOTES_LIMIT) + '…' : notes, '')
   }
   return out.join('\n').trimEnd() + '\n'
 }

@@ -118,3 +118,42 @@ describe('logIssue', () => {
     expect(s.files['flow-issues.log']).toBe('2026-11-04T10:00:00.000Z  a.md  why\n2026-11-04T10:00:01.000Z  b.md  again\n')
   })
 })
+
+describe('notes.md', () => {
+  it('a missing notes.md loads as empty and loading writes nothing', async () => {
+    const s = new MemoryFileStore({ 'projects/good.md': GOOD })
+    await ensureFolder(s)
+    const d = await loadFlow(s, T)
+    expect(d.notes).toEqual({ body: '', extra: {} })
+    expect(s.files['notes.md']).toBeUndefined()
+  })
+  it('loads notes.md with frontmatter extra, and saves it back', async () => {
+    const s = new MemoryFileStore({ 'notes.md': '---\nowner: me\n---\nHello\n' })
+    const d = await loadFlow(s, T)
+    expect(d.notes).toEqual({ body: 'Hello\n', extra: { owner: 'me' } })
+    const next = { ...d, notes: { ...d.notes, body: 'Changed\n' } }
+    await saveFlow(s, next, ['notes.md'])
+    expect(s.files['notes.md']).toBe('---\nowner: me\n---\nChanged\n')
+  })
+  it('an unreadable notes.md is skipped, logged and never written', async () => {
+    const bad = '---\ntags: [oops\n---\nmy words'
+    const s = new MemoryFileStore({ 'notes.md': bad })
+    const d = await loadFlow(s, T)
+    expect(d.skipped).toContain('notes.md')
+    expect(s.files['flow-issues.log']).toContain('notes.md')
+    await saveFlow(s, { ...d, notes: { body: 'overwrite', extra: {} } }, ['notes.md'])
+    expect(s.files['notes.md']).toBe(bad)
+  })
+  it('reloadPaths picks up edits and removal of notes.md', async () => {
+    const s = new MemoryFileStore({ 'notes.md': 'one' })
+    const d = await loadFlow(s, T)
+    await s.write('notes.md', 'two')
+    const r = await reloadPaths(s, d, ['notes.md'], T)
+    expect(r.notes.body).toBe('two')
+    delete s.files['notes.md']
+    expect((await reloadPaths(s, r, ['notes.md'], T)).notes.body).toBe('')
+  })
+  it('README documents notes.md', () => {
+    expect(README_TEXT).toContain('notes.md')
+  })
+})

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseDay, parseInbox, parseProject, serializeDay, serializeInbox, serializeProject } from './files'
+import { parseDay, parseInbox, parseNotes, parseProject, serializeDay, serializeInbox, serializeNotes, serializeProject } from './files'
 import { pickColor } from '../model/ids'
 
 const today = '2026-11-05'
@@ -215,5 +215,32 @@ focus:
   it.each(['25.5', '-3', 'abc', '"25"', 'null'])('rejects minutes %s', (m) => {
     const text = `---\ndate: 2026-11-04\nfocus:\n  - ref: a/t1\n    title: x\n    project: A\n    minutes: ${m}\n---\n`
     expect(() => parseDay('2026-11-04', text)).toThrow()
+  })
+})
+
+describe('notes.md', () => {
+  it('plain Markdown is the body, with no frontmatter written back', () => {
+    const n = parseNotes('# Ideas\n\nSome text\n')
+    expect(n).toEqual({ body: '# Ideas\n\nSome text\n', extra: {} })
+    expect(serializeNotes(n)).toBe('# Ideas\n\nSome text\n')
+  })
+  it('round-trips frontmatter extra and the body', () => {
+    const text = '---\ntags:\n  - a\n  - b\nowner: me\n---\nBody here\n'
+    const n = parseNotes(text)
+    expect(n.extra).toEqual({ tags: ['a', 'b'], owner: 'me' })
+    expect(n.body).toBe('Body here\n')
+    expect(serializeNotes(n)).toBe(text)
+  })
+  it('tolerates a BOM and blank lines before the frontmatter', () => {
+    const n = parseNotes('\uFEFF\n---\nowner: me\n---\nHi')
+    expect(n).toEqual({ body: 'Hi', extra: { owner: 'me' } })
+  })
+  it('throws on broken frontmatter', () => {
+    expect(() => parseNotes('---\ntags: [oops\n---\n')).toThrow()
+    expect(() => parseNotes('---\nnever closed\n')).toThrow()
+  })
+  it('a body that starts with a rule still reads back the same', () => {
+    const n = { body: '---\nnot frontmatter\n', extra: {} }
+    expect(parseNotes(serializeNotes(n))).toEqual(n)
   })
 })

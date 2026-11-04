@@ -13,6 +13,7 @@ function mergePath(into: FlowData, from: FlowData, path: string): FlowData {
   const proj = /^projects\/(.+)\.md$/.exec(path)?.[1]
   const day = /^days\/(.+)\.md$/.exec(path)?.[1]
   if (path === 'inbox.md') out.inbox = from.inbox
+  else if (path === 'notes.md') out.notes = from.notes
   else if (proj) { if (from.projects[proj]) out.projects[proj] = from.projects[proj]; else delete out.projects[proj] }
   else if (day) { if (from.days[day]) out.days[day] = from.days[day]; else delete out.days[day] }
   return out

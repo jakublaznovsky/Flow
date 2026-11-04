@@ -11,10 +11,12 @@ export interface Inbox { items: InboxItem[]; body: string; extra: Extra }
 export interface DoneEntry { ref: string; title: string; project: string; extra: Extra }
 export interface FocusEntry { ref: string; title: string; project: string; minutes: number; extra: Extra }
 export interface Day { date: ISODate; planned: string[]; done: DoneEntry[]; focus: FocusEntry[]; body: string; extra: Extra }
-export interface FlowData { projects: Record<string, Project>; inbox: Inbox;
+export interface Notes { body: string; extra: Extra }
+export interface FlowData { projects: Record<string, Project>; inbox: Inbox; notes: Notes;
   days: Record<ISODate, Day>; skipped: string[] }              // skipped = relative paths that failed to parse
 export interface Change { data: FlowData; changed: string[] }  // changed = relative file paths to write
 export const projectPath = (slug: string) => `projects/${slug}.md`;
 export const dayPath = (date: ISODate) => `days/${date}.md`;
 export const INBOX_PATH = 'inbox.md';
-export const emptyFlow = (): FlowData => ({ projects: {}, inbox: { items: [], body: '', extra: {} }, days: {}, skipped: [] });
+export const NOTES_PATH = 'notes.md';
+export const emptyFlow = (): FlowData => ({ projects: {}, inbox: { items: [], body: '', extra: {} }, notes: { body: '', extra: {} }, days: {}, skipped: [] });
