@@ -141,6 +141,7 @@ describe('aiErrorMessage', () => {
   it('maps SDK errors to one calm sentence each', () => {
     expect(aiErrorMessage(new Anthropic.AuthenticationError(401, {}, 'bad', h))).toBe("Claude didn't accept the API key — check it in Settings.")
     expect(aiErrorMessage(new Anthropic.PermissionDeniedError(403, {}, 'no', h))).toBe("This API key can't use that model — try another model in Settings.")
+    expect(aiErrorMessage(new Anthropic.NotFoundError(404, {}, 'model: nope', h))).toBe("This model isn't available for your key — pick another model in Settings.")
     expect(aiErrorMessage(new Anthropic.RateLimitError(429, {}, 'slow', h))).toBe('Claude is busy or a usage limit was reached — try again in a minute.')
     expect(aiErrorMessage(new Anthropic.BadRequestError(400, {}, 'bad', h))).toBe("Claude couldn't take this request — check your Anthropic account, for example its credit balance.")
     expect(aiErrorMessage(new Anthropic.APIConnectionError({ message: 'down' }))).toBe("Couldn't reach Claude — check your internet connection.")

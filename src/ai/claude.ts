@@ -1,6 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import {
-  APIConnectionError, APIError, APIUserAbortError, AuthenticationError, BadRequestError, PermissionDeniedError, RateLimitError,
+  APIConnectionError, APIError, APIUserAbortError, AuthenticationError, BadRequestError, NotFoundError, PermissionDeniedError, RateLimitError,
 } from '@anthropic-ai/sdk/error'
 import type {
   BetaMessage, BetaMessageStreamParams, MessageCreateParamsNonStreaming,
@@ -156,6 +156,7 @@ export function aiErrorMessage(e: unknown): string {
   if (e instanceof APIUserAbortError) return 'Stopped.'
   if (e instanceof AuthenticationError) return "Claude didn't accept the API key — check it in Settings."
   if (e instanceof PermissionDeniedError) return "This API key can't use that model — try another model in Settings."
+  if (e instanceof NotFoundError) return "This model isn't available for your key — pick another model in Settings."
   if (e instanceof RateLimitError) return 'Claude is busy or a usage limit was reached — try again in a minute.'
   if (e instanceof BadRequestError) return "Claude couldn't take this request — check your Anthropic account, for example its credit balance."
   if (e instanceof APIConnectionError) return "Couldn't reach Claude — check your internet connection."
