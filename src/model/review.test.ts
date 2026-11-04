@@ -27,6 +27,13 @@ function sample(): FlowData {
 
 describe('buildReviewPrompt', () => {
   const p = buildReviewPrompt(sample(), TODAY)
+  it('asks for a short answer with a word limit and fixed sections', () => {
+    expect(p).toMatch(/under 150 words/i)
+    expect(p).toMatch(/Went well/)
+    expect(p).toMatch(/Got in the way/)
+    expect(p).toMatch(/Next 3 days/)
+  })
+
   it('starts with the instruction paragraph', () => {
     expect(p).toMatch(/honest/i)
     expect(p).toMatch(/kind/i)

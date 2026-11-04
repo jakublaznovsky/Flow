@@ -4,8 +4,10 @@ import { doneOn, focusMinutesOn } from './stats'
 
 const INSTRUCTIONS =
   'You are my planning coach. Below is a record of my last 7 days and my active projects. ' +
-  'Give me honest but kind feedback: what went well, and what got in the way. ' +
-  'Then suggest a realistic plan for the next 3 days, with at most 3 tasks per day, chosen from my open tasks.'
+  'Give me honest but kind feedback and a realistic plan, chosen from my open tasks. ' +
+  'Keep the whole answer under 150 words, in exactly three short sections: ' +
+  '"Went well" (1–2 bullets), "Got in the way" (1–2 bullets) and "Next 3 days" (one line per day, at most 3 tasks per day). ' +
+  'No introduction, no closing remarks, no follow-up questions.'
 
 const NOTES_LIMIT = 2000
 
