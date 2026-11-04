@@ -276,3 +276,23 @@ describe('task steps', () => {
     expect(() => parseProject('p', withSteps('    steps:\n      - plain\n'), today)).toThrow()
   })
 })
+
+describe('task scheduled date', () => {
+  const withTask = (extra: string) =>
+    `---\ntitle: P\nstatus: active\ncolor: "#4f8cff"\ncreated: 2026-11-03\ntasks:\n  - id: t1\n    title: T\n    status: todo\n    created: 2026-11-03\n${extra}---\n`
+  it('parses and round-trips scheduled', () => {
+    const p = parseProject('p', withTask('    scheduled: 2026-11-06\n'), today)
+    expect(p.tasks[0].scheduled).toBe('2026-11-06')
+    expect(p.tasks[0].extra).toEqual({})
+    expect(serializeProject(p)).toContain('scheduled: 2026-11-06')
+    expect(parseProject('p', serializeProject(p), today)).toEqual(p)
+  })
+  it('omits scheduled when absent', () => {
+    const p = parseProject('p', withTask(''), today)
+    expect(p.tasks[0].scheduled).toBeUndefined()
+    expect(serializeProject(p)).not.toContain('scheduled')
+  })
+  it.each([['tomorrow'], ['2026-11-6'], ['20261106'], ['[2026-11-06]'], ['{a: 1}'], ['12']])('rejects a bad scheduled value (%s)', (bad) => {
+    expect(() => parseProject('p', withTask(`    scheduled: ${bad}\n`), today)).toThrow()
+  })
+})

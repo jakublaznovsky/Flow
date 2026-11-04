@@ -36,6 +36,15 @@ tasks:
     title: Set up Tauri project
     status: todo
     created: 2026-11-03
+  - id: t3
+    title: Sketch the week view
+    status: todo
+    first_step: Draw seven columns on paper
+    created: 2026-11-03
+  - id: t4
+    title: Write the README
+    status: todo
+    created: 2026-11-03
 ---
 Free notes about the project.
 `,

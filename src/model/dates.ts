@@ -24,3 +24,12 @@ export function weekStart(date: ISODate): ISODate {
   const dow = new Date(y, m - 1, d).getDay() // 0 = Sunday
   return addDays(date, -((dow + 6) % 7))
 }
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** Short English names for showing a date ("Thu", 5, "Nov", 2026). */
+export function dayParts(date: ISODate): { weekday: string; day: number; month: string; year: number } {
+  const [y, m, d] = parse(date)
+  return { weekday: WEEKDAYS[new Date(y, m - 1, d).getDay()], day: d, month: MONTHS[m - 1], year: y }
+}

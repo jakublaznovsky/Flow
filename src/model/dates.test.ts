@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { localDate, addDays, weekStart } from './dates'
+import { localDate, addDays, weekStart, dayParts } from './dates'
 
 describe('localDate', () => {
   it('formats a date as ISO YYYY-MM-DD in local time', () => {
@@ -42,5 +42,12 @@ describe('weekStart', () => {
   it('works mid-week and across month boundary', () => {
     expect(weekStart('2026-11-04')).toBe('2026-11-02')
     expect(weekStart('2026-12-01')).toBe('2026-11-30')
+  })
+})
+
+describe('dayParts', () => {
+  it('names weekday, day, month and year in local time', () => {
+    expect(dayParts('2026-11-05')).toEqual({ weekday: 'Thu', day: 5, month: 'Nov', year: 2026 })
+    expect(dayParts('2027-01-03')).toEqual({ weekday: 'Sun', day: 3, month: 'Jan', year: 2027 })
   })
 })

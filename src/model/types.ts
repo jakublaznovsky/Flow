@@ -4,7 +4,7 @@ export type TaskStatus = 'todo' | 'today' | 'done';
 export type Extra = Record<string, unknown>;                   // unknown frontmatter keys, preserved
 export interface Step { text: string; done: boolean; extra: Extra }
 export interface Task { id: string; title: string; status: TaskStatus; firstStep?: string;
-  created: ISODate; planned?: ISODate; done?: ISODate; steps?: Step[]; extra: Extra }
+  created: ISODate; planned?: ISODate; done?: ISODate; scheduled?: ISODate; steps?: Step[]; extra: Extra }
 export interface Project { slug: string; title: string; status: ProjectStatus; color: string;
   goal?: string; created: ISODate; tasks: Task[]; body: string; extra: Extra }
 export interface InboxItem { id: string; text: string; created: ISODate; extra: Extra }

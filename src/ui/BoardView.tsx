@@ -3,6 +3,7 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } f
 import { boardColumns, searchCards, type Card as CardData, type ColumnId } from '../model/board'
 import { addInboxItem, deleteInboxItem, editInboxItem } from '../model/inbox'
 import { addStep, deleteStep, editStep, toggleStep } from '../model/steps'
+import { scheduleTask } from '../model/schedule'
 import { addTask, changeTaskProject, deleteTask, editTask, moveTask } from '../model/tasks'
 import AddCard from './AddCard'
 import Card from './Card'
@@ -60,17 +61,28 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
     remember(slug)
     apply((d) => addTask(d, slug, title, status, today))
   }
-  const saveCard = (card: CardData, patch: { title: string; firstStep: string; project: string }) => {
+  const saveCard = (card: CardData, patch: { title: string; firstStep: string; project: string; scheduled: string }) => {
     if (card.kind === 'inbox') {
       apply((d) => editInboxItem(d, card.key.slice('inbox/'.length), patch.title))
       return
     }
-    // One apply (one save) for the edit and the optional project change.
+    // One apply (one save) for the edit, the optional project change and the "Plan for" day.
     apply((d) => {
       const edited = editTask(d, card.key, { title: patch.title, firstStep: patch.firstStep }, today)
-      if (!patch.project || patch.project === card.projectSlug) return edited
-      const moved = changeTaskProject(edited.data, card.key, patch.project)
-      return { data: moved.data, changed: [...new Set([...edited.changed, ...moved.changed])] }
+      let { data, changed } = edited
+      let ref = card.key
+      if (patch.project && patch.project !== card.projectSlug) {
+        const moved = changeTaskProject(data, ref, patch.project)
+        data = moved.data
+        changed = [...new Set([...changed, ...moved.changed])]
+        ref = moved.ref
+      }
+      if (patch.scheduled !== (card.scheduled ?? '')) {
+        const planned = scheduleTask(data, ref, patch.scheduled || null, today)
+        data = planned.data
+        changed = [...new Set([...changed, ...planned.changed])]
+      }
+      return { data, changed }
     })
   }
   const deleteCard = (card: CardData) => {

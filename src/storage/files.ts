@@ -53,7 +53,14 @@ function assignIds<T extends { id: string }>(items: (Omit<T, 'id'> & { id?: stri
   return items as T[]
 }
 
-const TASK_KNOWN = ['id', 'title', 'status', 'first_step', 'created', 'planned', 'done', 'steps']
+const TASK_KNOWN = ['id', 'title', 'status', 'first_step', 'created', 'planned', 'done', 'scheduled', 'steps']
+
+/** Optional strict date: absent → undefined; anything but a YYYY-MM-DD string fails the file. */
+function optDate(v: unknown, what: string): ISODate | undefined {
+  if (v === undefined || v === null) return undefined
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new Error(`${what} must be a date like 2026-11-06`)
+  return v
+}
 
 function parseSteps(v: unknown): Step[] | undefined {
   const items = list(v, 'steps').map((raw): Step => {
@@ -76,6 +83,7 @@ function parseTask(raw: unknown, today: ISODate): Omit<Task, 'id'> & { id?: stri
     created: present(raw.created) ? str(raw.created) : today,
     planned: optStr(raw.planned),
     done: optStr(raw.done),
+    scheduled: optDate(raw.scheduled, 'scheduled'),
     steps: parseSteps(raw.steps),
     extra: pickExtra(raw, TASK_KNOWN),
   }
@@ -87,6 +95,7 @@ function taskToObj(t: Task): Obj {
   o.created = t.created
   if (t.planned !== undefined) o.planned = t.planned
   if (t.done !== undefined) o.done = t.done
+  if (t.scheduled !== undefined) o.scheduled = t.scheduled
   if (t.steps && t.steps.length > 0) o.steps = t.steps.map((s) => ({ text: s.text, done: s.done, ...s.extra }))
   return { ...o, ...t.extra }
 }

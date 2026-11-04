@@ -1,13 +1,27 @@
-import type { FlowData, ISODate, Step } from './types'
+import type { FlowData, ISODate, Project, Step, Task } from './types'
 
 export type ColumnId = 'inbox' | 'todo' | 'today' | 'done'
 export interface Card {
   key: string; kind: 'task' | 'inbox'; title: string; firstStep?: string; steps?: Step[]
   projectSlug?: string; projectTitle?: string; color?: string; created: ISODate
+  /** Task cards only: the day it is planned for (Week view). */
+  scheduled?: ISODate
 }
 export type ColumnOrder = Partial<Record<ColumnId, string[]>>   // card keys
 
-function sortCards(cards: Card[], order: string[] | undefined): Card[] {
+/** The card for a task of `project`. */
+export function taskCard(project: Project, t: Task): Card {
+  const card: Card = {
+    key: `${project.slug}/${t.id}`, kind: 'task', title: t.title,
+    projectSlug: project.slug, projectTitle: project.title, color: project.color, created: t.created,
+  }
+  if (t.firstStep !== undefined) card.firstStep = t.firstStep
+  if (t.steps && t.steps.length > 0) card.steps = t.steps
+  if (t.scheduled !== undefined) card.scheduled = t.scheduled
+  return card
+}
+
+export function sortCards(cards: Card[], order: string[] | undefined): Card[] {
   const byKey = new Map(cards.map((c) => [c.key, c]))
   const first: Card[] = []
   for (const key of order ?? []) {
@@ -31,13 +45,7 @@ export function boardColumns(
     if (filter !== null && project.slug !== filter) continue
     for (const t of project.tasks) {
       if (t.status === 'done' && t.done !== today) continue
-      const card: Card = {
-        key: `${project.slug}/${t.id}`, kind: 'task', title: t.title,
-        projectSlug: project.slug, projectTitle: project.title, color: project.color, created: t.created,
-      }
-      if (t.firstStep !== undefined) card.firstStep = t.firstStep
-      if (t.steps && t.steps.length > 0) card.steps = t.steps
-      cols[t.status].push(card)
+      cols[t.status].push(taskCard(project, t))
     }
   }
   for (const id of Object.keys(cols) as ColumnId[]) cols[id] = sortCards(cols[id], order[id])

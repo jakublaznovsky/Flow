@@ -2,13 +2,15 @@ import { useState, type CSSProperties } from 'react'
 import type { Step } from '../model/types'
 import { useSortable } from '@dnd-kit/sortable'
 import type { Card as CardData, ColumnId } from '../model/board'
+import { dayParts } from '../model/dates'
 
 interface Props {
   card: CardData
   column: ColumnId
   projects: { slug: string; title: string }[]
   onToggle: () => void
-  onSave: (patch: { title: string; firstStep: string; project: string }) => void
+  /** `scheduled` is the "Plan for" day, '' for none. */
+  onSave: (patch: { title: string; firstStep: string; project: string; scheduled: string }) => void
   onDelete: () => void
   /** Today cards only: start a focus session on this task. */
   onFocus?: () => void
@@ -83,12 +85,14 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
   const [title, setTitle] = useState(card.title)
   const [step, setStep] = useState(card.firstStep ?? '')
   const [project, setProject] = useState(card.projectSlug ?? '')
+  const [planFor, setPlanFor] = useState(card.scheduled ?? '')
+  const chip = card.scheduled ? dayParts(card.scheduled) : undefined
 
   const open = () => {
-    setTitle(card.title); setStep(card.firstStep ?? ''); setProject(card.projectSlug ?? '')
+    setTitle(card.title); setStep(card.firstStep ?? ''); setProject(card.projectSlug ?? ''); setPlanFor(card.scheduled ?? '')
     setEditing(true)
   }
-  const save = () => { onSave({ title, firstStep: step, project }); setEditing(false) }
+  const save = () => { onSave({ title, firstStep: step, project, scheduled: planFor }); setEditing(false) }
 
   if (editing) {
     return (
@@ -104,6 +108,12 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
               <select aria-label="Project" value={project} onChange={(e) => setProject(e.target.value)}>
                 {projects.map((p) => <option key={p.slug} value={p.slug}>{p.title}</option>)}
               </select>
+              {column !== 'done' && (
+                <label className="plan-for">
+                  <span>Plan for</span>
+                  <input type="date" aria-label="Plan for" value={planFor} onChange={(e) => setPlanFor(e.target.value)} />
+                </label>
+              )}
             </>
           )}
           <div className="row">
@@ -133,7 +143,12 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
         <button className="card-title" onClick={open}>{card.title}</button>
         {card.firstStep && <div className="step">{card.firstStep}</div>}
         {next && !showSteps && <div className="step next-step">Next: {next}</div>}
-        {card.projectTitle && <span className="tag">{card.projectTitle}</span>}
+        {(card.projectTitle || chip) && (
+          <div className="card-meta">
+            {card.projectTitle && <span className="tag">{card.projectTitle}</span>}
+            {chip && <span className="day-chip" aria-label={`Planned for ${chip.weekday} ${chip.day} ${chip.month}`}>{chip.weekday} {chip.day}</span>}
+          </div>
+        )}
         {(inFocus || (onFocus && column === 'today' && card.kind === 'task')) && (
           <div className="focus-row">
             {inFocus && <span className="focus-mark">in focus</span>}

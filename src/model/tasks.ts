@@ -94,6 +94,8 @@ export function moveTask(d: FlowData, ref: string, to: TaskStatus, today: ISODat
     }
   }
   delete task.done
+  // A planned day only means something while the task waits in To do.
+  if (to !== 'todo') delete task.scheduled
   task.status = to
 
   if (to === 'today' && from === 'todo') {

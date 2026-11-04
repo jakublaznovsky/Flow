@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Change, FlowData, ISODate } from '../model/types'
 import type { ColumnOrder } from '../model/board'
 import { localDate } from '../model/dates'
+import { promoteScheduled } from '../model/schedule'
 import type { FileStore } from '../storage/fileStore'
 import { ensureFolder, loadFlow, reloadPaths, saveFlow } from '../storage/flowRepo'
 import type { Settings } from './settings'
@@ -111,6 +112,12 @@ export function useFlow(store: FileStore, settings: Settings, now: () => Date = 
       for (const path of failed) pending.current.add(path)
     })
   }, [store])
+
+  // Tasks planned for a day show up in Today by themselves: once loaded and whenever the date changes.
+  const loaded = data !== null
+  useEffect(() => {
+    if (loaded) apply((d) => promoteScheduled(d, today))
+  }, [loaded, today, apply])
 
   return { data, today, filter, setFilter, order, setOrder, lastProject, remember, apply }
 }

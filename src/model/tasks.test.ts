@@ -79,6 +79,15 @@ describe('editTask', () => {
 })
 
 describe('moveTask', () => {
+  it('clears a planned day when the task leaves To do without touching the input', () => {
+    const d = structuredClone(sample())
+    d.projects['flow-app'].tasks[0].scheduled = '2026-11-09'
+    const toToday = moveTask(d, 'flow-app/t1', 'today', T)
+    expect(toToday.data.projects['flow-app'].tasks[0].scheduled).toBeUndefined()
+    const toDone = moveTask(d, 'flow-app/t1', 'done', T)
+    expect(toDone.data.projects['flow-app'].tasks[0].scheduled).toBeUndefined()
+    expect(d.projects['flow-app'].tasks[0].scheduled).toBe('2026-11-09')
+  })
   it('todo -> today plans the day, no duplicates when repeated', () => {
     const a = moveTask(sample(), 'flow-app/t1', 'today', T)
     expect(a.data.projects['flow-app'].tasks[0]).toMatchObject({ status: 'today', planned: T })

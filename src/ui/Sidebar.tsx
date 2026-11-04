@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Project, ProjectStatus } from '../model/types'
 import { PROJECT_COLORS } from '../model/ids'
 
-export type View = 'board' | 'progress' | 'notes'
+export type View = 'board' | 'week' | 'progress' | 'notes'
 type Patch = { title?: string; color?: string; status?: ProjectStatus }
 
 interface Props {
@@ -25,6 +25,14 @@ function BoardIcon() {
       <rect x="1.75" y="2.25" width="3.5" height="11.5" rx="1" />
       <rect x="6.25" y="2.25" width="3.5" height="8" rx="1" />
       <rect x="10.75" y="2.25" width="3.5" height="5.5" rx="1" />
+    </svg>
+  )
+}
+function WeekIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      <rect x="2" y="3" width="12" height="11" rx="1.5" />
+      <path d="M2 6.5h12M5.25 1.75v2.5M10.75 1.75v2.5" />
     </svg>
   )
 }
@@ -122,6 +130,9 @@ export default function Sidebar({ view, onView, projects, hidden, progress, filt
       <div className="nav-group">
         <button className="nav-item" aria-pressed={view === 'board'} onClick={() => onView('board')}>
           <BoardIcon /><span>Board</span><kbd aria-hidden="true">B</kbd>
+        </button>
+        <button className="nav-item" aria-pressed={view === 'week'} onClick={() => onView('week')}>
+          <WeekIcon /><span>Week</span><kbd aria-hidden="true">W</kbd>
         </button>
         <button className="nav-item" aria-pressed={view === 'progress'} onClick={() => onView('progress')}>
           <ProgressIcon /><span>Progress</span><kbd aria-hidden="true">P</kbd>

@@ -415,3 +415,58 @@ input.quick-capture, input.quick-capture:focus {
 .steps li:hover .step-del, .steps li:focus-within .step-del { opacity: 1; }
 .step-del:hover { color: var(--danger, var(--text)); }
 .focus-next { display: block; font-size: 12px; font-weight: 400; opacity: 0.8; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Day chip and "Plan for" on board cards ---------- */
+.card-meta { align-self: stretch; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; }
+.day-chip {
+  display: inline-flex; align-items: center; margin-top: 4px; padding: 1px 8px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 500; color: var(--accent-text); background: var(--accent-soft); white-space: nowrap;
+}
+.plan-for { display: flex; align-items: center; gap: var(--space-2); font-size: 12.5px; color: var(--text-muted); }
+.plan-for span { flex: none; }
+.plan-for input[type='date'] {
+  flex: 1; min-width: 0; border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  padding: 4px 8px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; outline: none;
+}
+.plan-for input[type='date']:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ---------- Week ---------- */
+.week-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.week-head { display: flex; align-items: center; gap: var(--space-4); }
+.week-head h2 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -0.01em; }
+.week-nav { display: flex; align-items: center; gap: var(--space-1); }
+.week-nav .btn { padding: 4px 12px; }
+.icon-btn {
+  width: 30px; height: 30px; display: grid; place-items: center; padding: 0; font-size: 18px; line-height: 1;
+  background: none; border: 1px solid transparent; border-radius: var(--radius-md); color: var(--text-muted);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.icon-btn:hover { background: var(--surface-hover); color: var(--text); }
+.week-board { flex: 1; min-height: 0; display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--space-3); }
+.week-days { min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-2); }
+.week-col {
+  display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: var(--space-2) var(--space-1) var(--space-1);
+  background: var(--surface-2); border: 1px solid transparent; border-radius: var(--radius-lg);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.week-col header { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-2) var(--space-2); }
+.week-col h3 { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.week-col.is-today { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.week-col.is-today h3 { color: var(--accent-text); }
+.week-col.is-past { opacity: 0.55; }
+.week-col.is-over { border-color: var(--accent); }
+.week-tray h3 { font-size: 13px; }
+.week-cards {
+  list-style: none; margin: 0; padding: 2px 2px var(--space-2); flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
+}
+.card.week-card { align-items: center; gap: 6px; padding: 7px 8px 7px 11px; font-size: 13px; }
+.week-card-title { flex: 1; min-width: 0; font-weight: 500; line-height: 1.35; overflow-wrap: anywhere; }
+.week-card .dot { background: var(--project); }
+.card.week-card.is-placeholder { opacity: 0.4; }
+.week-done {
+  display: flex; align-items: flex-start; gap: 6px; padding: 4px 6px; font-size: 12px; line-height: 1.35;
+  color: var(--text-muted); overflow-wrap: anywhere;
+}
+.week-done svg { flex: none; margin-top: 2px; color: var(--accent); opacity: 0.8; }
+.week-done span { min-width: 0; text-decoration: line-through; text-decoration-color: var(--text-faint); }
