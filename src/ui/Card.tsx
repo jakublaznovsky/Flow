@@ -9,9 +9,12 @@ interface Props {
   onToggle: () => void
   onSave: (patch: { title: string; firstStep: string; project: string }) => void
   onDelete: () => void
+  /** Today cards only: start a focus session on this task. */
+  onFocus?: () => void
+  inFocus?: boolean
 }
 
-export default function Card({ card, column, projects, onToggle, onSave, onDelete }: Props) {
+export default function Card({ card, column, projects, onToggle, onSave, onDelete, onFocus, inFocus }: Props) {
   const [editing, setEditing] = useState(false)
   const { setNodeRef, listeners, transform, transition, isDragging } = useSortable({
     id: card.key, data: { column }, disabled: editing,
@@ -54,7 +57,7 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
   }
   return (
     <li
-      className={`card${column === 'done' ? ' is-done' : ''}${card.kind === 'inbox' ? ' is-inbox' : ''}${isDragging ? ' is-dragging' : ''}`}
+      className={`card${column === 'done' ? ' is-done' : ''}${card.kind === 'inbox' ? ' is-inbox' : ''}${isDragging ? ' is-dragging' : ''}${inFocus ? ' in-focus' : ''}`}
       ref={setNodeRef}
       style={dragStyle}
       {...listeners}
@@ -71,6 +74,14 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
         <button className="card-title" onClick={open}>{card.title}</button>
         {card.firstStep && <div className="step">{card.firstStep}</div>}
         {card.projectTitle && <span className="tag">{card.projectTitle}</span>}
+        {(inFocus || (onFocus && column === 'today' && card.kind === 'task')) && (
+          <div className="focus-row">
+            {inFocus && <span className="focus-mark">in focus</span>}
+            {onFocus && column === 'today' && card.kind === 'task' && (
+              <button type="button" className="card-focus" aria-label={`Focus on ${card.title}`} onClick={onFocus}>Focus</button>
+            )}
+          </div>
+        )}
       </div>
     </li>
   )

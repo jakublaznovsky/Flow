@@ -24,9 +24,12 @@ interface Props {
   /** Set by the `n` shortcut to open "New task" in To do; cleared via onAddHandled. */
   addRequest: boolean
   onAddHandled: () => void
+  /** Start a focus session on a Today task; `focusRef` marks the card currently in focus. */
+  onFocus?: (ref: string, title: string) => void
+  focusRef?: string | null
 }
 
-export default function BoardView({ flow, query, picker, onDrop, createProject, addRequest, onAddHandled }: Props) {
+export default function BoardView({ flow, query, picker, onDrop, createProject, addRequest, onAddHandled, onFocus, focusRef }: Props) {
   const { data, today, filter, order, lastProject, remember, apply } = flow
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   if (!data) return null
@@ -117,6 +120,8 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
                   onToggle={() => apply((d) => moveTask(d, card.key, id === 'done' ? 'today' : 'done', today))}
                   onSave={(patch) => saveCard(card, patch)}
                   onDelete={() => deleteCard(card)}
+                  onFocus={onFocus ? () => onFocus(card.key, card.title) : undefined}
+                  inFocus={card.key === focusRef}
                 />
               ))}
             </Column>

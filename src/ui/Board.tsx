@@ -3,8 +3,10 @@ import { boardColumns, searchCards, type Card as CardData, type ColumnId } from 
 import { promoteInboxItem } from '../model/inbox'
 import { addDecision, createProject, updateProject } from '../model/projects'
 import { doneOn, projectProgress, weekDates } from '../model/stats'
+import { logFocus } from '../model/focus'
 import { moveTask } from '../model/tasks'
 import type { FileStore } from '../storage/fileStore'
+import FocusBar from './FocusBar'
 import BoardView from './BoardView'
 import NotesPanel from './NotesPanel'
 import ProjectHeader from './ProjectHeader'
@@ -13,6 +15,7 @@ import SearchBox from './SearchBox'
 import Sidebar, { type View } from './Sidebar'
 import type { Settings } from './settings'
 import { useFlow } from './useFlow'
+import { useFocus } from './useFocus'
 import './theme.css'
 import './board.css'
 
@@ -111,6 +114,8 @@ export default function Board({ store, settings, now, onReady }: Props) {
   const todayRef = useRef(today)
   todayRef.current = today
   useEffect(() => onReady?.({ apply, today: () => todayRef.current }), [onReady, apply])
+  const clock = useCallback(() => (now ?? (() => new Date()))(), [now])
+  const focus = useFocus((ref, m) => apply((d) => logFocus(d, ref, m, todayRef.current)), clock)
   const [query, setQuery] = useState('')
   const promotion = usePromotion(flow, query)
   const [view, setViewState] = useState<View>('board')
@@ -204,7 +209,12 @@ export default function Board({ store, settings, now, onReady }: Props) {
           </div>
           <SearchBox ref={searchRef} value={query} onChange={onSearch} />
         </div>
-        <div className="focus-slot" />
+        <div className="focus-slot">
+          <FocusBar
+            focus={focus}
+            onMarkDone={(ref) => { apply((d) => moveTask(d, ref, 'done', today)); focus.close() }}
+          />
+        </div>
         <div className="content">
         <div className="view">
           {view === 'board' ? (
@@ -216,6 +226,8 @@ export default function Board({ store, settings, now, onReady }: Props) {
               createProject={createProjectNamed}
               addRequest={addRequest}
               onAddHandled={clearAddRequest}
+              onFocus={(ref, title) => focus.start(ref, title)}
+              focusRef={focus.state?.finished ? null : focus.state?.ref}
             />
           ) : (
             <section className="progress-view" aria-label="Progress"><h2>Progress</h2></section>
