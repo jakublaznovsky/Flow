@@ -18,6 +18,8 @@ interface Props {
   onSaveNotes: (text: string) => boolean
   /** Put suggestions on tomorrow, all in one change; says per suggestion whether it worked. */
   onAdd: (list: PlanSuggestion[]) => boolean[]
+  /** Called with the raw error (for Flow/flow-issues.log); never for a user stop. */
+  onError?: (e: unknown) => void
 }
 
 const TITLE: Record<AiKind, string> = { review: 'Review of your week', plan: 'Plan for tomorrow' }
@@ -80,7 +82,7 @@ function Suggestions({ plan, onAdd }: { plan: Plan; onAdd: Props['onAdd'] }) {
 }
 
 /** Right drawer that runs one Claude request and shows its answer. Mounted per request. */
-export default function AiPanel({ kind, client, model, prompt, onClose, onSaveNotes, onAdd }: Props) {
+export default function AiPanel({ kind, client, model, prompt, onClose, onSaveNotes, onAdd, onError }: Props) {
   const [status, setStatus] = useState<Status>('running')
   const [text, setText] = useState('')
   const [plan, setPlan] = useState<Plan | null>(null)
@@ -90,6 +92,8 @@ export default function AiPanel({ kind, client, model, prompt, onClose, onSaveNo
   const stopped = useRef(false)
   const { copied, fallback, copy } = useCopyText(() => text)
 
+  const errorRef = useRef(onError)
+  errorRef.current = onError
   useEffect(() => {
     const c = new AbortController()
     ctrl.current = c
@@ -104,6 +108,7 @@ export default function AiPanel({ kind, client, model, prompt, onClose, onSaveNo
       (e: unknown) => {
         if (!live) return
         if (stopped.current) { setStatus('stopped'); return }
+        errorRef.current?.(e)
         setError(aiErrorMessage(e))
         setStatus('error')
       },

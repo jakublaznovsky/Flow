@@ -67,6 +67,9 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 - No streaks anywhere: nothing counts consecutive days.
 - The Claude API key and model live in local app settings only, never in the Flow folder. AI
   buttons send data only on press; errors show as one calm line in the AI panel.
+  The API's own error (status, type, message — never the key) goes to `flow-issues.log` via
+  `aiErrorDetail`. Structured-output schemas must avoid unsupported keywords (`maxItems`,
+  `minItems`, `minimum`/`maximum`, `minLength`/`maxLength`…); enforce such limits client-side.
 - Dev-only `?fakeAi=1` (browser dev) swaps in a canned Claude client; never in production builds.
 - Shortcuts (`/ n b w p o r`) fire only when no input, textarea or select has focus. `n` is a
   no-op while To do is hidden.

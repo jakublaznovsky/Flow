@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { describe, expect, it, vi } from 'vitest'
-import { aiErrorMessage, createAiClient, PLAN_SCHEMA, type SdkClient } from './claude'
+import { aiErrorDetail, aiErrorMessage, createAiClient, PLAN_SCHEMA, type SdkClient } from './claude'
 
 type Msg = { stop_reason: string | null; content: { type: string; text?: string }[] }
 const text = (t: string, stop = 'end_turn'): Msg => ({ stop_reason: stop, content: [{ type: 'thinking' }, { type: 'text', text: t }] })
@@ -94,10 +94,9 @@ describe('planTomorrow', () => {
     })
   })
 
-  it('has a strict schema with at most 3 tasks', () => {
+  it('has a strict schema (the 3-task cap is enforced client-side, see below)', () => {
     expect(PLAN_SCHEMA.additionalProperties).toBe(false)
     expect(PLAN_SCHEMA.required).toEqual(['summary', 'tasks'])
-    expect(PLAN_SCHEMA.properties.tasks.maxItems).toBe(3)
     expect(PLAN_SCHEMA.properties.tasks.items.additionalProperties).toBe(false)
     expect(PLAN_SCHEMA.properties.tasks.items.required).toEqual(['ref', 'title', 'project', 'first_step'])
   })
@@ -143,7 +142,7 @@ describe('aiErrorMessage', () => {
     expect(aiErrorMessage(new Anthropic.PermissionDeniedError(403, {}, 'no', h))).toBe("This API key can't use that model — try another model in Settings.")
     expect(aiErrorMessage(new Anthropic.NotFoundError(404, {}, 'model: nope', h))).toBe("This model isn't available for your key — pick another model in Settings.")
     expect(aiErrorMessage(new Anthropic.RateLimitError(429, {}, 'slow', h))).toBe('Claude is busy or a usage limit was reached — try again in a minute.')
-    expect(aiErrorMessage(new Anthropic.BadRequestError(400, {}, 'bad', h))).toBe("Claude couldn't take this request — check your Anthropic account, for example its credit balance.")
+    expect(aiErrorMessage(new Anthropic.BadRequestError(400, {}, 'bad', h))).toBe("Claude couldn't process this request — the details are in flow-issues.log.")
     expect(aiErrorMessage(new Anthropic.APIConnectionError({ message: 'down' }))).toBe("Couldn't reach Claude — check your internet connection.")
     expect(aiErrorMessage(new Anthropic.APIConnectionTimeoutError())).toBe("Couldn't reach Claude — check your internet connection.")
     expect(aiErrorMessage(new Anthropic.InternalServerError(500, {}, 'oops', h))).toBe('Claude had a problem answering — try again in a moment.')
@@ -165,5 +164,26 @@ describe('default SDK client', () => {
     expect(aiErrorMessage(plan)).toBe('Stopped.')
     expect(fetchSpy).not.toHaveBeenCalled()
     fetchSpy.mockRestore()
+  })
+})
+
+describe('PLAN_SCHEMA', () => {
+  // Structured outputs reject these JSON Schema keywords with a 400 (complex array, numeric and string constraints).
+  const UNSUPPORTED = ['maxItems', 'minItems', 'uniqueItems', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', 'minLength', 'maxLength']
+  const keys = (v: unknown): string[] => (v && typeof v === 'object')
+    ? Object.entries(v as Record<string, unknown>).flatMap(([k, x]) => [k, ...keys(x)]) : []
+  it('uses only JSON Schema keywords the API supports', () => {
+    expect(keys(PLAN_SCHEMA).filter((k) => UNSUPPORTED.includes(k))).toEqual([])
+  })
+})
+
+describe('aiErrorDetail', () => {
+  const h = new Headers()
+  it('gives the status and the API message for the issue log', () => {
+    expect(aiErrorDetail(new Anthropic.BadRequestError(400, { type: 'error', error: { type: 'invalid_request_error', message: 'tasks: maxItems is not supported' } }, undefined, h)))
+      .toBe('Claude API 400 (invalid_request_error): tasks: maxItems is not supported')
+  })
+  it('returns nothing for a user stop', () => {
+    expect(aiErrorDetail(new Anthropic.APIUserAbortError())).toBeUndefined()
   })
 })

@@ -158,6 +158,16 @@ describe('Review my week', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
   })
 
+  it('a rejected request shows one calm line and logs the API detail to flow-issues.log', async () => {
+    const { user, ai, store } = await setup()
+    ai.setPlan(new Anthropic.BadRequestError(400, { type: 'error', error: { type: 'invalid_request_error', message: 'output_config.format.schema: maxItems is not supported' } }, undefined, new Headers()))
+    await user.click(await aiCard().findByRole('button', { name: 'Plan tomorrow' }))
+    const p = panel('Plan for tomorrow')
+    expect(p.getByText("Claude couldn't process this request — the details are in flow-issues.log.")).toBeInTheDocument()
+    expect(p.queryByText(/maxItems/)).not.toBeInTheDocument()
+    await waitFor(() => expect(store.files['flow-issues.log']).toMatch(/claude\s+Claude API 400 \(invalid_request_error\): .*maxItems is not supported/))
+  })
+
   it('Stop aborts the request and keeps what arrived', async () => {
     const { user, ai } = await setup()
     await user.click(await aiCard().findByRole('button', { name: 'Review my week' }))

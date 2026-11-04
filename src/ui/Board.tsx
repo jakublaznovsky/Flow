@@ -10,7 +10,8 @@ import { logFocus } from '../model/focus'
 import { findTask, moveTask } from '../model/tasks'
 import { appendNotes } from '../model/notes'
 import { planSuggestions } from '../model/plan'
-import { createAiClient, DEFAULT_MODEL, isAiModel, type AiClient, type AiModel } from '../ai/claude'
+import { aiErrorDetail, createAiClient, DEFAULT_MODEL, isAiModel, type AiClient, type AiModel } from '../ai/claude'
+import { logIssue } from '../storage/flowRepo'
 import { buildPlanPrompt, buildReviewPrompt } from '../ai/prompts'
 import AiPanel, { AiActions, type AiKind } from './AiPanel'
 import SettingsPanel from './SettingsPanel'
@@ -382,6 +383,7 @@ export default function Board({ store, settings, now, onReady, ai, shortcut }: P
             prompt={aiRun.prompt}
             onClose={() => setAiRun(null)}
             onSaveNotes={saveReviewToNotes}
+            onError={(e) => { const detail = aiErrorDetail(e); if (detail) void logIssue(store, 'claude', detail) }}
             onAdd={(list) => {
               let added = list.map(() => false)
               apply((d) => { const c = planSuggestions(d, list, today, focusProjectThisWeek(d, today)); added = c.added; return c })
