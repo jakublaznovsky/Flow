@@ -1,11 +1,72 @@
 # Flow
 
-Flow is a small desktop planner for one person. It has a single board with four columns:
-**Parking lot** (loose thoughts), **To do**, **Today** (pick up to 3) and **Done**. You drag
-cards between columns and tick them off. Everything you enter is stored as plain Markdown
-files in a folder you choose, so you (or an AI assistant) can read and edit them any time.
+Flow is a calm desktop planner for one person, built to help you stay with one thing at a time.
+Everything you enter is stored as plain Markdown files in a folder you choose, so you (or an
+AI assistant) can read and edit them any time. Nothing is sent anywhere unless you press one
+of the Claude buttons (see below).
 
 ![Flow board](docs/screenshot.png)
+
+## What you can do
+
+- **Board.** Four columns: **Parking lot** (loose thoughts), **To do**, **Today** and **Done**.
+  Drag cards between columns and tick them off.
+- **Focus on one project.** Click a project in the sidebar to see only its cards, with its goal,
+  a progress bar and how much you finished this week. Edit the goal and the project notes in
+  place, and add short dated decisions.
+- **Focus timer.** Press **Focus** on a Today card to start a quiet 15, 25 or 45 minute timer.
+  When it ends, nothing pops up; the bar at the top just offers "Mark done" or "Another round".
+  Finished sessions are logged so you can see your focus time.
+- **Checklists.** Break a task into steps. The card shows `2/5` and the next step to do.
+- **Plan your week.** The **Week** view has seven day columns and an Unscheduled tray. Drag a
+  task onto a day. When that day comes, the task moves to Today by itself.
+- **Weekly review.** A short guided review: what you finished, what is unfinished (keep, push to
+  next week, send back or delete), a project to focus on next week, and a few words of reflection.
+  It is saved in your folder and the chosen project gets a star in the sidebar next week.
+- **Progress.** This week by day, a year heatmap of finished tasks, progress per project and a
+  note for today. There are no streaks: Flow never counts consecutive days.
+- **Notes.** A big, quiet place for general notes and for each project's notes.
+- **Claude built in (optional).** See the section below.
+- **Light and dark** theme, following your system.
+
+![Week view](docs/screenshot-week.png)
+
+![Progress view](docs/screenshot-progress.png)
+
+![Dark theme](docs/screenshot-dark.png)
+
+## Keyboard shortcuts
+
+They work when you are not typing in a text field.
+
+| Key | What it does |
+| --- | --- |
+| `/` | Search tasks |
+| `n` | New task in To do |
+| `b` | Board |
+| `w` | Week |
+| `p` | Progress |
+| `o` | Notes |
+| `r` | Weekly review |
+| Ctrl+Shift+Space | Quick capture into the Parking lot, from any app (Cmd+Shift+Space on Mac) |
+
+## Claude built in
+
+Flow can ask Claude (made by Anthropic) to **review your week** and to **plan tomorrow**. It is
+optional and off until you add a key.
+
+1. Create an account at https://console.anthropic.com and make an API key there (usage is billed
+   by Anthropic, separately from Flow).
+2. In Flow, open **Settings** (bottom of the sidebar), paste the key and press Save. You can also
+   choose the model.
+3. Use **Review my week** or **Plan tomorrow** in the Progress view or in the last step of the
+   weekly review.
+
+What it sends: only when you press one of those buttons, Flow sends the data shown in that
+request to Anthropic: your last few days (finished tasks, focus minutes, day notes), your active
+projects with goals and open tasks, and your general notes (cut to 2,000 characters). The key is
+kept in Flow's own settings on this computer and is never written into your Flow folder. Without
+a key you can still press **Copy AI review** and paste the text into any AI yourself.
 
 ## Install on Windows (no setup needed)
 
@@ -16,8 +77,8 @@ files in a folder you choose, so you (or an AI assistant) can read and edit them
 
 To update, install the newer `.exe` over the old one. Your tasks stay in your Flow folder.
 
-**Making a new release (for the maintainer):** bump `version` in `package.json` and
-`src-tauri/tauri.conf.json`, commit, then push a tag such as `v0.2.0`
+**Making a new release (for the maintainer):** bump `version` in `package.json`,
+`src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, commit, then push a tag such as `v0.2.0`
 (`git tag v0.2.0 && git push origin v0.2.0`). The GitHub Actions workflow
 `.github/workflows/release.yml` builds the installer and attaches it to the release.
 
@@ -47,13 +108,14 @@ npx tauri build
 ```
 The installer appears under `src-tauri/target/release/bundle/`.
 
-To try the board quickly in a web browser (no desktop app; data lives only in memory and is
+To try the board quickly in a web browser (no desktop app; it shows example data that lives only in memory and is
 lost on reload), run `npm run dev` and open http://localhost:1420.
 
 ## What to check by hand
 
-Automated tests cover the logic, and a browser smoke test (`node scripts/smoke.mjs`) covers
-drag and drop, but these only work in the real desktop app:
+Automated tests cover the logic, and a browser smoke test (`node scripts/smoke.mjs`, with
+`npm run dev` running; it also refreshes the screenshots) covers drag and drop and the main
+views, but these only work in the real desktop app:
 
 - **Quick capture window:** press Ctrl+Shift+Space (Cmd+Shift+Space on Mac) from any app. A
   small window should appear; type a thought, press Enter, and it should land in the Parking
@@ -67,10 +129,19 @@ drag and drop, but these only work in the real desktop app:
 
 ## What the data folder looks like
 
-`inbox.md` (the Parking lot), `projects/<slug>.md` (one file per project, tasks in the YAML
-header, free notes below), `days/YYYY-MM-DD.md` (what was planned and finished each day), a
-`README.md` describing the format in full (Flow writes it on first run), and
-`flow-issues.log` (files Flow could not read). Dates are YYYY-MM-DD in local time.
+```
+Flow/
+  README.md          describes the format in full (Flow writes it on first run)
+  inbox.md           the Parking lot
+  notes.md           general notes (created when you first write some)
+  projects/<slug>.md one file per project: tasks (with steps and planned dates) in the
+                     YAML header, project notes and decisions below
+  days/YYYY-MM-DD.md what you planned and finished each day, plus focus sessions
+  reviews/YYYY-Www.md one file per weekly review
+  flow-issues.log    files Flow could not read (Flow never overwrites them)
+```
+
+Dates are YYYY-MM-DD in local time. Your Claude key is not in this folder.
 
 ## Ask an AI about your week
 

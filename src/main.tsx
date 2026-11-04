@@ -2,6 +2,7 @@ import { StrictMode, type ComponentProps } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { addInboxItem } from './model/inbox'
+import { addDays, isoWeek, localDate } from './model/dates'
 import FolderSetup from './ui/FolderSetup'
 import QuickCapture from './ui/QuickCapture'
 import { logIssue } from './storage/flowRepo'
@@ -9,46 +10,78 @@ import type { BoardApi } from './ui/Board'
 import { MemoryFileStore, type FileStore } from './storage/fileStore'
 import { MemorySettings } from './ui/settings'
 
-// Browser dev: in-memory store seeded with the spec's example files.
-const store = new MemoryFileStore({
-  'inbox.md': `---
-items:
-  - id: i1
-    text: Look into Spanish podcasts
-    created: 2026-11-03
----
-`,
-  'projects/flow-app.md': `---
-title: Flow app
-status: active
-color: "#4f8cff"
-goal: Build my own ADHD-friendly planner
-created: 2026-11-03
-tasks:
-  - id: t1
-    title: Design the data format
-    status: done
-    first_step: List what a project needs
-    created: 2026-11-03
-    planned: 2026-11-03
-    done: 2026-11-03
-  - id: t2
-    title: Set up Tauri project
-    status: todo
-    created: 2026-11-03
-  - id: t3
-    title: Sketch the week view
-    status: todo
-    first_step: Draw seven columns on paper
-    created: 2026-11-03
-  - id: t4
-    title: Write the README
-    status: todo
-    created: 2026-11-03
----
-Free notes about the project.
-`,
-})
+// Browser dev: in-memory store seeded with example data, relative to today's local date.
+const q = (v: string) => JSON.stringify(v)
+interface SeedTask { id: string; title: string; status: 'todo' | 'today' | 'done'; first?: string; created: string; planned?: string; done?: string; scheduled?: string; steps?: [string, boolean][] }
+const taskYaml = (t: SeedTask) => [
+  `  - id: ${t.id}`,
+  `    title: ${q(t.title)}`,
+  `    status: ${t.status}`,
+  ...(t.first ? [`    first_step: ${q(t.first)}`] : []),
+  `    created: ${t.created}`,
+  ...(t.planned ? [`    planned: ${t.planned}`] : []),
+  ...(t.done ? [`    done: ${t.done}`] : []),
+  ...(t.scheduled ? [`    scheduled: ${t.scheduled}`] : []),
+  ...(t.steps ? ['    steps:', ...t.steps.flatMap(([text, done]) => [`      - text: ${q(text)}`, `        done: ${done}`])] : []),
+].join('\n')
+const projectFile = (title: string, color: string, goal: string, created: string, tasks: SeedTask[], body: string) =>
+  `---\ntitle: ${q(title)}\nstatus: active\ncolor: ${q(color)}\ngoal: ${q(goal)}\ncreated: ${created}\ntasks:\n${tasks.map(taskYaml).join('\n')}\n---\n${body}\n`
+
+function seedFiles(today: string): Record<string, string> {
+  const ago = (n: number) => addDays(today, -n)
+  const created = ago(30)
+  const flowTasks: SeedTask[] = [
+    { id: 't1', title: 'Design the data format', status: 'done', first: 'List what a project needs', created, planned: ago(9), done: ago(9) },
+    { id: 't2', title: 'Set up Tauri project', status: 'done', created, planned: ago(5), done: ago(5) },
+    { id: 't3', title: 'Build the week view', status: 'today', first: 'Draw seven columns on paper', created, planned: today,
+      steps: [['Sketch the layout', true], ['Day columns', true], ['Unscheduled tray', false], ['Drag and drop', false]] },
+    { id: 't4', title: 'Write the README', status: 'todo', created, scheduled: addDays(today, 1) },
+    { id: 't5', title: 'Try the weekly review', status: 'todo', first: 'Open it on Sunday', created },
+  ]
+  const spanishTasks: SeedTask[] = [
+    { id: 't1', title: 'Pick a textbook', status: 'done', created, planned: ago(12), done: ago(12) },
+    { id: 't2', title: 'Learn the 50 most common verbs', status: 'today', first: 'Make a list of ten', created, planned: today,
+      steps: [['Ten verbs', true], ['Next ten', false], ['Next ten', false]] },
+    { id: 't3', title: 'Find a language partner', status: 'todo', created },
+    { id: 't4', title: 'Listen to one podcast episode', status: 'todo', created, scheduled: addDays(today, 2) },
+  ]
+  const shedTasks: SeedTask[] = [
+    { id: 't1', title: 'Measure the corner of the garden', status: 'done', created, planned: ago(2), done: ago(2) },
+    { id: 't2', title: 'Order the wood', status: 'todo', first: 'Compare two shops', created },
+    { id: 't3', title: 'Paint the fence', status: 'done', created, planned: today, done: today },
+  ]
+  const files: Record<string, string> = {
+    'inbox.md': `---\nitems:\n  - id: i1\n    text: Look into Spanish podcasts\n    created: ${today}\n  - id: i2\n    text: Buy a new notebook\n    created: ${ago(1)}\n---\n`,
+    'projects/flow-app.md': projectFile('Flow app', '#4f8cff', 'Build my own ADHD-friendly planner', created, flowTasks,
+      `Keep it small and calm.\n\n## Decisions\n- ${ago(20)}: Build with Tauri, data as Markdown files.\n- ${ago(8)}: No streaks.`),
+    'projects/learn-spanish.md': projectFile('Learn Spanish', '#3fb68b', 'Hold a 10 minute conversation by spring', created, spanishTasks, 'Twenty minutes a day beats two hours on Sunday.'),
+    'projects/garden-shed.md': projectFile('Garden shed', '#f2994a', 'Build a small shed before winter', created, shedTasks, ''),
+    'notes.md': `# General notes\n\nIdeas to come back to:\n\n- A calmer morning routine\n- Ask Sam about the allotment\n`,
+  }
+  // ~4 weeks of history: done entries and focus sessions (deterministic pattern, relative to today).
+  const titles: [string, string, string][] = [
+    ['flow-app/t1', 'Design the data format', 'Flow app'], ['flow-app/t2', 'Set up Tauri project', 'Flow app'],
+    ['learn-spanish/t1', 'Pick a textbook', 'Learn Spanish'], ['garden-shed/t1', 'Measure the corner of the garden', 'Garden shed'],
+  ]
+  for (let i = 0; i <= 28; i++) {
+    const date = ago(i)
+    const count = i === 0 ? 1 : [0, 2, 1, 3, 0, 4, 1, 2, 5, 1, 0, 2, 3, 6][(i * 5) % 14]
+    const minutes = i === 0 ? [25] : [25, 25, 45, 15, 25].slice(0, (i * 3) % 4)
+    const done = Array.from({ length: count }, (_, k) => titles[(i + k) % titles.length])
+    if (i === 0) done.splice(0, 1, ['garden-shed/t3', 'Paint the fence', 'Garden shed'])
+    if (done.length === 0 && minutes.length === 0) continue
+    const lines = ['---', `date: ${date}`]
+    if (done.length) lines.push('done:', ...done.flatMap(([ref, title, project]) => [`  - ref: ${ref}`, `    title: ${q(title)}`, `    project: ${q(project)}`]))
+    if (minutes.length) lines.push('focus:', ...minutes.flatMap((m, k) => [`  - ref: ${titles[(i + k) % titles.length][0]}`, `    title: ${q(titles[(i + k) % titles.length][1])}`, `    project: ${q(titles[(i + k) % titles.length][2])}`, `    minutes: ${m}`]))
+    lines.push('---', i === 1 ? 'Slow start, good finish.' : '')
+    files[`days/${date}.md`] = lines.join('\n') + '\n'
+  }
+  files[`reviews/${isoWeek(ago(7))}.md`] =
+    `---\nweek: ${isoWeek(ago(7))}\nfocus_project: learn-spanish\nintention: Twenty minutes of Spanish every day\n---\nGood momentum on the app. Spanish slipped midweek; short sessions work better for me.\n`
+  return files
+}
+
+const store = new MemoryFileStore(seedFiles(localDate()))
 
 const rootEl = document.getElementById('root')!
 

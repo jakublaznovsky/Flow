@@ -50,6 +50,12 @@ tasks:
     title: Set up Tauri project
     status: todo
     created: 2026-11-03
+    scheduled: 2026-11-06 # planned for this day (see below)
+    steps:                # checklist inside the task
+      - text: Install the prerequisites
+        done: true
+      - text: Run the app once
+        done: false
 ---
 Free notes about the project.
 
@@ -61,7 +67,13 @@ Free notes about the project.
   the title is renamed, so references stay valid.
 - Task ids are unique within a project (t1, t2, ... incrementing). The global task
   reference is <slug>/<id>, e.g. flow-app/t2.
-- Optional task fields (first_step, planned, done) are omitted when empty.
+- Optional task fields (first_step, planned, done, scheduled, steps) are omitted when empty.
+- steps is a list of { text, done } checklist items. Ticking every step does not complete
+  the task; the task's own status does that. Unknown fields on steps are kept.
+- scheduled is a date the task is planned for (set in the Week view or the task's "Plan for"
+  field). When that day arrives (or has passed), Flow moves a To do task of an active project
+  into Today by itself (status today, planned set) and removes scheduled. Tasks of paused,
+  done or archived projects keep waiting with their date.
 - The body (notes and ## Decisions) is free text. Flow preserves it unchanged.
 
 ## Parking lot: inbox.md
