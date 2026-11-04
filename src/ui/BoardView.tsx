@@ -14,15 +14,17 @@ import type { Change, ISODate } from '../model/types'
 import AddCard from './AddCard'
 import Card, { CardPreview } from './Card'
 import Column from './Column'
+import DoneBar from './DoneBar'
 import { handleStepDrop } from './stepDrop'
 import type { useFlow } from './useFlow'
 
 export const COLUMNS: { id: ColumnId; title: string; empty: string }[] = [
   { id: 'inbox', title: 'Parking lot', empty: 'Nothing parked' },
   { id: 'todo', title: 'To do', empty: 'Nothing to do' },
-  { id: 'tomorrow', title: 'Tomorrow', empty: 'Plan tomorrow here' },
   { id: 'today', title: 'Today', empty: 'pick up to 3' },
-  { id: 'done', title: 'Done', empty: 'Done today shows here' },
+  { id: 'tomorrow', title: 'Tomorrow', empty: 'Plan tomorrow here' },
+  // Not a column: the Done bar under the board (listed here for Settings and drop targets).
+  { id: 'done', title: 'Done', empty: '' },
 ]
 
 /** Short settle animation into the drop place; none when the OS asks for reduced motion. */
@@ -45,9 +47,12 @@ interface Props {
   focusRef?: string | null
   /** Columns turned off in Settings; their cards are untouched, just not shown. */
   hidden?: readonly ColumnId[]
+  /** Whether the Done bar shows its cards (local setting `doneBarOpen`). */
+  doneOpen?: boolean
+  onToggleDone?: () => void
 }
 
-export default function BoardView({ flow, query, picker, onDrop, createProject, addRequest, onAddHandled, onFocus, focusRef, hidden = [] }: Props) {
+export default function BoardView({ flow, query, picker, onDrop, createProject, addRequest, onAddHandled, onFocus, focusRef, hidden = [], doneOpen = true, onToggleDone }: Props) {
   const { data, today, filter, order, lastProject, remember, apply } = flow
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   // The card being dragged is drawn in a DragOverlay (fixed position, above all columns) so it is
@@ -97,7 +102,7 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
     })
   }
   const planCard = (card: CardData, date: ISODate | null) => apply((d) => scheduleTask(d, card.key, date, today))
-  const saveCard = (card: CardData, patch: { title: string; firstStep: string; project: string; scheduled: string }) => {
+  const saveCard = (card: CardData, patch: { title: string; firstStep?: string; project: string; scheduled: string }) => {
     if (card.kind === 'inbox') {
       apply((d) => editInboxItem(d, card.key.slice('inbox/'.length), patch.title))
       return
@@ -126,6 +131,30 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
     else apply((d) => deleteTask(d, card.key))
   }
 
+  const renderCard = (card: CardData, id: ColumnId) => (
+    <Card
+      key={card.key}
+      card={card}
+      column={id}
+      projects={projects}
+      compact={id === 'done'}
+      onToggle={() => apply((d) => moveTask(d, card.key, id === 'done' ? 'today' : 'done', today))}
+      onSave={(patch) => saveCard(card, patch)}
+      onDelete={() => deleteCard(card)}
+      onFocus={onFocus ? () => onFocus(card.key, card.title) : undefined}
+      inFocus={card.key === focusRef}
+      today={today}
+      onPlan={card.kind === 'task' && id !== 'done' ? (date) => planCard(card, date) : undefined}
+      steps={card.kind === 'task' && id !== 'done' ? {
+        onAdd: (text) => apply((d) => addStep(d, card.key, text)),
+        onToggle: (i) => apply((d) => toggleStep(d, card.key, i)),
+        onEdit: (i, text) => apply((d) => editStep(d, card.key, i, text)),
+        onDelete: (i) => apply((d) => deleteStep(d, card.key, i)),
+        onMove: (from, to) => handleStepDrop({ ref: card.key, activeIndex: from, overIndex: to }, apply),
+      } : undefined}
+    />
+  )
+
   return (
     <div className="board-view">
       {picker && (
@@ -136,14 +165,14 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
       )}
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
         <div className="columns">
-          {shown.map(({ id, title, empty }) => (
+          {shown.filter(({ id }) => id !== 'done').map(({ id, title, empty }) => (
             <Column
               key={id}
               id={id}
               keys={cols[id].map((c) => c.key)}
               title={title}
               empty={empty}
-              footer={id === 'done' ? undefined : (
+              footer={(
                 <AddCard
                   label={`Add to ${title}`}
                   placeholder={id === 'inbox' ? 'Capture a thought' : 'New task'}
@@ -153,7 +182,7 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
                   defaultProject={defaultProject}
                   onAdd={id === 'inbox'
                     ? (text) => apply((d) => addInboxItem(d, text, today))
-                    : addTaskTo(id)}
+                    : addTaskTo(id as 'todo' | 'tomorrow' | 'today')}
                   onCreateProject={createProject}
                   planFor={id === 'todo'}
                   openRequest={id === 'todo' && addRequest}
@@ -161,31 +190,15 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
                 />
               )}
             >
-              {cols[id].map((card) => (
-                <Card
-                  key={card.key}
-                  card={card}
-                  column={id}
-                  projects={projects}
-                  onToggle={() => apply((d) => moveTask(d, card.key, id === 'done' ? 'today' : 'done', today))}
-                  onSave={(patch) => saveCard(card, patch)}
-                  onDelete={() => deleteCard(card)}
-                  onFocus={onFocus ? () => onFocus(card.key, card.title) : undefined}
-                  inFocus={card.key === focusRef}
-                  today={today}
-                  onPlan={card.kind === 'task' && id !== 'done' ? (date) => planCard(card, date) : undefined}
-                  steps={card.kind === 'task' ? {
-                    onAdd: (text) => apply((d) => addStep(d, card.key, text)),
-                    onToggle: (i) => apply((d) => toggleStep(d, card.key, i)),
-                    onEdit: (i, text) => apply((d) => editStep(d, card.key, i, text)),
-                    onDelete: (i) => apply((d) => deleteStep(d, card.key, i)),
-                    onMove: (from, to) => handleStepDrop({ ref: card.key, activeIndex: from, overIndex: to }, apply),
-                  } : undefined}
-                />
-              ))}
+              {cols[id].map((card) => renderCard(card, id))}
             </Column>
           ))}
         </div>
+        {!hidden.includes('done') && (
+          <DoneBar keys={cols.done.map((c) => c.key)} open={doneOpen} onToggle={() => onToggleDone?.()}>
+            {cols.done.map((card) => renderCard(card, 'done'))}
+          </DoneBar>
+        )}
         <DragOverlay dropAnimation={dropAnimation()}>
           {dragging && <CardPreview card={dragging.card} column={dragging.column} />}
         </DragOverlay>

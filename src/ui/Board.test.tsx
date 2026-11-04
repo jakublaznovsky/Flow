@@ -27,12 +27,16 @@ const col = (name: string) => within(screen.getByRole('region', { name }))
 afterEach(() => vi.useRealTimers())
 
 describe('Board', () => {
-  it('shows the five columns', async () => {
+  it('shows four columns (Today before Tomorrow) and the Done bar under them', async () => {
     setup()
     await screen.findByText('Set up Tauri')
-    for (const n of ['Parking lot', 'To do', 'Tomorrow', 'Today', 'Done']) {
+    const regions = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))
+    expect(regions).toEqual(['Parking lot', 'To do', 'Today', 'Tomorrow', 'Done'])
+    for (const n of ['Parking lot', 'To do', 'Today', 'Tomorrow']) {
       expect(screen.getByRole('heading', { name: n })).toBeInTheDocument()
     }
+    expect(screen.getByRole('heading', { name: 'Done today (0)' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Done' })).toHaveClass('done-bar')
   })
 
   it('shows "pick up to 3" only while Today is empty', async () => {
@@ -67,9 +71,10 @@ describe('Board', () => {
     await user.click(await screen.findByRole('button', { name: 'Set up Tauri' }))
     await user.clear(screen.getByRole('textbox', { name: 'Title' }))
     await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Set up Rust')
-    await user.type(screen.getByRole('textbox', { name: 'First step' }), 'Install rustup')
+    // New tasks have no first step, so the form does not offer one.
+    expect(screen.queryByRole('textbox', { name: 'First step' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save' }))
-    expect(screen.getByText('Install rustup')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Set up Rust' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Set up Rust' }))
     await user.click(screen.getByRole('button', { name: 'Delete' }))
     expect(screen.queryByText('Set up Rust')).not.toBeInTheDocument()

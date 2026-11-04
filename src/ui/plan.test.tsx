@@ -28,10 +28,10 @@ const col = (name: string) => within(screen.getByRole('region', { name }))
 afterEach(() => vi.useRealTimers())
 
 describe('Tomorrow column', () => {
-  it('sits between To do and Today and holds the tasks planned for tomorrow', async () => {
+  it('sits after Today (before the Done bar) and holds the tasks planned for tomorrow', async () => {
     await setup()
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent))
-      .toEqual(['Parking lot', 'To do', 'Tomorrow', 'Today', 'Done'])
+      .toEqual(['Parking lot', 'To do', 'Today', 'Tomorrow', 'Done today (1)'])
     expect(col('Tomorrow').getByText('Ship beta')).toBeInTheDocument()
     expect(col('To do').queryByText('Ship beta')).not.toBeInTheDocument()
   })
@@ -135,7 +135,7 @@ describe('Plan menu on task cards', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(button).toHaveFocus()
     await user.click(button)
-    await user.click(screen.getByRole('heading', { name: 'Done' }))
+    await user.click(screen.getByRole('heading', { name: 'Parking lot' }))
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(col('To do').getByText('Set up Tauri')).toBeInTheDocument()
   })

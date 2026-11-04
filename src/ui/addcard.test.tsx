@@ -36,11 +36,11 @@ describe('the new-task form can always be closed', () => {
     it(`${column}: clicking outside closes it when empty, keeps it open with text`, async () => {
       const { user } = await setup()
       await user.click(screen.getByRole('button', { name: `Add to ${column}` }))
-      await user.click(screen.getByRole('heading', { name: 'Done' }))
+      await user.click(screen.getByRole('heading', { name: 'Parking lot' }))
       expect(col(column).queryByRole('textbox', { name: label })).not.toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: `Add to ${column}` }))
       await user.type(col(column).getByRole('textbox', { name: label }), 'keep me')
-      await user.click(screen.getByRole('heading', { name: 'Done' }))
+      await user.click(screen.getByRole('heading', { name: 'Parking lot' }))
       expect(col(column).getByRole('textbox', { name: label })).toHaveValue('keep me')
     })
   }
@@ -85,7 +85,7 @@ describe('Plan for in the add form', () => {
     await user.click(screen.getByRole('button', { name: 'Add to To do' }))
     const { fireEvent } = await import('@testing-library/react')
     fireEvent.change(col('To do').getByLabelText('Plan for'), { target: { value: '2026-11-09' } })
-    await user.click(screen.getByRole('heading', { name: 'Done' }))
+    await user.click(screen.getByRole('heading', { name: 'Parking lot' }))
     expect(col('To do').getByLabelText('Plan for')).toHaveValue('2026-11-09')
   })
 })

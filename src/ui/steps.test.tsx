@@ -29,54 +29,58 @@ async function setup() {
 afterEach(() => vi.useRealTimers())
 
 describe('card checklist', () => {
-  it('shows a progress pill and the next step when collapsed', async () => {
+  it('always shows the checklist with a progress pill; no chevron and no "Next:" line', async () => {
     const { card } = await setup()
     const c = within(card('Set up Tauri'))
     expect(c.getByLabelText('1 of 3 steps done')).toHaveTextContent('1/3')
-    expect(c.getByText('Next: Run init')).toBeInTheDocument()
-    expect(c.queryByRole('list')).not.toBeInTheDocument()
-    expect(c.getByRole('button', { name: 'Show steps' })).toHaveAttribute('aria-expanded', 'false')
+    expect(within(c.getByRole('list')).getAllByRole('listitem')).toHaveLength(3)
+    expect(c.getByRole('checkbox', { name: 'Install Rust' })).toBeChecked()
+    expect(c.getByRole('checkbox', { name: 'Run init' })).not.toBeChecked()
+    expect(c.getByRole('textbox', { name: 'Add step' })).toHaveAttribute('placeholder', 'Add step')
+    expect(c.queryByText(/^Next:/)).not.toBeInTheDocument()
+    expect(c.queryByRole('button', { name: /^(Show|Hide) steps$/ })).not.toBeInTheDocument()
+    // The only toggle left on the card is the calendar (plan) menu.
+    expect([...card('Set up Tauri').querySelectorAll('[aria-expanded]')].map((el) => el.getAttribute('aria-label'))).toEqual(['Plan Set up Tauri'])
   })
 
-  it('puts the pill and chevron in the title row so text below uses the full card width', async () => {
+  it('puts the pill in the title row, the checklist under it and the project tag in the footer', async () => {
     const { card } = await setup()
     const li = card('Set up Tauri')
     const head = li.querySelector('.card-body > .card-head') as HTMLElement
     expect(head).not.toBeNull()
     expect(within(head).getByRole('button', { name: 'Set up Tauri' })).toBeInTheDocument()
     expect(within(head).getByLabelText('1 of 3 steps done')).toBeInTheDocument()
-    expect(within(head).getByRole('button', { name: 'Show steps' })).toBeInTheDocument()
     expect(li.querySelector(':scope > .steps-ctl')).toBeNull()
+    const body = li.querySelector('.card-body') as HTMLElement
+    const parts = [...body.children].map((el) => el.className.split(' ')[0])
+    expect(parts.indexOf('card-head')).toBeLessThan(parts.indexOf('checklist'))
+    expect(parts.indexOf('checklist')).toBeLessThan(parts.indexOf('card-meta'))
     expect(within(li).getByText('Flow app')).toHaveClass('tag-text')
   })
 
-  it('shows no pill on a task without steps but offers the chevron', async () => {
+  it('shows no pill on a task without steps; the Add step input is its only step row', async () => {
     const { card } = await setup()
     const c = within(card('Write spec'))
     expect(c.queryByText(/steps? done/)).not.toBeInTheDocument()
-    expect(c.getByRole('button', { name: 'Show steps' })).toBeInTheDocument()
+    expect(c.queryByRole('list')).not.toBeInTheDocument()
+    expect(c.getByRole('textbox', { name: 'Add step' })).toBeInTheDocument()
   })
 
-  it('expands, ticks a step, and persists without changing task status', async () => {
+  it('ticks steps and persists without changing task status (ticking the last never completes it)', async () => {
     const { card, file, user } = await setup()
-    await user.click(within(card('Set up Tauri')).getByRole('button', { name: 'Show steps' }))
     const c = within(card('Set up Tauri'))
-    expect(c.getByRole('button', { name: 'Hide steps' })).toHaveAttribute('aria-expanded', 'true')
     expect(c.getAllByRole('listitem')).toHaveLength(3)
-    expect(c.queryByText('Next: Run init')).not.toBeInTheDocument()
     await user.click(c.getByRole('checkbox', { name: 'Run init' }))
     await user.click(c.getByRole('checkbox', { name: 'Commit' }))
     await vi.waitFor(() => expect(file()).toMatch(/text: Commit\n\s+done: true/))
     expect(file()).toMatch(/text: Run init\n\s+done: true/)
     expect(file()).toMatch(/title: Set up Tauri\n\s+status: todo/)
     expect(c.getByLabelText('3 of 3 steps done')).toBeInTheDocument()
-    await user.click(c.getByRole('button', { name: 'Hide steps' }))
     expect(c.queryByText(/^Next:/)).not.toBeInTheDocument()
   })
 
   it('adds steps with Enter and keeps focus for the next', async () => {
     const { card, file, user } = await setup()
-    await user.click(within(card('Write spec')).getByRole('button', { name: 'Show steps' }))
     const input = within(card('Write spec')).getByRole('textbox', { name: 'Add step' })
     await user.type(input, 'Outline{Enter}Draft{Enter}')
     await vi.waitFor(() => expect(file()).toMatch(/text: Draft/))
@@ -88,7 +92,6 @@ describe('card checklist', () => {
 
   it('edits a step inline: Enter saves, Escape cancels, empty deletes', async () => {
     const { card, file, user } = await setup()
-    await user.click(within(card('Set up Tauri')).getByRole('button', { name: 'Show steps' }))
     const c = () => within(card('Set up Tauri'))
     await user.click(c().getByText('Run init'))
     await user.clear(c().getByRole('textbox', { name: 'Edit step' }))
@@ -106,15 +109,13 @@ describe('card checklist', () => {
 
   it('deletes a step with the × button', async () => {
     const { card, file, user } = await setup()
-    await user.click(within(card('Set up Tauri')).getByRole('button', { name: 'Show steps' }))
     await user.click(within(card('Set up Tauri')).getByRole('button', { name: 'Delete step Install Rust' }))
     await vi.waitFor(() => expect(file()).not.toContain('Install Rust'))
     expect(file()).toContain('Run init')
   })
 
   it('interacting with the checklist does not start a drag or open the editor', async () => {
-    const { card, user } = await setup()
-    await user.click(within(card('Set up Tauri')).getByRole('button', { name: 'Show steps' }))
+    const { card } = await setup()
     const box = within(card('Set up Tauri')).getByRole('checkbox', { name: 'Run init' })
     fireEvent.pointerDown(box, { button: 0, clientX: 0, clientY: 0, isPrimary: true })
     fireEvent.pointerMove(document, { clientX: 40, clientY: 40 })
@@ -124,12 +125,55 @@ describe('card checklist', () => {
   })
 })
 
+describe('first step (legacy field)', () => {
+  const withFirst = (): Record<string, string> => ({
+    'projects/flow-app.md': project(
+      '  - id: t1\n    title: Set up Tauri\n    status: todo\n    first_step: review\n    created: 2026-11-01\n' +
+      '  - id: t2\n    title: Write spec\n    status: today\n    created: 2026-11-01\n'),
+  })
+  async function open(files: Record<string, string>) {
+    const store = new MemoryFileStore(files)
+    render(<App store={store} settings={new MemorySettings()} now={() => NOW} />)
+    await screen.findByText('Set up Tauri')
+    return { store, user: userEvent.setup() }
+  }
+
+  it('is not shown on the card, and stays in the file', async () => {
+    const { store } = await open(withFirst())
+    expect(screen.queryByText('review')).not.toBeInTheDocument()
+    expect(store.files['projects/flow-app.md']).toContain('first_step: review')
+  })
+
+  it('the edit form offers "First step" only for a task that has one, so it can be cleared', async () => {
+    const { store, user } = await open(withFirst())
+    await user.click(screen.getByRole('button', { name: 'Write spec' }))
+    expect(screen.queryByRole('textbox', { name: 'First step' })).not.toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: 'Set up Tauri' }))
+    const field = screen.getByRole('textbox', { name: 'First step' })
+    expect(field).toHaveValue('review')
+    await user.clear(field)
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await vi.waitFor(() => expect(store.files['projects/flow-app.md']).not.toContain('first_step'))
+    await user.click(screen.getByRole('button', { name: 'Set up Tauri' }))
+    expect(screen.queryByRole('textbox', { name: 'First step' })).not.toBeInTheDocument()
+  })
+
+  it('saving a task without the field leaves its file free of first_step', async () => {
+    const { store, user } = await open(withFirst())
+    await user.click(screen.getByRole('button', { name: 'Write spec' }))
+    await user.clear(screen.getByRole('textbox', { name: 'Title' }))
+    await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Write the spec{Enter}')
+    await vi.waitFor(() => expect(store.files['projects/flow-app.md']).toContain('title: Write the spec'))
+    expect(store.files['projects/flow-app.md'].match(/first_step/g)).toHaveLength(1)
+  })
+})
+
 describe('reordering steps', () => {
   const texts = (li: HTMLElement) => within(li).getAllByRole('button', { name: /^Reorder step / }).map((b) => b.getAttribute('aria-label'))
 
   it('gives each step a drag handle; the handle is the only drag start', async () => {
     const { card, user } = await setup()
-    await user.click(within(card('Set up Tauri')).getByRole('button', { name: 'Show steps' }))
     await within(card('Set up Tauri')).findByRole('button', { name: 'Reorder step Install Rust' })
     expect(texts(card('Set up Tauri'))).toEqual(['Reorder step Install Rust', 'Reorder step Run init', 'Reorder step Commit'])
     // The step text still opens the inline editor; the checkbox still toggles.
@@ -154,8 +198,7 @@ describe('reordering steps', () => {
 
   it('Alt+ArrowDown / Alt+ArrowUp move the step, persist, and keep focus on its handle', async () => {
     const { card, file, user } = await setup()
-    await user.click(within(card('Set up Tauri')).getByRole('button', { name: 'Show steps' }))
-    // Wait for the expanded checklist to render (slower machines, e.g. the CI Windows runner).
+    // Wait for the checklist to render (slower machines, e.g. the CI Windows runner).
     ;(await within(card('Set up Tauri')).findByRole('button', { name: 'Reorder step Install Rust' })).focus()
     await user.keyboard('{Alt>}{ArrowDown}{/Alt}')
     expect(texts(card('Set up Tauri'))).toEqual(['Reorder step Run init', 'Reorder step Install Rust', 'Reorder step Commit'])
@@ -210,7 +253,6 @@ describe('handleStepDrop', () => {
 describe('focus bar next step', () => {
   it('shows the next unchecked step under the title', async () => {
     const { card, user } = await setup()
-    await user.click(within(card('Write spec')).getByRole('button', { name: 'Show steps' }))
     await user.type(within(card('Write spec')).getByRole('textbox', { name: 'Add step' }), 'Outline{Enter}')
     await user.click(screen.getByRole('button', { name: 'Focus on Write spec' }))
     const today = within(screen.getByRole('region', { name: 'Today' }))

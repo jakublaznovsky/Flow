@@ -1,7 +1,7 @@
 /* ---------- Generic screens (folder setup, loading) ---------- */
 .app { min-height: 100vh; padding: var(--space-8); display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); }
 .app h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
-.app > button { background: var(--accent); color: var(--on-accent); border: 0; border-radius: var(--radius-md); padding: 8px 14px; font-weight: 500; }
+.app > button { background: var(--accent-strong); color: var(--on-accent); border: 0; border-radius: var(--radius-md); padding: 8px 14px; font-weight: 500; }
 .app.loading { align-items: center; justify-content: center; color: var(--text-faint); }
 
 /* ---------- Shell: sidebar + main ---------- */
@@ -30,7 +30,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
   border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .primary {
-  background: var(--accent); color: var(--on-accent); border: 0; border-radius: var(--radius-md);
+  background: var(--accent-strong); color: var(--on-accent); border: 0; border-radius: var(--radius-md);
   padding: 6px 12px; font-weight: 500; transition: background var(--dur) var(--ease);
 }
 .primary:hover { background: var(--accent-hover); }
@@ -50,7 +50,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 .brand { display: flex; align-items: center; gap: 10px; padding: 2px var(--space-2) var(--space-5); }
 .brand-mark {
   position: relative; width: 24px; height: 24px; border-radius: 7px; flex: none;
-  background: linear-gradient(135deg, #7c7cf0 0%, #5b5bd6 55%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #e3ae5c 0%, #c98a2b 55%, #a8701f 100%);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
 }
 .brand-mark::before, .brand-mark::after {
@@ -141,7 +141,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 /* The one confirmation dialog (Delete project). */
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--space-4);
-  background: rgba(16, 24, 40, 0.32);
+  background: var(--backdrop);
 }
 .modal {
   width: min(400px, 100%); padding: var(--space-5); background: var(--surface); color: var(--text);
@@ -173,6 +173,30 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
   transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 .column.is-over { border-color: var(--accent); }
+/* ---------- Done bar (under the columns) ---------- */
+.done-bar {
+  flex: none; display: flex; flex-direction: column; min-width: 0; padding: 4px var(--space-2);
+  background: var(--surface-2); border: 1px solid transparent; border-radius: var(--radius-lg);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.done-bar.is-open { padding-bottom: var(--space-2); }
+.done-bar.is-over { border-color: var(--success); background: color-mix(in srgb, var(--success-soft) 70%, var(--surface-2)); }
+.done-bar-head { margin: 0; font-size: 13px; font-weight: 600; }
+.done-bar-toggle, .week-tray-toggle {
+  display: inline-flex; align-items: center; gap: 8px; padding: 4px 8px; margin: 0;
+  background: none; border: 0; border-radius: var(--radius-md); color: var(--text); font: inherit; font-weight: 600;
+  transition: background var(--dur) var(--ease);
+}
+.done-bar-toggle:hover, .week-tray-toggle:hover { background: var(--surface-hover); }
+.done-bar-chevron, .week-tray-chevron { flex: none; color: var(--text-muted); transition: transform var(--dur) var(--ease); }
+[aria-expanded='true'] > .done-bar-chevron, [aria-expanded='true'] > .week-tray-chevron { transform: rotate(90deg); }
+.done-bar-count { color: var(--text-muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.done-cards {
+  list-style: none; margin: 0; padding: 4px 4px 2px; display: flex; gap: var(--space-2);
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: thin;
+}
+.done-cards > .card { flex: 0 0 224px; }
+.done-empty { padding: 6px 4px; font-size: 12.5px; color: var(--text-muted); }
 .column header { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-2) var(--space-3); }
 .column h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
 .column-today h2::before {
@@ -207,38 +231,37 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 .card.is-dragging { opacity: 0.35; box-shadow: none; }
 .card.is-overlay { cursor: grabbing; box-shadow: inset 3px 0 0 var(--project), var(--shadow-lg); pointer-events: none; }
 .card.is-done .card-title { text-decoration: line-through; color: var(--text-muted); }
+.card.is-compact { padding: 8px 10px 8px 12px; align-items: flex-start; }
+.card.is-compact .card-title { font-size: 13px; }
+.card.is-compact .tag { margin-top: 4px; font-size: 12px; padding: 2px 9px 2px 7px; }
+.card.is-compact .tag::before { width: 7px; height: 7px; }
 .card.is-done { background: color-mix(in srgb, var(--surface) 70%, transparent); box-shadow: inset 3px 0 0 var(--project); }
 .card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
 .card-title {
   background: none; border: 0; padding: 0; text-align: left; font-weight: 500; line-height: 1.4;
   color: var(--text); overflow-wrap: anywhere; border-radius: 3px; cursor: inherit;
 }
-/* Title row: the steps pill + chevron sit top-right; an invisible float of the same size
-   inside the title keeps only the first line clear of them, so the title wraps under. */
-.card-head { position: relative; align-self: stretch; min-width: 0; }
-.card-head .card-title { display: block; width: 100%; }
-.title-gap { float: right; display: flex; gap: 4px; height: 1em; margin: 0 -4px 0 6px; visibility: hidden; }
-.title-gap[data-pill]::before {
-  content: attr(data-pill); padding: 0 8px; font-size: 11.5px; font-weight: 400; font-variant-numeric: tabular-nums;
-}
-.title-gap::after { content: ''; width: 22px; }
-.step { font-size: 12.5px; color: var(--text-muted); overflow-wrap: break-word; }
+/* Title row: the title wraps beside the steps pill. */
+.card-head { align-self: stretch; min-width: 0; display: flex; align-items: flex-start; gap: 8px; }
+.card-head .card-title { flex: 1; min-width: 0; }
+/* Project name tag: tinted with the project colour, a coloured dot, full name unless it cannot fit. */
 .tag {
-  display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 1px 8px 1px 6px;
-  font-size: 11.5px; color: var(--text-muted); background: var(--surface-2); border-radius: 999px; max-width: 100%;
-  min-width: 0; box-sizing: border-box;
+  display: inline-flex; align-items: center; gap: 7px; margin-top: 6px; padding: 3px 10px 3px 8px;
+  font-size: 13px; font-weight: 500; line-height: 1.35; color: var(--text);
+  background: color-mix(in srgb, var(--project) 15%, var(--surface));
+  border-radius: 999px; max-width: 100%; min-width: 0; box-sizing: border-box;
 }
 .tag-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tag::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--project); flex: none; }
+.tag::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--project); flex: none; }
 
 .card input[type='checkbox'] {
   appearance: none; -webkit-appearance: none; flex: none; width: 18px; height: 18px; margin: 1px 0 0;
   border: 1.5px solid var(--border-strong); border-radius: 50%; background: var(--surface) center / 12px no-repeat;
   cursor: pointer; transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
 }
-.card input[type='checkbox']:hover { border-color: var(--accent); }
+.card input[type='checkbox']:hover { border-color: var(--success); }
 .card input[type='checkbox']:checked {
-  border-color: var(--accent); background-color: var(--accent);
+  border-color: var(--success-strong); background-color: var(--success-strong);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-4.9'/%3E%3C/svg%3E");
 }
 .card.editing { cursor: default; padding: 10px; }
@@ -355,10 +378,10 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 .heat-grid { grid-template-rows: repeat(7, auto); grid-auto-flow: column; }
 .heat-cell { aspect-ratio: 1; border-radius: 2px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--border); }
 .heat-cell.future { background: transparent; box-shadow: none; }
-.heat-cell.level-1 { background: color-mix(in srgb, var(--accent) 28%, var(--surface)); box-shadow: none; }
-.heat-cell.level-2 { background: color-mix(in srgb, var(--accent) 52%, var(--surface)); box-shadow: none; }
-.heat-cell.level-3 { background: color-mix(in srgb, var(--accent) 76%, var(--surface)); box-shadow: none; }
-.heat-cell.level-4 { background: var(--accent); box-shadow: none; }
+.heat-cell.level-1 { background: color-mix(in srgb, var(--success) 28%, var(--surface)); box-shadow: none; }
+.heat-cell.level-2 { background: color-mix(in srgb, var(--success) 52%, var(--surface)); box-shadow: none; }
+.heat-cell.level-3 { background: color-mix(in srgb, var(--success) 76%, var(--surface)); box-shadow: none; }
+.heat-cell.level-4 { background: var(--success-strong); box-shadow: none; }
 .proj-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-4); }
 .proj-head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: 6px; }
 .proj-title { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -370,7 +393,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 .progress-fallback { margin-top: var(--space-3); min-height: 90px; font-size: 12px; }
 .btn { padding: 6px 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-sm); }
 .btn:hover { background: var(--surface-hover); }
-.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn.primary { background: var(--accent-strong); color: var(--on-accent); border-color: var(--accent-strong); }
 .btn.primary:hover { background: var(--accent-hover); }
 .progress-hint { margin: 0 0 var(--space-3); color: var(--text-muted); }
 
@@ -401,7 +424,7 @@ input.quick-capture, input.quick-capture:focus {
 }
 .focus-presets button + button { border-left: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
 .focus-presets button:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.focus-presets button[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); }
+.focus-presets button[aria-pressed='true'] { background: var(--accent-strong); color: var(--on-accent); }
 .focus-btn {
   background: var(--surface); color: var(--text); border: 1px solid var(--border-strong);
   border-radius: var(--radius-md); padding: 5px 12px; font-weight: 500;
@@ -420,20 +443,11 @@ input.quick-capture, input.quick-capture:focus {
 .card.in-focus { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 
 /* ---------- Checklist inside a task ---------- */
-.next-step { color: var(--text-muted); }
-.steps-ctl { position: absolute; top: -1px; right: -4px; display: flex; align-items: center; gap: 4px; cursor: default; }
 .steps-pill {
-  font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--text-muted);
+  flex: none; margin-top: 1px; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--text-muted);
   background: var(--surface-2); border-radius: 999px; padding: 1px 8px;
 }
-.steps-toggle {
-  display: grid; place-items: center; width: 22px; height: 22px; padding: 0; background: none; border: 0;
-  border-radius: var(--radius-sm, 4px); color: var(--text-faint); cursor: pointer;
-  opacity: 0.45; transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
-}
-.card:hover .steps-toggle, .card:focus-within .steps-toggle, .steps-toggle[aria-expanded='true'], .steps-toggle:focus-visible { opacity: 1; }
-.steps-toggle[aria-expanded='true'] { transform: rotate(180deg); }
-.plan-ctl { position: absolute; top: 3px; right: -6px; display: flex; cursor: default; }
+.plan-ctl { position: absolute; top: 6px; right: -6px; display: flex; cursor: default; }
 .plan-toggle {
   display: grid; place-items: center; width: 22px; height: 22px; padding: 0; background: none; border: 0;
   border-radius: var(--radius-sm, 4px); color: var(--text-faint); cursor: pointer;
@@ -454,18 +468,20 @@ input.quick-capture, input.quick-capture:focus {
   background: var(--surface); color: var(--text); font: inherit; font-size: 13px; outline: none;
 }
 .plan-date:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.steps-toggle:hover { color: var(--text); background: var(--surface-2); }
-.card:has(> .checklist) { flex-wrap: wrap; }
-.checklist { flex: 0 0 100%; min-width: 0; box-sizing: border-box; padding-left: 26px; margin-top: 2px; cursor: default; display: flex; flex-direction: column; gap: 4px; }
+/* Always-open checklist under the title; step checkboxes line up with the title text and each
+   grip sits in the indent under the task's own checkbox. */
+.checklist { align-self: stretch; min-width: 0; margin-top: 3px; cursor: default; display: flex; flex-direction: column; gap: 3px; }
 .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.steps li { display: flex; align-items: center; gap: 8px; min-height: 26px; }
+.steps li { display: flex; align-items: center; gap: 8px; min-height: 24px; }
 /* Grip handle sits in the checklist's left indent, so step checkboxes stay aligned under the title. */
 .steps li { position: relative; border-radius: var(--radius-sm, 4px); }
 .step-grip {
   flex: none; display: grid; place-items: center; width: 14px; height: 22px; margin-left: -22px; padding: 0;
   background: none; border: 0; border-radius: 3px; color: var(--text-faint); cursor: grab; touch-action: none;
-  opacity: 0.45; transition: opacity var(--dur) var(--ease);
+  opacity: 0; transition: opacity var(--dur) var(--ease);
 }
+/* Grips stay out of sight until the card is hovered (always there for keyboard focus). */
+.card:hover .step-grip { opacity: 0.5; }
 .steps li:hover .step-grip, .steps li:focus-within .step-grip, .step-grip:focus-visible { opacity: 1; }
 .step-grip:hover { color: var(--text); background: var(--surface-2); }
 .steps li.is-dragging-step { z-index: 2; cursor: grabbing; }
@@ -481,8 +497,21 @@ input.quick-capture, input.quick-capture:focus {
   color: var(--text); overflow-wrap: break-word; cursor: text;
 }
 .steps li.is-ticked .step-text { color: var(--text-muted); text-decoration: line-through; }
-.step-edit, .step-add { flex: 1; min-width: 0; font-size: 13px; padding: 3px 6px; }
-.step-add { width: 100%; flex: none; }
+.checklist .step-edit { flex: 1; min-width: 0; font-size: 13px; padding: 2px 6px; }
+/* Compact "Add step": a quiet single-line field that firms up on hover and focus. */
+.checklist .step-add {
+  width: 100%; flex: none; height: 26px; font-size: 12.5px; padding: 2px 7px 2px 23px; margin-left: -1px;
+  /* A small "+" where a step's checkbox would be, so the placeholder lines up with step text. */
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%239c9286' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M6 2.5v7M2.5 6h7'/%3E%3C/svg%3E") 3px center / 11px no-repeat;
+  border: 1px dashed transparent; border-radius: var(--radius-sm);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.card:hover .checklist .step-add { border-color: var(--border-strong); }
+.checklist .step-add:focus { border-style: solid; background-color: var(--surface); }
+/* Drag preview: steps without grips. */
+.steps-static { align-self: stretch; margin-top: 3px; }
+.steps-static li { min-height: 22px; }
+.steps-static .step-text { cursor: inherit; }
 .step-del {
   background: none; border: 0; padding: 0 4px; font-size: 15px; line-height: 1; color: var(--text-faint);
   border-radius: 3px; cursor: pointer; opacity: 0;
@@ -492,15 +521,15 @@ input.quick-capture, input.quick-capture:focus {
 .focus-next { display: block; font-size: 12px; font-weight: 400; opacity: 0.8; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- Day chip and "Plan for" on board cards ---------- */
-.card-meta { align-self: stretch; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; }
+.card-meta { align-self: stretch; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; margin-top: 1px; }
 /* Task footer: the calendar button is pinned top-right of the first row (it never wraps). Tag and
    day chip keep their natural width; when both don't fit, the chip wraps under the tag. Only a tag
    wider than the whole row truncates (the row is well over 80px at 1280px wide). */
 .card-meta:has(.plan-ctl) { position: relative; padding-right: 24px; }
 .card-meta:has(.plan-ctl) .day-chip { flex: none; }
 .day-chip {
-  display: inline-flex; align-items: center; margin-top: 4px; padding: 1px 8px; border-radius: 999px;
-  font-size: 11.5px; font-weight: 500; color: var(--accent-text); background: var(--accent-soft); white-space: nowrap;
+  display: inline-flex; align-items: center; margin-top: 6px; padding: 3px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 500; line-height: 1.35; color: var(--accent-text); background: var(--accent-soft); white-space: nowrap;
 }
 .plan-for { display: flex; align-items: center; gap: var(--space-2); font-size: 12.5px; color: var(--text-muted); }
 .plan-for span { flex: none; }
@@ -522,8 +551,8 @@ input.quick-capture, input.quick-capture:focus {
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .icon-btn:hover { background: var(--surface-hover); color: var(--text); }
-.week-board { flex: 1; min-height: 0; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--space-3); }
-.week-days { min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-2); }
+.week-board { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.week-days { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-2); }
 .week-col {
   display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: var(--space-2) var(--space-1) var(--space-1);
   background: var(--surface-2); border: 1px solid transparent; border-radius: var(--radius-lg);
@@ -537,7 +566,20 @@ input.quick-capture, input.quick-capture:focus {
 .week-col.is-over { border-color: var(--accent); }
 /* Past days stay dim, but light up as a drop target (dropping there = done that day). */
 .week-col.is-past.is-over { opacity: 0.9; background: var(--accent-soft); }
-.week-tray h3 { font-size: 13px; }
+.week-tray {
+  flex: none; display: flex; flex-direction: column; min-width: 0; padding: 4px var(--space-2);
+  background: var(--surface-2); border: 1px solid transparent; border-radius: var(--radius-lg);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.week-tray.is-open { padding-bottom: var(--space-2); }
+.week-tray.is-over { border-color: var(--accent); }
+.week-tray-head { margin: 0; font-size: 13px; font-weight: 600; }
+.week-tray-cards {
+  list-style: none; margin: 0; padding: 4px 4px 2px; display: flex; gap: 6px;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: thin;
+}
+.week-tray-cards > .week-card { flex: 0 0 184px; }
+.week-tray-empty { padding: 6px 4px; font-size: 12.5px; color: var(--text-muted); }
 .week-cards {
   list-style: none; margin: 0; padding: 2px 2px var(--space-2); flex: 1 1 auto; min-height: 0;
   overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
@@ -550,7 +592,7 @@ input.quick-capture, input.quick-capture:focus {
   display: flex; align-items: flex-start; gap: 6px; padding: 4px 6px; font-size: 12px; line-height: 1.35;
   color: var(--text-muted); overflow-wrap: break-word;
 }
-.week-done svg { flex: none; margin-top: 2px; color: var(--accent); opacity: 0.8; }
+.week-done svg { flex: none; margin-top: 2px; color: var(--success); }
 .week-done span { min-width: 0; text-decoration: line-through; text-decoration-color: var(--text-faint); }
 /* Today tasks on today's day: muted (they are already on the board's Today column), but draggable. */
 .week-in-today {
@@ -577,7 +619,7 @@ input.quick-capture, input.quick-capture:focus {
 .review-step-no { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border-strong); font-size: 11px; }
 .review-steps .is-past { color: var(--text-muted); }
 .review-steps .is-current { color: var(--accent-text); font-weight: 600; }
-.review-steps .is-current .review-step-no { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.review-steps .is-current .review-step-no { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--on-accent); }
 .review-body { min-height: 260px; }
 .review-body h2 { margin: 0 0 var(--space-3); font-size: 18px; font-weight: 600; }
 .review-summary { margin: 0 0 var(--space-4); color: var(--text-muted); }
@@ -640,7 +682,7 @@ input.quick-capture, input.quick-capture:focus {
 .ai-step { font-size: 13px; }
 .ai-step-label { color: var(--text-muted); font-size: 12px; }
 .ai-suggestion .btn { margin-top: var(--space-1); padding: 4px 10px; font-size: 12px; }
-.ai-added { margin-top: var(--space-1); font-size: 12px; font-weight: 600; color: var(--accent-text); }
+.ai-added { margin-top: var(--space-1); font-size: 12px; font-weight: 600; color: var(--success-text); }
 .markdownish h3, .markdownish h4, .markdownish h5 { margin: var(--space-4) 0 var(--space-1); font-weight: 600; }
 .markdownish h3 { font-size: 15px; }
 .markdownish h4 { font-size: 14px; }

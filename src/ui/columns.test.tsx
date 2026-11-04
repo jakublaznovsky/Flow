@@ -13,16 +13,17 @@ const seed = (): Record<string, string> => ({
     '  - id: t1\n    title: Set up Tauri\n    status: todo\n    created: 2026-11-01\n' +
     '  - id: t2\n    title: Write spec\n    status: todo\n    created: 2026-11-01\n    scheduled: 2026-11-04\n---\n',
 })
-const ALL = ['Parking lot', 'To do', 'Tomorrow', 'Today', 'Done']
+const ALL = ['Parking lot', 'To do', 'Today', 'Tomorrow', 'Done']
 
 async function setup(settings = new MemorySettings(), props: Partial<Parameters<typeof App>[0]> = {}) {
   const store = new MemoryFileStore(seed())
   const user = userEvent.setup()
   render(<App store={store} settings={settings} now={() => NOW} {...props} />)
-  await screen.findByRole('heading', { name: 'Done' })
+  await screen.findByRole('region', { name: 'Done' })
   return { store, settings, user }
 }
-const headings = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+/** Board columns and the Done bar, in page order ("Done today (N)" counts as Done). */
+const headings = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent?.startsWith('Done today') ? 'Done' : h.textContent)
   .filter((t) => t && ALL.includes(t))
 async function openSettings(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Settings' }))
@@ -71,7 +72,7 @@ describe('Board columns setting', () => {
   it('disables the last checked box with a calm title', async () => {
     const { user } = await setup()
     const group = await openSettings(user)
-    for (const n of ['Parking lot', 'To do', 'Tomorrow', 'Today']) await user.click(group.getByRole('checkbox', { name: n }))
+    for (const n of ['Parking lot', 'To do', 'Today', 'Tomorrow']) await user.click(group.getByRole('checkbox', { name: n }))
     const done = group.getByRole('checkbox', { name: 'Done' })
     expect(done).toBeChecked()
     expect(done).toBeDisabled()

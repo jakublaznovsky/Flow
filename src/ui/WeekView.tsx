@@ -147,23 +147,38 @@ function DayColumn({ day, today, movable }: { day: WeekDay; today: ISODate; mova
   )
 }
 
-function Tray({ cards }: { cards: CardData[] }) {
+/**
+ * The Unscheduled drawer above the days: one horizontally scrolling row of compact cards. Its
+ * header button opens and closes it; open or closed, it is the `unscheduled` drop target.
+ */
+function Tray({ cards, open, onToggle }: { cards: CardData[]; open: boolean; onToggle: () => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'unscheduled' })
   return (
-    <section ref={setNodeRef} aria-label="Unscheduled" className={`week-col week-tray${isOver ? ' is-over' : ''}`}>
-      <header>
-        <h3>Unscheduled</h3>
-        <span className="count">{cards.length}</span>
-      </header>
-      <ul className="week-cards">
-        {cards.map((c) => <WeekCard key={c.key} card={c} />)}
-        {cards.length === 0 && <li className="empty">Nothing waiting</li>}
-      </ul>
+    <section ref={setNodeRef} aria-label="Unscheduled" className={`week-tray${open ? ' is-open' : ''}${isOver ? ' is-over' : ''}`}>
+      <h3 className="week-tray-head">
+        <button type="button" className="week-tray-toggle" aria-expanded={open} aria-controls="week-tray-cards" onClick={onToggle}>
+          <svg className="week-tray-chevron" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 3l3 3-3 3" /></svg>
+          Unscheduled <span className="count">{cards.length}</span>
+        </button>
+      </h3>
+      {open && (
+        <ul id="week-tray-cards" className="week-tray-cards">
+          {cards.map((c) => <WeekCard key={c.key} card={c} />)}
+          {cards.length === 0 && <li className="week-tray-empty">Nothing waiting</li>}
+        </ul>
+      )}
     </section>
   )
 }
 
-export default function WeekView({ flow }: { flow: Flow }) {
+interface Props {
+  flow: Flow
+  /** Whether the Unscheduled drawer shows its cards (local setting `weekTrayOpen`). */
+  trayOpen?: boolean
+  onToggleTray?: () => void
+}
+
+export default function WeekView({ flow, trayOpen = true, onToggleTray }: Props) {
   const { data, today, filter } = flow
   const [offset, setOffset] = useState(0)
   const [dragging, setDragging] = useState<DragItem | null>(null)
@@ -198,7 +213,7 @@ export default function WeekView({ flow }: { flow: Flow }) {
       </header>
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
         <div className="week-board">
-          <Tray cards={plan.unscheduled} />
+          <Tray cards={plan.unscheduled} open={trayOpen} onToggle={() => onToggleTray?.()} />
           <div className="week-days">
             {plan.days.map((day) => <DayColumn key={day.date} day={day} today={today} movable={movable} />)}
           </div>

@@ -328,6 +328,37 @@ describe('Week view', () => {
     expect(otherDay).not.toHaveAttribute('aria-roledescription')
   })
 
+  it('puts the Unscheduled drawer above the days; it collapses and is remembered in local settings', async () => {
+    const { user, view, settings, store } = await open()
+    const tray = view.getByRole('region', { name: 'Unscheduled' })
+    const mon = view.getByRole('region', { name: 'Mon 2 Nov' })
+    expect(tray.compareDocumentPosition(mon) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(tray.contains(mon)).toBe(false)
+    const toggle = within(tray).getByRole('button', { name: /^Unscheduled/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(within(tray).getByText('Buy a book')).toBeInTheDocument()
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(within(tray).queryByText('Buy a book')).not.toBeInTheDocument()
+    expect(view.getByRole('region', { name: 'Unscheduled' })).toBeInTheDocument()
+    await waitFor(async () => expect(await settings.get('weekTrayOpen')).toBe(false))
+    expect(Object.values(store.files).some((t) => t.includes('weekTrayOpen'))).toBe(false)
+    await user.click(toggle)
+    expect(within(tray).getByText('Buy a book')).toBeInTheDocument()
+    await waitFor(async () => expect(await settings.get('weekTrayOpen')).toBe(true))
+  })
+
+  it('opens with the drawer collapsed when weekTrayOpen is false', async () => {
+    const store = new MemoryFileStore(seed())
+    const settings = new MemorySettings()
+    await settings.set('weekTrayOpen', false)
+    await settings.set('view', 'week')
+    render(<App store={store} settings={settings} now={() => NOW} />)
+    const tray = within(await screen.findByRole('region', { name: 'Unscheduled' }))
+    await waitFor(() => expect(tray.getByRole('button', { name: /^Unscheduled/ })).toHaveAttribute('aria-expanded', 'false'))
+    expect(tray.queryByText('Buy a book')).not.toBeInTheDocument()
+  })
+
   it('respects the project filter', async () => {
     const { user, view } = await open()
     await user.click(within(screen.getByRole('navigation', { name: 'Sidebar' })).getByRole('button', { name: 'Learn Spanish' }))

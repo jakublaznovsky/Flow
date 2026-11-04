@@ -34,6 +34,7 @@ import Sidebar, { type View } from './Sidebar'
 import type { Settings } from './settings'
 import { useFlow } from './useFlow'
 import { useFocus } from './useFocus'
+import { useStoredFlag } from './useStoredFlag'
 import './theme.css'
 import './board.css'
 
@@ -170,7 +171,7 @@ function useAiSettings(settings: Settings) {
   return { apiKey, model, saveKey, removeKey, setModel }
 }
 
-const COLUMN_IDS: readonly ColumnId[] = ['inbox', 'todo', 'tomorrow', 'today', 'done']
+const COLUMN_IDS: readonly ColumnId[] = ['inbox', 'todo', 'today', 'tomorrow', 'done']
 
 /** Stored `hiddenColumns`, cleaned: known ids only, and never all five (one column always stays visible). */
 export function cleanHiddenColumns(v: unknown): ColumnId[] {
@@ -221,6 +222,8 @@ export default function Board({ store, settings, now, onReady, ai, shortcut }: P
   const viewChosen = useRef(false)
   const aiSettings = useAiSettings(settings)
   const columns = useHiddenColumns(settings)
+  const [doneOpen, toggleDone] = useStoredFlag(settings, 'doneBarOpen', true)
+  const [trayOpen, toggleTray] = useStoredFlag(settings, 'weekTrayOpen', true)
   const todoVisible = !columns.hidden.includes('todo')
   const aiClient = useMemo(() => (aiSettings.apiKey ? (ai ?? createAiClient)(aiSettings.apiKey) : null), [ai, aiSettings.apiKey])
   const [aiRun, setAiRun] = useState<{ id: number; kind: AiKind; prompt: string } | null>(null)
@@ -351,9 +354,11 @@ export default function Board({ store, settings, now, onReady, ai, shortcut }: P
               onFocus={(ref, title) => focus.start(ref, title)}
               focusRef={focus.state?.finished ? null : focus.state?.ref}
               hidden={columns.hidden}
+              doneOpen={doneOpen}
+              onToggleDone={toggleDone}
             />
           ) : view === 'week' ? (
-            <WeekView flow={flow} />
+            <WeekView flow={flow} trayOpen={trayOpen} onToggleTray={toggleTray} />
           ) : view === 'notes' ? (
             <NotesView data={data} apply={apply} initial={filter} />
           ) : view === 'review' ? (

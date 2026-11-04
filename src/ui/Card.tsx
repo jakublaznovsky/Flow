@@ -16,8 +16,8 @@ interface Props {
   column: ColumnId
   projects: { slug: string; title: string }[]
   onToggle: () => void
-  /** `scheduled` is the "Plan for" day, '' for none. */
-  onSave: (patch: { title: string; firstStep: string; project: string; scheduled: string }) => void
+  /** `scheduled` is the "Plan for" day, '' for none; `firstStep` only when the form offered it. */
+  onSave: (patch: { title: string; firstStep?: string; project: string; scheduled: string }) => void
   onDelete: () => void
   /** Today cards only: start a focus session on this task. */
   onFocus?: () => void
@@ -34,6 +34,8 @@ interface Props {
     /** Move the step at `from` to index `to` (drag and drop or Alt+Arrow on its handle). */
     onMove: (from: number, to: number) => void
   }
+  /** Done bar: a small card (checkbox, title, pill, project tag) without the checklist. */
+  compact?: boolean
 }
 
 const reduceMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -164,13 +166,18 @@ function Checklist({ steps, api }: { steps: Step[]; api: NonNullable<Props['step
   )
 }
 
+/** The project name tag: tinted with the project colour, with a coloured dot. */
+function Tag({ title }: { title: string }) {
+  return <span className="tag" title={title}><span className="tag-text">{title}</span></span>
+}
+
 /** Static look-alike of a card, shown in the drag overlay so it can float above every column. */
 export function CardPreview({ card, column }: { card: CardData; column: ColumnId }) {
   const list = card.steps ?? []
   const chip = card.scheduled && column !== 'tomorrow' ? dayParts(card.scheduled) : undefined
   return (
     <div
-      className={`card is-overlay${column === 'done' ? ' is-done' : ''}${card.kind === 'inbox' ? ' is-inbox' : ''}`}
+      className={`card is-overlay${column === 'done' ? ' is-done is-compact' : ''}${card.kind === 'inbox' ? ' is-inbox' : ''}`}
       style={{ '--project': card.color ?? 'var(--border-strong)' } as CSSProperties}
       aria-hidden="true"
     >
@@ -178,14 +185,21 @@ export function CardPreview({ card, column }: { card: CardData; column: ColumnId
       <div className="card-body">
         <div className="card-head">
           <span className="card-title">{card.title}</span>
-          {list.length > 0 && (
-            <div className="steps-ctl"><span className="steps-pill">{list.filter((x) => x.done).length}/{list.length}</span></div>
-          )}
+          {list.length > 0 && <span className="steps-pill">{list.filter((x) => x.done).length}/{list.length}</span>}
         </div>
-        {card.firstStep && <div className="step">{card.firstStep}</div>}
+        {card.kind === 'task' && column !== 'done' && list.length > 0 && (
+          <ul className="steps steps-static">
+            {list.map((st, i) => (
+              <li key={i} className={st.done ? 'is-ticked' : undefined}>
+                <input type="checkbox" tabIndex={-1} readOnly checked={st.done} />
+                <span className="step-text">{st.text}</span>
+              </li>
+            ))}
+          </ul>
+        )}
         {(card.projectTitle || chip) && (
           <div className="card-meta">
-            {card.projectTitle && <span className="tag"><span className="tag-text">{card.projectTitle}</span></span>}
+            {card.projectTitle && <Tag title={card.projectTitle} />}
             {chip && <span className="day-chip">{chip.weekday} {chip.day}</span>}
           </div>
         )}
@@ -194,19 +208,18 @@ export function CardPreview({ card, column }: { card: CardData; column: ColumnId
   )
 }
 
-export default function Card({ card, column, projects, onToggle, onSave, onDelete, onFocus, inFocus, today, onPlan, steps }: Props) {
+export default function Card({ card, column, projects, onToggle, onSave, onDelete, onFocus, inFocus, today, onPlan, steps, compact }: Props) {
   const [editing, setEditing] = useState(false)
-  const [showSteps, setShowSteps] = useState(false)
   const list = card.steps ?? []
   const doneCount = list.filter((x) => x.done).length
-  const next = list.find((x) => !x.done)?.text
   const { setNodeRef, listeners, transform, transition, isDragging } = useSortable({
     id: card.key, data: { column }, disabled: editing,
   })
   const stripe = { '--project': card.color ?? 'var(--border-strong)' } as CSSProperties
   const dragStyle = { ...stripe, transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined, transition }
   const [title, setTitle] = useState(card.title)
-  const [step, setStep] = useState(card.firstStep ?? '')
+  // `first_step` is no longer shown or offered; a task that still has one can clear or copy it here.
+  const [step, setStep] = useState<string | null>(null)
   const [project, setProject] = useState(card.projectSlug ?? '')
   const [planFor, setPlanFor] = useState(card.scheduled ?? '')
   // In the Tomorrow column the day is the column itself; no chip.
@@ -214,10 +227,13 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
   const plan = onPlan && today && card.kind === 'task' && column !== 'done' && column !== 'inbox'
 
   const open = () => {
-    setTitle(card.title); setStep(card.firstStep ?? ''); setProject(card.projectSlug ?? ''); setPlanFor(card.scheduled ?? '')
+    setTitle(card.title); setStep(card.firstStep ?? null); setProject(card.projectSlug ?? ''); setPlanFor(card.scheduled ?? '')
     setEditing(true)
   }
-  const save = () => { onSave({ title, firstStep: step, project, scheduled: planFor }); setEditing(false) }
+  const save = () => {
+    onSave({ title, ...(step !== null ? { firstStep: step } : {}), project, scheduled: planFor })
+    setEditing(false)
+  }
 
   if (editing) {
     return (
@@ -229,7 +245,9 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
           <input autoFocus aria-label={card.kind === 'inbox' ? 'Text' : 'Title'} value={title} onChange={(e) => setTitle(e.target.value)} />
           {card.kind === 'task' && (
             <>
-              <input aria-label="First step" placeholder="First step" value={step} onChange={(e) => setStep(e.target.value)} />
+              {step !== null && (
+                <input aria-label="First step" placeholder="First step" value={step} onChange={(e) => setStep(e.target.value)} />
+              )}
               <select aria-label="Project" value={project} onChange={(e) => setProject(e.target.value)}>
                 {projects.map((p) => <option key={p.slug} value={p.slug}>{p.title}</option>)}
               </select>
@@ -249,9 +267,10 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
       </li>
     )
   }
+  const showFocus = !compact && (inFocus || (onFocus && column === 'today' && card.kind === 'task'))
   return (
     <li
-      className={`card${column === 'done' ? ' is-done' : ''}${card.kind === 'inbox' ? ' is-inbox' : ''}${isDragging ? ' is-dragging' : ''}${inFocus ? ' in-focus' : ''}`}
+      className={`card${column === 'done' ? ' is-done' : ''}${compact ? ' is-compact' : ''}${card.kind === 'inbox' ? ' is-inbox' : ''}${isDragging ? ' is-dragging' : ''}${inFocus ? ' in-focus' : ''}`}
       ref={setNodeRef}
       style={dragStyle}
       {...listeners}
@@ -266,29 +285,15 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
       )}
       <div className="card-body">
         <div className="card-head">
-          <button className="card-title" onClick={open}>
-            {steps && <span className="title-gap" aria-hidden="true" data-pill={list.length > 0 ? `${doneCount}/${list.length}` : undefined} />}
-            {card.title}
-          </button>
-          {steps && (
-            <div className="steps-ctl" onPointerDown={(e) => e.stopPropagation()}>
-              {list.length > 0 && (
-                <span className="steps-pill" aria-label={`${doneCount} of ${list.length} steps done`}>{doneCount}/{list.length}</span>
-              )}
-              <button
-                type="button" className="steps-toggle" aria-expanded={showSteps}
-                aria-label={showSteps ? 'Hide steps' : 'Show steps'} onClick={() => setShowSteps((v) => !v)}
-              >
-                <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4.5l3 3 3-3" /></svg>
-              </button>
-            </div>
+          <button className="card-title" onClick={open}>{card.title}</button>
+          {list.length > 0 && (
+            <span className="steps-pill" aria-label={`${doneCount} of ${list.length} steps done`}>{doneCount}/{list.length}</span>
           )}
         </div>
-        {card.firstStep && <div className="step">{card.firstStep}</div>}
-        {next && !showSteps && <div className="step next-step">Next: {next}</div>}
+        {steps && !compact && <Checklist steps={list} api={steps} />}
         {(card.projectTitle || chip || plan) && (
           <div className="card-meta">
-            {card.projectTitle && <span className="tag" title={card.projectTitle}><span className="tag-text">{card.projectTitle}</span></span>}
+            {card.projectTitle && <Tag title={card.projectTitle} />}
             {chip && <span className="day-chip" aria-label={`Planned for ${chip.weekday} ${chip.day} ${chip.month}`}>{chip.weekday} {chip.day}</span>}
             {plan && (
               // Stop pointer-down so the calendar button never starts a drag.
@@ -298,7 +303,7 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
             )}
           </div>
         )}
-        {(inFocus || (onFocus && column === 'today' && card.kind === 'task')) && (
+        {showFocus && (
           <div className="focus-row">
             {inFocus && <span className="focus-mark">in focus</span>}
             {onFocus && column === 'today' && card.kind === 'task' && (
@@ -307,7 +312,6 @@ export default function Card({ card, column, projects, onToggle, onSave, onDelet
           </div>
         )}
       </div>
-      {steps && showSteps && <Checklist steps={list} api={steps} />}
     </li>
   )
 }
