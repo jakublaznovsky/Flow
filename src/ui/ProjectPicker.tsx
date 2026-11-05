@@ -36,7 +36,6 @@ export default function ProjectPicker({ projects, onChoose, onCreate, onCancel }
   }
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.target !== e.currentTarget) return // keys typed in the name input
     if (e.key === 'ArrowDown') { e.preventDefault(); setIndex((i) => Math.min(i + 1, count - 1)) }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setIndex((i) => Math.max(i - 1, 0)) }
     else if (e.key === 'Enter') { e.preventDefault(); pick(index) }
@@ -55,30 +54,45 @@ export default function ProjectPicker({ projects, onChoose, onCreate, onCancel }
 
   const activeId = naming ? undefined : projects[index] ? `pp-${projects[index].slug}` : index === newIndex ? NEW_ID : undefined
   return (
-    <ul
-      ref={ref}
-      className="project-picker"
-      role="listbox"
-      aria-label="Choose a project"
-      tabIndex={0}
-      aria-activedescendant={activeId}
-      onKeyDown={onKeyDown}
-    >
-      {projects.map((p, i) => (
-        <li
-          key={p.slug}
-          id={`pp-${p.slug}`}
-          role="option"
-          aria-selected={!naming && i === index}
-          className={!naming && i === index ? 'active' : undefined}
-          onMouseEnter={() => { if (!naming) setIndex(i) }}
-          onClick={() => onChoose(p.slug)}
-        >
-          {p.title}
-        </li>
-      ))}
-      {naming ? (
-        <li role="none" className="project-picker-new">
+    <div className="project-picker">
+      <ul
+        ref={ref}
+        className="project-picker-list"
+        role="listbox"
+        aria-label="Choose a project"
+        tabIndex={0}
+        aria-activedescendant={activeId}
+        onKeyDown={onKeyDown}
+      >
+        {projects.map((p, i) => (
+          <li
+            key={p.slug}
+            id={`pp-${p.slug}`}
+            role="option"
+            aria-selected={!naming && i === index}
+            className={!naming && i === index ? 'active' : undefined}
+            onMouseEnter={() => { if (!naming) setIndex(i) }}
+            onClick={() => onChoose(p.slug)}
+          >
+            {p.title}
+          </li>
+        ))}
+        {!naming && (
+          <li
+            id={NEW_ID}
+            role="option"
+            aria-selected={index === newIndex}
+            className={`project-picker-add${index === newIndex ? ' active' : ''}`}
+            onMouseEnter={() => setIndex(newIndex)}
+            onClick={() => pick(newIndex)}
+          >
+            + New project
+          </li>
+        )}
+      </ul>
+      {/* Outside the listbox (which may only own options), in place of the "+ New project" row. */}
+      {naming && (
+        <div className="project-picker-new">
           <input
             type="text"
             aria-label="New project name"
@@ -88,19 +102,8 @@ export default function ProjectPicker({ projects, onChoose, onCreate, onCancel }
             onChange={(e) => setName(e.target.value)}
             onKeyDown={onNameKeyDown}
           />
-        </li>
-      ) : (
-        <li
-          id={NEW_ID}
-          role="option"
-          aria-selected={index === newIndex}
-          className={`project-picker-add${index === newIndex ? ' active' : ''}`}
-          onMouseEnter={() => setIndex(newIndex)}
-          onClick={() => pick(newIndex)}
-        >
-          + New project
-        </li>
+        </div>
       )}
-    </ul>
+    </div>
   )
 }

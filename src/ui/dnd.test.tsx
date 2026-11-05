@@ -1,4 +1,4 @@
-import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { MemoryFileStore } from '../storage/fileStore'
@@ -233,6 +233,8 @@ describe('handleDrop', () => {
     view.rerender(<Picker />)
     const input = screen.getByRole('textbox', { name: 'New project name' })
     expect(input).toHaveFocus()
+    expect(screen.getByRole('listbox')).not.toContainElement(input)
+    expect(within(screen.getByRole('listbox')).queryAllByRole('textbox')).toEqual([])
     await user.keyboard('   {Enter}')
     expect(screen.getByRole('textbox', { name: 'New project name' })).toBeInTheDocument()
     expect(hook.result.current.flow.data!.projects['home']).toBeUndefined()
