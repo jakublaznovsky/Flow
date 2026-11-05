@@ -51,8 +51,8 @@ interface Props {
   shortcut?: ShortcutStatus
 }
 
-/** Columns an inbox item can be promoted into (Tomorrow = To do planned for tomorrow). */
-export type PromoteTo = 'todo' | 'today' | 'tomorrow'
+/** Columns an inbox item can be promoted into (Tomorrow = To do planned for tomorrow; Done = done today). */
+export type PromoteTo = 'todo' | 'today' | 'tomorrow' | 'done'
 
 const mergeChanges = (a: Change, b: Change): Change => ({ data: b.data, changed: [...new Set([...a.changed, ...b.changed])] })
 
@@ -97,10 +97,9 @@ export function handleDrop(
   const { flow, query } = ctx
   if (!flow.data) return
   if (from === 'inbox') {
-    const hasProject = Object.values(flow.data.projects).some((p) => p.status === 'active')
     if (to === 'inbox') reorder(flow, cardKey, from, to, index, cardKey, query)
-    // With no active project there is nothing to pick, so the drop is rejected.
-    else if ((to === 'todo' || to === 'today' || to === 'tomorrow') && hasProject) ctx.openPicker(cardKey.slice('inbox/'.length), to, index)
+    // The picker opens even with no active project: it can create one ("+ New project").
+    else ctx.openPicker(cardKey.slice('inbox/'.length), to, index)
     return
   }
   if (to === 'inbox') {
@@ -116,26 +115,39 @@ export function handleDrop(
   reorder(flow, cardKey, from, to, index, cardKey, query)
 }
 
-/** Picker state and the promotion it performs once a project is chosen. */
+/** Picker state and the promotion it performs once a project is chosen (or created in the picker). */
 export function usePromotion(flow: ReturnType<typeof useFlow>, query = '') {
   const [pending, setPending] = useState<{ itemId: string; to: PromoteTo; index: number } | null>(null)
   const openPicker = (itemId: string, to: PromoteTo, index = Number.MAX_SAFE_INTEGER) =>
     setPending({ itemId, to, index })
-  const choose = (slug: string) => {
+  /** One apply: optionally create the project (`create` = its title), then promote into it. */
+  const promote = (target: { slug: string } | { create: string }) => {
     if (!pending || !flow.data) return
-    const before = new Set(flow.data.projects[slug]?.tasks.map((t) => t.id))
+    const { itemId, to } = pending
+    let slug = 'slug' in target ? target.slug : ''
     let newKey: string | null = null
     flow.apply((d) => {
-      const c = promoteInboxItem(d, pending.itemId, slug, pending.to === 'today' ? 'today' : 'todo', flow.today)
+      let base: Change = { data: d, changed: [] }
+      if ('create' in target) {
+        const created = createProject(d, target.create, flow.today)
+        if (!created.slug) return base
+        slug = created.slug
+        base = created
+      }
+      const before = new Set(base.data.projects[slug]?.tasks.map((t) => t.id))
+      const c = promoteInboxItem(base.data, itemId, slug, to === 'tomorrow' ? 'todo' : to, flow.today)
+      // All or nothing: a project made here only exists together with its promoted task.
+      if (c.changed.length === 0) return { data: d, changed: [] }
       const added = c.data.projects[slug]?.tasks.find((t) => !before.has(t.id))
-      if (c.changed.length > 0 && added) newKey = `${slug}/${added.id}`
+      if (added) newKey = `${slug}/${added.id}`
+      const promoted = mergeChanges(base, c)
       // Tomorrow: the new To do task is planned for the next day in the same save.
-      if (newKey && pending.to === 'tomorrow') return mergeChanges(c, scheduleTask(c.data, newKey, addDays(flow.today, 1), flow.today))
-      return c
+      if (newKey && to === 'tomorrow') return mergeChanges(promoted, scheduleTask(promoted.data, newKey, addDays(flow.today, 1), flow.today))
+      return promoted
     })
     if (newKey) {
       flow.remember(slug)
-      reorder(flow, `inbox/${pending.itemId}`, 'inbox', pending.to, pending.index, newKey, query)
+      reorder(flow, `inbox/${itemId}`, 'inbox', to, pending.index, newKey, query)
     }
     setPending(null)
   }
@@ -143,9 +155,11 @@ export function usePromotion(flow: ReturnType<typeof useFlow>, query = '') {
     ? Object.values(flow.data.projects).filter((p) => p.status === 'active').map((p) => ({ slug: p.slug, title: p.title }))
     : []
   const picker = pending && (
-    <ProjectPicker projects={projects} onChoose={choose} onCancel={() => setPending(null)} />
+    <ProjectPicker projects={projects} onChoose={(slug) => promote({ slug })} onCreate={(title) => promote({ create: title })}
+      onCancel={() => setPending(null)} />
   )
-  return { openPicker, picker, pendingTo: pending?.to ?? null }
+  const label = pending ? (pending.to === 'done' ? 'Done in which project?' : 'Move to which project?') : null
+  return { openPicker, picker, label }
 }
 
 /** Views the app reopens on; Settings and the Weekly review are one-off visits, so the next start opens the Board. */
@@ -353,6 +367,7 @@ export default function Board({ store, settings, now, onReady, ai, shortcut }: P
               flow={flow}
               query={query}
               picker={promotion.picker}
+              pickerLabel={promotion.label ?? undefined}
               onDrop={(args) => handleDrop(args, { flow, openPicker: promotion.openPicker, query })}
               createProject={createProjectNamed}
               addRequest={addRequest}

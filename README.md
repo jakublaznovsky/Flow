@@ -13,6 +13,8 @@ of the Claude buttons (see below).
   **Tomorrow**, with a **Done today** bar underneath. Drag cards between columns and tick them off;
   drop a card on the Done bar to finish it. The bar folds down to one thin line when you want the
   room. Drop a task on the Parking lot to park it (its steps and planned day are kept in the note).
+  Drop a Parking lot note on a column or on the Done bar and pick its project (or make a new one
+  right there with "+ New project"); dropped on Done, it is finished today.
   Tasks in Tomorrow move to Today by themselves the next morning.
 - **Plan a task in two clicks.** The small calendar button on a card offers Today, Tomorrow, the
   next few days, next week or any date. A new task can get a "Plan for" date right away.

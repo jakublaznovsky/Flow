@@ -177,6 +177,25 @@ try {
     console.log('ok: Done bar toggles open again; unticking there reopens the card in Today')
   }
 
+  // --- Parking lot -> Done: the project picker ("Done in which project?") then Done today ---
+  {
+    await page.waitForTimeout(100)
+    const item = col('Parking lot').locator('li.card', { hasText: 'Buy a new notebook' })
+    await drag(page, item, doneBar)
+    const picker = page.getByRole('listbox', { name: 'Choose a project' })
+    await picker.waitFor({ timeout: 3000 })
+    if (!(await page.getByText('Done in which project?').isVisible())) fail('picker label for a Done drop is not "Done in which project?"')
+    await page.waitForTimeout(100) // dnd-kit ignores clicks for 50 ms after a drag
+    await picker.getByRole('option', { name: '+ New project' }).click()
+    await page.getByRole('textbox', { name: 'New project name' }).waitFor({ timeout: 3000 })
+    if (process.env.FLOW_PICKER_SHOT) await page.locator('.picker-wrap').screenshot({ path: process.env.FLOW_PICKER_SHOT })
+    await page.keyboard.press('Escape') // back to the list
+    await picker.getByRole('option').first().click()
+    await doneBar.getByText('Buy a new notebook').waitFor({ timeout: 3000 })
+    if (await col('Parking lot').getByText('Buy a new notebook').count()) fail('item dropped on Done is still in the Parking lot')
+    else console.log('ok: a Parking lot item dropped on the Done bar is done today in the chosen project')
+  }
+
   // --- Tomorrow: drag a To do card into Tomorrow ---
   const todoCard = col('To do').locator('li.card').first()
   const tomorrowTitle = (await todoCard.locator('.card-title').innerText()).trim()
@@ -362,6 +381,16 @@ try {
     await c.screenshot({ path: process.env.FLOW_STEP_SHOT_DARK })
     await dark.keyboard.press('Escape')
     await dark.mouse.up()
+  }
+  if (process.env.FLOW_PICKER_SHOT_DARK) {
+    const dcol = (name) => dark.getByRole('region', { name, exact: true })
+    await drag(dark, dcol('Parking lot').locator('li.card').first(), dcol('Done'))
+    await dark.waitForTimeout(100)
+    await dark.getByRole('option', { name: '+ New project' }).click()
+    await dark.getByRole('textbox', { name: 'New project name' }).fill('Garden')
+    await dark.locator('.picker-wrap').screenshot({ path: process.env.FLOW_PICKER_SHOT_DARK })
+    await dark.keyboard.press('Escape')
+    await dark.keyboard.press('Escape')
   }
 
   console.log('SMOKE OK')

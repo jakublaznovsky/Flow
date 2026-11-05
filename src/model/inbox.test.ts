@@ -69,6 +69,28 @@ describe('promoteInboxItem', () => {
     expect(promoteInboxItem(d, 'zz', 'flow-app', 'todo', T)).toEqual({ data: d, changed: [] })
     expect(promoteInboxItem(d, 'i1', 'nope', 'todo', T)).toEqual({ data: d, changed: [] })
   })
+  it('to done adds the task and completes it today in one change', () => {
+    const r = promoteInboxItem(sample(), 'i1', 'flow-app', 'done', T)
+    expect(r.data.inbox.items.map((i) => i.id)).toEqual(['i2'])
+    const task = r.data.projects['flow-app'].tasks[0]
+    expect(task).toMatchObject({ id: 't1', title: 'Call dentist', status: 'done', done: T })
+    expect(r.data.days[T].done).toEqual([{ ref: 'flow-app/t1', title: 'Call dentist', project: 'Flow app', extra: {} }])
+    expect(r.data.days[T].planned).toEqual([])
+    expect(r.changed).toEqual(['inbox.md', 'projects/flow-app.md', `days/${T}.md`])
+  })
+  it('does nothing when a file it would write failed to parse', () => {
+    for (const [to, path] of [
+      ['todo', 'inbox.md'], ['todo', 'projects/flow-app.md'], ['today', `days/${T}.md`], ['done', 'inbox.md'],
+      ['done', 'projects/flow-app.md'], ['done', `days/${T}.md`],
+    ] as const) {
+      const d = deepFreeze({ ...structuredClone(sample()), skipped: [path] })
+      expect(promoteInboxItem(d, 'i1', 'flow-app', to, T)).toEqual({ data: d, changed: [] })
+    }
+  })
+  it('a skipped day file does not block a To do promotion', () => {
+    const d = deepFreeze({ ...structuredClone(sample()), skipped: [`days/${T}.md`] })
+    expect(promoteInboxItem(d, 'i1', 'flow-app', 'todo', T).changed).toEqual(['inbox.md', 'projects/flow-app.md'])
+  })
 })
 
 describe('editInboxItem', () => {

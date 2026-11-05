@@ -37,6 +37,8 @@ interface Props {
   flow: ReturnType<typeof useFlow>
   query: string
   picker: ReactNode
+  /** Shown beside the picker ("Move to which project?", or "Done in which project?" for a Done drop). */
+  pickerLabel?: string
   onDrop: (args: { cardKey: string; from: ColumnId; to: ColumnId; index: number }) => void
   createProject: (title: string) => string
   /** Set by the `n` shortcut to open "New task" in To do; cleared via onAddHandled. */
@@ -52,7 +54,7 @@ interface Props {
   onToggleDone?: () => void
 }
 
-export default function BoardView({ flow, query, picker, onDrop, createProject, addRequest, onAddHandled, onFocus, focusRef, hidden = [], doneOpen = true, onToggleDone }: Props) {
+export default function BoardView({ flow, query, picker, pickerLabel = 'Move to which project?', onDrop, createProject, addRequest, onAddHandled, onFocus, focusRef, hidden = [], doneOpen = true, onToggleDone }: Props) {
   const { data, today, filter, order, lastProject, remember, apply } = flow
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   // The card being dragged is drawn in a DragOverlay (fixed position, above all columns) so it is
@@ -159,7 +161,7 @@ export default function BoardView({ flow, query, picker, onDrop, createProject, 
     <div className="board-view">
       {picker && (
         <div className="picker-wrap">
-          <span className="picker-label" aria-hidden="true">Move to which project?</span>
+          <span className="picker-label" aria-hidden="true">{pickerLabel}</span>
           {picker}
         </div>
       )}

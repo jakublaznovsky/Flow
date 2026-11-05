@@ -88,6 +88,14 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   focus filter and lastProject cleared. loadFlow never reads `deleted/`.
 - Tomorrow column = no new state: it is `scheduled === today + 1`. Drops onto it schedule tomorrow
   (Done tasks reopen first); Tomorrow → To do clears the date.
+- Promoting a Parking lot item (v0.2.8): dropping it on To do / Today / Tomorrow / the Done bar
+  (open or collapsed) always opens `ProjectPicker` (also with no active project). Label "Move to
+  which project?", or "Done in which project?" for Done. `promoteInboxItem(..., to: 'todo' |
+  'today' | 'done')`: done = addTask + `moveTask(done, today)` (day `done` snapshot); no change if
+  inbox.md, the project or (today/done) the day file is skipped. The picker's last option
+  "+ New project" swaps to an input ("New project name"): Enter (non-blank) runs `createProject` +
+  the promotion in ONE apply (neither happens without the other); Escape there returns to the list
+  (focus on "+ New project"); Escape in the list cancels. Escape/cancel never changes anything.
 - Parking a task: text `<title> — first step: X; steps: a ✓, b; planned: <scheduled ?? planned>`
   (only parts present), task `extra` kept on the item; day files untouched; no change if inbox.md or
   the project file is skipped.

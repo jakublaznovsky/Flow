@@ -1,6 +1,6 @@
 import { INBOX_PATH, dayPath, projectPath, type Change, type FlowData, type ISODate } from './types'
-import { nextInboxId } from './ids'
-import { addTask, deleteTask, findTask } from './tasks'
+import { nextInboxId, nextTaskIdFor } from './ids'
+import { addTask, deleteTask, findTask, moveTask } from './tasks'
 
 const noChange = (d: FlowData): Change => ({ data: d, changed: [] })
 
@@ -28,18 +28,26 @@ export function deleteInboxItem(d: FlowData, id: string): Change {
   return { data: { ...d, inbox }, changed: [INBOX_PATH] }
 }
 
+/**
+ * Turn a Parking lot item into a task in `slug`: in To do, in Today (planned today), or done
+ * today (added, then completed in the same change). Never writes half a move: nothing changes
+ * when inbox.md, the project file or (Today/Done) today's day file failed to parse.
+ */
 export function promoteInboxItem(
-  d: FlowData, id: string, slug: string, to: 'todo' | 'today', today: ISODate,
+  d: FlowData, id: string, slug: string, to: 'todo' | 'today' | 'done', today: ISODate,
 ): Change {
   const item = d.inbox.items.find((i) => i.id === id)
   if (!item || !d.projects[slug]) return noChange(d)
-  const added = addTask(d, slug, item.text, to, today)
+  const writes = [INBOX_PATH, projectPath(slug), ...(to === 'todo' ? [] : [dayPath(today)])]
+  if (writes.some((p) => d.skipped.includes(p))) return noChange(d)
+  const ref = `${slug}/${nextTaskIdFor(d, slug)}`
+  let added = addTask(d, slug, item.text, to === 'today' ? 'today' : 'todo', today)
+  if (added.changed.length === 0) return noChange(d)
+  if (to === 'done') added = moveTask(added.data, ref, 'done', today)
   if (added.changed.length === 0) return noChange(d)
   const inbox = structuredClone(d.inbox)
   inbox.items = inbox.items.filter((i) => i.id !== id)
-  const changed = [INBOX_PATH, projectPath(slug)]
-  if (to === 'today') changed.push(dayPath(today))
-  return { data: { ...added.data, inbox }, changed }
+  return { data: { ...added.data, inbox }, changed: writes }
 }
 
 /**

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { MemoryFileStore } from '../storage/fileStore'
 import { handleDrop, usePromotion } from './Board'
 import { MemorySettings } from './settings'
+import Sidebar from './Sidebar'
 import { useFlow } from './useFlow'
 
 const NOW = new Date(2026, 10, 3, 10, 0)
@@ -40,15 +41,6 @@ describe('handleDrop', () => {
     const { store, ctx } = await harness()
     act(() => handleDrop({ cardKey: 'flow-app/t2', from: 'today', to: 'done', index: 0 }, ctx()))
     await waitFor(() => expect(store.files['days/2026-11-03.md']).toContain('flow-app/t2'))
-  })
-
-  it('rejects an inbox item dropped on Done', async () => {
-    const { store, ctx, hook } = await harness()
-    const before = { ...store.files }
-    act(() => handleDrop({ cardKey: 'inbox/i1', from: 'inbox', to: 'done', index: 0 }, ctx()))
-    expect(store.files).toEqual(before)
-    expect(hook.result.current.flow.order).toEqual({})
-    expect(hook.result.current.promotion.picker).toBeFalsy()
   })
 
   it('a task dropped on the Parking lot is parked there at the drop index', async () => {
@@ -98,15 +90,6 @@ describe('handleDrop', () => {
     // 'h' matches "Third" and "Learn Spanish" (project title) but not "Set up Tauri".
     act(() => handleDrop({ cardKey: 'learn-spanish/t1', from: 'todo', to: 'todo', index: 0 }, { ...ctx(), query: 'h' }))
     expect(hook.result.current.flow.order.todo).toEqual(['flow-app/t1', 'learn-spanish/t1', 'flow-app/t3'])
-  })
-
-  it('rejects an inbox drop on To do when there is no active project', async () => {
-    const files = seed()
-    files['projects/flow-app.md'] = files['projects/flow-app.md'].replace('status: active', 'status: paused')
-    files['projects/learn-spanish.md'] = files['projects/learn-spanish.md'].replace('status: active', 'status: archived')
-    const { ctx, hook } = await harness(files)
-    act(() => handleDrop({ cardKey: 'inbox/i1', from: 'inbox', to: 'today', index: 0 }, ctx()))
-    expect(hook.result.current.promotion.picker).toBeFalsy()
   })
 
   const tomorrowSeed = () => {
@@ -198,5 +181,111 @@ describe('handleDrop', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
     expect(store.files).toEqual(before)
     expect(hook.result.current.flow.order).toEqual({})
+  })
+
+  async function dropInbox(to: 'todo' | 'today' | 'tomorrow' | 'done', files: Record<string, string> = seed()) {
+    const h = await harness(files)
+    const Picker = () => <>{h.hook.result.current.promotion.picker}</>
+    const view = render(<Picker />)
+    act(() => handleDrop({ cardKey: 'inbox/i1', from: 'inbox', to, index: 0 }, h.ctx()))
+    view.rerender(<Picker />)
+    return { ...h, view, Picker, user: userEvent.setup() }
+  }
+
+  it('inbox -> Done asks "Done in which project?", then adds the task done today', async () => {
+    const { store, hook, user } = await dropInbox('done')
+    expect(hook.result.current.promotion.label).toBe('Done in which project?')
+    await user.click(screen.getByRole('option', { name: 'Learn Spanish' }))
+    await waitFor(() => expect(store.files['days/2026-11-03.md']).toContain('learn-spanish/t2'))
+    expect(hook.result.current.flow.data!.projects['learn-spanish'].tasks.at(-1))
+      .toMatchObject({ title: 'Look into podcasts', status: 'done', done: '2026-11-03' })
+    expect(store.files['projects/learn-spanish.md']).toContain('Look into podcasts')
+    expect(store.files['inbox.md']).not.toContain('Look into podcasts')
+    expect(hook.result.current.flow.data!.days['2026-11-03'].done.map((e) => e.ref)).toEqual(['learn-spanish/t2'])
+    expect(hook.result.current.promotion.picker).toBeFalsy()
+  })
+
+  it('Escape on the Done picker leaves the item in the Parking lot', async () => {
+    const { store, hook, view, Picker, user } = await dropInbox('done')
+    expect(screen.getByRole('listbox')).toHaveFocus()
+    const before = { ...store.files }
+    await user.keyboard('{Escape}')
+    view.rerender(<Picker />)
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(store.files).toEqual(before)
+    expect(hook.result.current.flow.data!.inbox.items.map((i) => i.id)).toEqual(['i1'])
+  })
+
+  it('the picker ends with "+ New project", reachable with the arrows', async () => {
+    const { user, hook } = await dropInbox('todo')
+    expect(hook.result.current.promotion.label).toBe('Move to which project?')
+    const options = screen.getAllByRole('option')
+    expect(options.map((o) => o.textContent)).toEqual(['Flow app', 'Learn Spanish', '+ New project'])
+    await user.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}')
+    expect(screen.getByRole('option', { name: '+ New project' })).toHaveAttribute('aria-selected', 'true')
+    await user.keyboard('{ArrowUp}')
+    expect(screen.getByRole('option', { name: 'Learn Spanish' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('inbox -> To do via "+ New project" creates the project with the task in one save', async () => {
+    const { store, hook, view, Picker, user } = await dropInbox('todo')
+    await user.click(screen.getByRole('option', { name: '+ New project' }))
+    view.rerender(<Picker />)
+    const input = screen.getByRole('textbox', { name: 'New project name' })
+    expect(input).toHaveFocus()
+    await user.keyboard('   {Enter}')
+    expect(screen.getByRole('textbox', { name: 'New project name' })).toBeInTheDocument()
+    expect(hook.result.current.flow.data!.projects['home']).toBeUndefined()
+    await user.clear(input)
+    await user.type(input, 'Home{Enter}')
+    await waitFor(() => expect(store.files['projects/home.md']).toContain('Look into podcasts'))
+    const d = hook.result.current.flow.data!
+    expect(d.projects['home']).toMatchObject({ title: 'Home', status: 'active' })
+    expect(d.projects['home'].tasks).toEqual([expect.objectContaining({ id: 't1', title: 'Look into podcasts', status: 'todo' })])
+    expect(store.files['inbox.md']).not.toContain('Look into podcasts')
+    expect(hook.result.current.flow.lastProject).toBe('home')
+    expect(hook.result.current.flow.order.todo?.[0]).toBe('home/t1')
+    expect(hook.result.current.promotion.picker).toBeFalsy()
+    const noop = () => {}
+    render(<Sidebar view="board" onView={noop} projects={Object.values(d.projects).filter((p) => p.status === 'active')}
+      hidden={[]} progress={{}} filter={null} onFilter={noop} onCreate={noop} onUpdate={noop} onDelete={noop} />)
+    expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument()
+  })
+
+  it('inbox -> Done via "+ New project" completes the task today in the new project', async () => {
+    const { store, hook, user } = await dropInbox('done')
+    await user.keyboard('{ArrowUp}{ArrowDown}{ArrowDown}{ArrowDown}{Enter}')
+    await user.keyboard('Errands{Enter}')
+    await waitFor(() => expect(store.files['days/2026-11-03.md']).toContain('errands/t1'))
+    expect(hook.result.current.flow.data!.projects['errands'].tasks[0]).toMatchObject({ status: 'done', done: '2026-11-03' })
+    expect(store.files['projects/errands.md']).toContain('Look into podcasts')
+  })
+
+  it('Escape in the name input returns to the list; Escape again cancels', async () => {
+    const { store, hook, view, Picker, user } = await dropInbox('today')
+    const before = { ...store.files }
+    await user.click(screen.getByRole('option', { name: '+ New project' }))
+    await user.keyboard('Half typed{Escape}')
+    expect(screen.queryByRole('textbox', { name: 'New project name' })).not.toBeInTheDocument()
+    expect(screen.getByRole('listbox')).toHaveFocus()
+    expect(screen.getByRole('option', { name: '+ New project' })).toHaveAttribute('aria-selected', 'true')
+    view.rerender(<Picker />)
+    expect(hook.result.current.promotion.picker).toBeTruthy()
+    await user.keyboard('{Escape}')
+    view.rerender(<Picker />)
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(store.files).toEqual(before)
+    expect(Object.keys(hook.result.current.flow.data!.projects)).toEqual(['flow-app', 'learn-spanish'])
+  })
+
+  it('with no active project the picker opens with only "+ New project"', async () => {
+    const files = seed()
+    files['projects/flow-app.md'] = files['projects/flow-app.md'].replace('status: active', 'status: paused')
+    files['projects/learn-spanish.md'] = files['projects/learn-spanish.md'].replace('status: active', 'status: archived')
+    const { store, user } = await dropInbox('today', files)
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['+ New project'])
+    await user.keyboard('{Enter}New one{Enter}')
+    await waitFor(() => expect(store.files['projects/new-one.md']).toContain('Look into podcasts'))
+    expect(store.files['days/2026-11-03.md']).toContain('new-one/t1')
   })
 })
