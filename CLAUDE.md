@@ -38,6 +38,8 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   menu on To do/Tomorrow/Today cards: scheduleTask), `FocusBar` +
   `useFocus`, `SearchBox`, `AiPanel`; tokens and themes in `theme.css`, styles in `board.css`.
 - `src/shortcut.ts` idempotent global-shortcut registration (injected plugin functions).
+- `tauri-plugin-persisted-scope` (lib.rs, after fs) persists folder access granted via the folder
+  picker, so a Flow folder outside `$HOME` (e.g. on D:) is reopened after a restart without asking.
 - `src/main.tsx` picks the shell: browser or Tauri (main window / capture window).
 - All app logic is TypeScript; Rust (`src-tauri`) only registers plugins.
 

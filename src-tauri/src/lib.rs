@@ -5,6 +5,8 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        // Remembers folders granted via the folder picker (e.g. on D:) across restarts. Must come after fs.
+        .plugin(tauri_plugin_persisted_scope::init())
         .run(tauri::generate_context!())
         .expect("error while building tauri application");
 }

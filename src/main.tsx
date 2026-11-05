@@ -190,7 +190,8 @@ async function renderTauri() {
   root.render(
     <FolderSetup
       onChoose={() => {
-        void open({ directory: true, recursive: true }).then(async (picked) => {
+        // Open at the previously chosen folder (if any) so re-confirming it is one click.
+        void open({ directory: true, recursive: true, ...(folder ? { defaultPath: folder } : {}) }).then(async (picked) => {
           if (typeof picked !== 'string') return
           await settings.set('folder', picked)
           root.unmount()
