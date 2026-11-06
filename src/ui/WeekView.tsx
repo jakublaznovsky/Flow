@@ -1,13 +1,14 @@
-import { useState, type CSSProperties } from 'react'
+import { useRef, useState, type CSSProperties } from 'react'
 import {
   DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors,
   type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import type { Card as CardData } from '../model/board'
-import { addDays, dayParts, weekStart } from '../model/dates'
+import { addDays, dayParts, daysBetween, weekStart } from '../model/dates'
 import { scheduleTask, weekPlan, type WeekDay } from '../model/schedule'
 import { completeOn, findTask, moveTask } from '../model/tasks'
 import type { Change, DoneEntry, FlowData, ISODate } from '../model/types'
+import MonthPicker from './MonthPicker'
 import type { useFlow } from './useFlow'
 
 type Flow = ReturnType<typeof useFlow>
@@ -50,6 +51,52 @@ function weekTitle(start: ISODate): string {
   const s = dayParts(start)
   const e = dayParts(addDays(start, 6))
   return `Week of ${s.day} ${s.month}${s.year !== e.year ? ` ${s.year}` : ''} – ${e.day} ${e.month} ${e.year}`
+}
+
+/**
+ * Sizes the title box for the widest title ("May" is the widest month name, two-digit days, two
+ * years, tabular digits), so the arrows after it never move when the title changes length.
+ */
+const TITLE_SIZER = 'Week of 28 May 2026 – 28 May 2027'
+
+const Chevron = () => (
+  <svg className="week-title-chevron" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4.5l3 3 3-3" /></svg>
+)
+
+/**
+ * The week title as a button opening the month/year picker. The title and an invisible sizer share
+ * one grid cell, so the box is always as wide as the widest title.
+ */
+function WeekTitle({ start, today, onChooseMonth }: { start: ISODate; today: ISODate; onChooseMonth: (first: ISODate) => void }) {
+  const [open, setOpen] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const close = (refocus: boolean) => {
+    setOpen(false)
+    if (refocus) buttonRef.current?.focus()
+  }
+  return (
+    <div className="week-title">
+      <h2>
+        <button
+          ref={buttonRef} type="button" className="week-title-btn" aria-haspopup="dialog" aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+        >
+          <span className="week-title-text">
+            <span>{weekTitle(start)}<Chevron /></span>
+            <span className="week-title-sizer" aria-hidden="true">{TITLE_SIZER}<Chevron /></span>
+          </span>
+        </button>
+      </h2>
+      {open && (
+        <MonthPicker
+          // The shown week's month is the month of its Sunday: a week that contains the 1st of a
+          // month counts as that month, so choosing a month highlights it next time.
+          current={addDays(start, 6)} today={today} anchor={buttonRef} onClose={close}
+          onChoose={(first) => { close(true); onChooseMonth(first) }}
+        />
+      )}
+    </div>
+  )
 }
 
 function CardFace({ card }: { card: CardData }) {
@@ -204,7 +251,11 @@ export default function WeekView({ flow, trayOpen = true, onToggleTray }: Props)
   return (
     <section className="week-view" aria-label="Week">
       <header className="week-head">
-        <h2>{weekTitle(start)}</h2>
+        <WeekTitle
+          start={start} today={today}
+          // The week (Mon–Sun) containing the 1st, kept as an offset from this week.
+          onChooseMonth={(first) => setOffset(Math.round(daysBetween(weekStart(today), weekStart(first)) / 7))}
+        />
         <div className="week-nav">
           <button type="button" className="icon-btn" aria-label="Previous week" onClick={() => setOffset((o) => o - 1)}>‹</button>
           <button type="button" className="btn" onClick={() => setOffset(0)}>This week</button>

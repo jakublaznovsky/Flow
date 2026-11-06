@@ -295,6 +295,46 @@ try {
     }
   }
 
+  // --- Week header: the ‹ button stays put for short and long titles; the month/year picker ---
+  {
+    const prev = week.getByRole('button', { name: 'Previous week' })
+    const next = week.getByRole('button', { name: 'Next week' })
+    const titleBtn = week.locator('.week-title-btn')
+    await week.getByRole('button', { name: 'This week' }).click()
+    const xs = new Map()
+    for (let i = 0; i < 60; i++) { // more than a year ahead: every month, one Dec–Jan week with two years
+      const t = (await titleBtn.innerText()).trim()
+      xs.set(t, (await prev.boundingBox()).x)
+      await next.click()
+    }
+    const titles = [...xs.keys()]
+    const longT = titles.find((t) => /\d{4} – .*\d{4}/.test(t))
+    const shortT = titles.reduce((a, b) => (b.length < a.length ? b : a))
+    const distinct = [...new Set(xs.values())]
+    if (!longT) fail('no Dec–Jan week title in the measured weeks')
+    else if (distinct.length !== 1) fail(`‹ moves with the title: ${distinct.join(', ')} px`)
+    else console.log(`ok: ‹ at x=${distinct[0]} for all ${titles.length} titles ("${shortT}" … "${longT}")`)
+
+    await week.getByRole('button', { name: 'This week' }).click()
+    const before = (await titleBtn.innerText()).trim()
+    await titleBtn.click()
+    const dialog = page.getByRole('dialog', { name: 'Choose month' })
+    await dialog.waitFor({ timeout: 3000 })
+    const nm = await page.evaluate(() => {
+      const d = new Date(); const n = new Date(d.getFullYear(), d.getMonth() + 1, 1)
+      return { label: `${n.toLocaleDateString('en-US', { month: 'long' })} ${n.getFullYear()}`, nextYear: n.getFullYear() !== d.getFullYear() }
+    })
+    if (process.env.FLOW_MONTH_SHOT) await page.screenshot({ path: process.env.FLOW_MONTH_SHOT, clip: { x: 0, y: 0, width: 800, height: 380 } })
+    if (nm.nextYear) await dialog.getByRole('button', { name: 'Next year' }).click()
+    await dialog.getByRole('button', { name: nm.label }).click()
+    await dialog.waitFor({ state: 'detached', timeout: 3000 })
+    const after = (await titleBtn.innerText()).trim()
+    await week.getByRole('button', { name: 'This week' }).click()
+    const back = (await titleBtn.innerText()).trim()
+    if (after === before || back !== before) fail(`month picker: "${before}" → "${after}" → "${back}"`)
+    else console.log(`ok: picked ${nm.label} → "${after}"; This week → "${back}"`)
+  }
+
   // --- Progress (key p): heatmap and "This week" ---
   await key(page, 'p')
   await page.getByRole('heading', { name: 'This week' }).waitFor({ timeout: 3000 })
@@ -390,6 +430,14 @@ try {
     await dark.getByRole('textbox', { name: 'New project name' }).fill('Garden')
     await dark.locator('.picker-wrap').screenshot({ path: process.env.FLOW_PICKER_SHOT_DARK })
     await dark.keyboard.press('Escape')
+    await dark.keyboard.press('Escape')
+  }
+
+  if (process.env.FLOW_MONTH_SHOT_DARK) {
+    await dark.keyboard.press('w')
+    await dark.locator('.week-title-btn').click()
+    await dark.getByRole('dialog', { name: 'Choose month' }).waitFor({ timeout: 3000 })
+    await dark.screenshot({ path: process.env.FLOW_MONTH_SHOT_DARK, clip: { x: 0, y: 0, width: 800, height: 380 } })
     await dark.keyboard.press('Escape')
   }
 

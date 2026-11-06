@@ -555,6 +555,36 @@ input.quick-capture, input.quick-capture:focus {
 .week-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3); }
 .week-head { display: flex; align-items: center; gap: var(--space-4); }
 .week-head h2 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -0.01em; }
+/* The title box is as wide as its widest text, so the arrows after it never move. */
+.week-title { position: relative; flex: none; }
+.week-title-btn {
+  display: inline-flex; align-items: center; margin: 0 0 0 -8px; padding: 4px 8px;
+  background: none; border: 1px solid transparent; border-radius: var(--radius-md);
+  color: var(--text); font: inherit; letter-spacing: inherit; text-align: left; cursor: pointer;
+  transition: background var(--dur) var(--ease);
+}
+.week-title-btn:hover, .week-title-btn[aria-expanded='true'] { background: var(--surface-hover); }
+.week-title-text { display: grid; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.week-title-text > span { grid-area: 1 / 1; display: inline-flex; align-items: center; gap: 6px; }
+.week-title-sizer { visibility: hidden; }
+.week-title-chevron { flex: none; color: var(--text-muted); }
+.month-picker {
+  position: absolute; top: calc(100% + 4px); left: -8px; z-index: 40; width: 232px; padding: var(--space-2) var(--space-3) var(--space-3);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+}
+.month-picker-head { display: flex; align-items: center; gap: 2px; margin-bottom: var(--space-2); }
+.month-picker-year { flex: 1; font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; padding-left: 4px; }
+.month-picker-head .icon-btn { width: 28px; height: 28px; }
+.month-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.month-cell {
+  padding: 8px 0; background: none; border: 1px solid transparent; border-radius: var(--radius-md);
+  color: var(--text); font: inherit; font-size: 13px; cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.month-cell:hover { background: var(--surface-hover); }
+.month-cell.is-today { border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent-text); }
+.month-cell[aria-current='true'] { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.month-cell[aria-current='true']:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .week-nav { display: flex; align-items: center; gap: var(--space-1); }
 .week-nav .btn { padding: 4px 12px; }
 .icon-btn {

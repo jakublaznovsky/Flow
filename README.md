@@ -31,6 +31,7 @@ of the Claude buttons (see below).
 - **Plan your week.** The **Week** view has an Unscheduled drawer across the top (it folds away)
   and seven day columns under it. Drag a task onto a day. When that day comes, the task moves to Today by itself.
   You can move any task freely, Today tasks too; dropping one on a past day marks it done that day.
+  Click the week title to jump to any month and year.
 - **Weekly review.** A short guided review: what you finished, what is unfinished (keep, push to
   next week, send back or delete), a project to focus on next week, and a few words of reflection.
   It is saved in your folder and the chosen project gets a star in the sidebar next week.

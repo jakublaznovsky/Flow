@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { localDate, addDays, weekStart, dayParts, isoWeek } from './dates'
+import { localDate, addDays, weekStart, dayParts, isoWeek, daysBetween } from './dates'
 
 describe('localDate', () => {
   it('formats a date as ISO YYYY-MM-DD in local time', () => {
@@ -64,5 +64,17 @@ describe('isoWeek', () => {
     expect(isoWeek('2027-01-04')).toBe('2027-W01')
     expect(isoWeek('2024-12-30')).toBe('2025-W01')
     expect(isoWeek('2026-01-01')).toBe('2026-W01')
+  })
+})
+
+describe('daysBetween', () => {
+  it('counts calendar days from a to b (negative when b is earlier)', () => {
+    expect(daysBetween('2026-11-02', '2026-11-09')).toBe(7)
+    expect(daysBetween('2026-11-09', '2026-11-02')).toBe(-7)
+    expect(daysBetween('2026-11-02', '2027-03-01')).toBe(119)
+  })
+  it('is not shifted by DST changes', () => {
+    expect(daysBetween('2026-03-23', '2026-03-30')).toBe(7)
+    expect(daysBetween('2026-10-19', '2026-11-02')).toBe(14)
   })
 })

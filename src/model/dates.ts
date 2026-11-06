@@ -42,3 +42,10 @@ export function isoWeek(date: ISODate): string {
   const dayOfYear = Math.round((new Date(y, m - 1, d).getTime() - jan1.getTime()) / 86_400_000)
   return `${y}-W${pad(Math.floor(dayOfYear / 7) + 1)}`
 }
+
+/** Calendar days from a to b (negative when b is earlier). Counted in UTC so DST cannot skew it. */
+export function daysBetween(a: ISODate, b: ISODate): number {
+  const [ay, am, ad] = parse(a)
+  const [by, bm, bd] = parse(b)
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000)
+}
