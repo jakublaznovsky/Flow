@@ -1,4 +1,5 @@
 import { useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import {
   DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors,
   type DragEndEvent, type DragStartEvent,
@@ -223,9 +224,14 @@ interface Props {
   /** Whether the Unscheduled drawer shows its cards (local setting `weekTrayOpen`). */
   trayOpen?: boolean
   onToggleTray?: () => void
+  /**
+   * Where the week header (title + ‹ This week ›) goes: the shell's top bar, on the search box's
+   * line. Without one (or before it mounts) the header renders at the top of the view.
+   */
+  headerSlot?: HTMLElement | null
 }
 
-export default function WeekView({ flow, trayOpen = true, onToggleTray }: Props) {
+export default function WeekView({ flow, trayOpen = true, onToggleTray, headerSlot }: Props) {
   const { data, today, filter } = flow
   const [offset, setOffset] = useState(0)
   const [dragging, setDragging] = useState<DragItem | null>(null)
@@ -248,20 +254,24 @@ export default function WeekView({ flow, trayOpen = true, onToggleTray }: Props)
     if (e.over) handleWeekDrop({ cardKey: ref, target: String(e.over.id) }, { flow, today })
   }
 
+  const header = (
+    <header className="week-head" role="group" aria-label="Week navigation">
+      <WeekTitle
+        start={start} today={today}
+        // The week (Mon–Sun) containing the 1st, kept as an offset from this week.
+        onChooseMonth={(first) => setOffset(Math.round(daysBetween(weekStart(today), weekStart(first)) / 7))}
+      />
+      <div className="week-nav">
+        <button type="button" className="icon-btn" aria-label="Previous week" onClick={() => setOffset((o) => o - 1)}>‹</button>
+        <button type="button" className="btn" onClick={() => setOffset(0)}>This week</button>
+        <button type="button" className="icon-btn" aria-label="Next week" onClick={() => setOffset((o) => o + 1)}>›</button>
+      </div>
+    </header>
+  )
+
   return (
     <section className="week-view" aria-label="Week">
-      <header className="week-head">
-        <WeekTitle
-          start={start} today={today}
-          // The week (Mon–Sun) containing the 1st, kept as an offset from this week.
-          onChooseMonth={(first) => setOffset(Math.round(daysBetween(weekStart(today), weekStart(first)) / 7))}
-        />
-        <div className="week-nav">
-          <button type="button" className="icon-btn" aria-label="Previous week" onClick={() => setOffset((o) => o - 1)}>‹</button>
-          <button type="button" className="btn" onClick={() => setOffset(0)}>This week</button>
-          <button type="button" className="icon-btn" aria-label="Next week" onClick={() => setOffset((o) => o + 1)}>›</button>
-        </div>
-      </header>
+      {headerSlot ? createPortal(header, headerSlot) : header}
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
         <div className="week-board">
           <Tray cards={plan.unscheduled} open={trayOpen} onToggle={() => onToggleTray?.()} />

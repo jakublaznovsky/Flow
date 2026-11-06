@@ -281,6 +281,9 @@ export default function Board({ store, settings, now, onReady, ai, shortcut }: P
     return () => window.removeEventListener('keydown', onKey)
   }, [setView, todoVisible])
 
+  // The top bar's left slot: the project header on the Board, the week header on Week.
+  const [headerSlot, setHeaderSlot] = useState<HTMLDivElement | null>(null)
+
   if (!data) return <div className="app loading"><span className="brand-name">Flow</span></div>
 
   const all = Object.values(data.projects)
@@ -338,7 +341,7 @@ export default function Board({ store, settings, now, onReady, ai, shortcut }: P
       />
       <main className="main">
         <div className="topbar">
-          <div className="header-slot">
+          <div className="header-slot" ref={setHeaderSlot}>
             {showHeader && focused && (
               <ProjectHeader
                 project={focused}
@@ -379,7 +382,7 @@ export default function Board({ store, settings, now, onReady, ai, shortcut }: P
               onToggleDone={toggleDone}
             />
           ) : view === 'week' ? (
-            <WeekView flow={flow} trayOpen={trayOpen} onToggleTray={toggleTray} />
+            <WeekView flow={flow} trayOpen={trayOpen} onToggleTray={toggleTray} headerSlot={headerSlot} />
           ) : view === 'notes' ? (
             <NotesView data={data} apply={apply} initial={filter} />
           ) : view === 'review' ? (

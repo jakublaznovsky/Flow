@@ -297,10 +297,16 @@ try {
 
   // --- Week header: the ‹ button stays put for short and long titles; the month/year picker ---
   {
-    const prev = week.getByRole('button', { name: 'Previous week' })
-    const next = week.getByRole('button', { name: 'Next week' })
-    const titleBtn = week.locator('.week-title-btn')
-    await week.getByRole('button', { name: 'This week' }).click()
+    const weekHead = page.getByRole('group', { name: 'Week navigation' })
+    const hb = await weekHead.boundingBox()
+    const sb = await page.getByRole('search').boundingBox()
+    const inBar = await weekHead.evaluate((el) => !!el.closest('.topbar') && !el.closest('.week-view'))
+    if (!inBar || Math.abs((hb.y + hb.height / 2) - (sb.y + sb.height / 2)) > 4 || hb.x + hb.width > sb.x) fail(`week header not on the search row (head ${JSON.stringify(hb)}, search ${JSON.stringify(sb)})`)
+    else console.log('ok: week header sits in the top bar, left of the search box on its row')
+    const prev = weekHead.getByRole('button', { name: 'Previous week' })
+    const next = weekHead.getByRole('button', { name: 'Next week' })
+    const titleBtn = weekHead.locator('.week-title-btn')
+    await weekHead.getByRole('button', { name: 'This week' }).click()
     const xs = new Map()
     for (let i = 0; i < 60; i++) { // more than a year ahead: every month, one Dec–Jan week with two years
       const t = (await titleBtn.innerText()).trim()
@@ -315,7 +321,7 @@ try {
     else if (distinct.length !== 1) fail(`‹ moves with the title: ${distinct.join(', ')} px`)
     else console.log(`ok: ‹ at x=${distinct[0]} for all ${titles.length} titles ("${shortT}" … "${longT}")`)
 
-    await week.getByRole('button', { name: 'This week' }).click()
+    await weekHead.getByRole('button', { name: 'This week' }).click()
     const before = (await titleBtn.innerText()).trim()
     await titleBtn.click()
     const dialog = page.getByRole('dialog', { name: 'Choose month' })
@@ -329,7 +335,7 @@ try {
     await dialog.getByRole('button', { name: nm.label }).click()
     await dialog.waitFor({ state: 'detached', timeout: 3000 })
     const after = (await titleBtn.innerText()).trim()
-    await week.getByRole('button', { name: 'This week' }).click()
+    await weekHead.getByRole('button', { name: 'This week' }).click()
     const back = (await titleBtn.innerText()).trim()
     if (after === before || back !== before) fail(`month picker: "${before}" → "${after}" → "${back}"`)
     else console.log(`ok: picked ${nm.label} → "${after}"; This week → "${back}"`)

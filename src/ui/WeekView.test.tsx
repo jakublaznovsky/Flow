@@ -51,6 +51,9 @@ const taskOf = (store: MemoryFileStore, path: string, id: string) => {
 
 afterEach(() => vi.useRealTimers())
 
+/** The week header (title + ‹ This week ›), which sits in the shell's top bar. */
+const head = () => within(screen.getByRole('group', { name: 'Week navigation' }))
+
 describe('promotion of scheduled tasks', () => {
   it('on load moves a task scheduled yesterday into Today, clears the date and writes once', async () => {
     const files = seed()
@@ -254,7 +257,7 @@ describe('Week view', () => {
 
   it('shows the week, today marked, scheduled and done tasks, and the Unscheduled tray', async () => {
     const { view } = await open()
-    expect(view.getByRole('heading', { name: 'Week of 2 Nov – 8 Nov 2026' })).toBeInTheDocument()
+    expect(head().getByRole('heading', { name: 'Week of 2 Nov – 8 Nov 2026' })).toBeInTheDocument()
     const days = ['Mon 2 Nov', 'Tue 3 Nov', 'Wed 4 Nov', 'Thu 5 Nov', 'Fri 6 Nov', 'Sat 7 Nov', 'Sun 8 Nov']
     for (const d of days) expect(view.getByRole('region', { name: d })).toBeInTheDocument()
     const wed = view.getByRole('region', { name: 'Wed 4 Nov' })
@@ -273,14 +276,29 @@ describe('Week view', () => {
 
   it('navigates to previous and next weeks and back to this week', async () => {
     const { user, view } = await open()
-    await user.click(view.getByRole('button', { name: 'Next week' }))
-    expect(view.getByRole('heading', { name: 'Week of 9 Nov – 15 Nov 2026' })).toBeInTheDocument()
+    await user.click(head().getByRole('button', { name: 'Next week' }))
+    expect(head().getByRole('heading', { name: 'Week of 9 Nov – 15 Nov 2026' })).toBeInTheDocument()
     expect(view.queryByRole('region', { name: 'Wed 4 Nov' })).not.toBeInTheDocument()
-    await user.click(view.getByRole('button', { name: 'Previous week' }))
-    await user.click(view.getByRole('button', { name: 'Previous week' }))
-    expect(view.getByRole('heading', { name: 'Week of 26 Oct – 1 Nov 2026' })).toBeInTheDocument()
-    await user.click(view.getByRole('button', { name: 'This week' }))
-    expect(view.getByRole('heading', { name: 'Week of 2 Nov – 8 Nov 2026' })).toBeInTheDocument()
+    await user.click(head().getByRole('button', { name: 'Previous week' }))
+    await user.click(head().getByRole('button', { name: 'Previous week' }))
+    expect(head().getByRole('heading', { name: 'Week of 26 Oct – 1 Nov 2026' })).toBeInTheDocument()
+    await user.click(head().getByRole('button', { name: 'This week' }))
+    expect(head().getByRole('heading', { name: 'Week of 2 Nov – 8 Nov 2026' })).toBeInTheDocument()
+  })
+
+  it('puts the week header in the top bar, on the search box\'s line, outside the Week region', async () => {
+    const { view } = await open()
+    const group = screen.getByRole('group', { name: 'Week navigation' })
+    expect(view.queryByRole('group', { name: 'Week navigation' })).toBeNull()
+    const bar = group.closest('.topbar') as HTMLElement
+    expect(bar).not.toBeNull()
+    expect(within(bar).getByRole('searchbox')).toBeInTheDocument()
+    expect(group.compareDocumentPosition(within(bar).getByRole('searchbox')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(group).getByRole('heading', { level: 2, name: 'Week of 2 Nov – 8 Nov 2026' })).toBeInTheDocument()
+    const nav = within(screen.getByRole('navigation', { name: 'Sidebar' }))
+    const userEv = userEvent.setup()
+    await userEv.click(nav.getByRole('button', { name: 'Board' }))
+    expect(screen.queryByRole('group', { name: 'Week navigation' })).toBeNull()
   })
 
   it("today's column also shows what is in Today, muted and labelled", async () => {
@@ -427,14 +445,14 @@ describe('Week month picker', () => {
     await screen.findByText('Buy a book')
     await user.keyboard('w')
     const view = within(await screen.findByRole('region', { name: 'Week' }))
-    const title = view.getByRole('button', { name: 'Week of 2 Nov – 8 Nov 2026' })
+    const title = head().getByRole('button', { name: 'Week of 2 Nov – 8 Nov 2026' })
     return { user, view, title }
   }
   const picker = () => screen.queryByRole('dialog', { name: 'Choose month' })
 
   it('the week title is a button that opens and closes the picker', async () => {
-    const { user, view, title } = await open()
-    expect(view.getByRole('heading', { name: 'Week of 2 Nov – 8 Nov 2026' })).toContainElement(title)
+    const { user, title } = await open()
+    expect(head().getByRole('heading', { name: 'Week of 2 Nov – 8 Nov 2026' })).toContainElement(title)
     expect(title).toHaveAttribute('aria-haspopup', 'dialog')
     expect(title).toHaveAttribute('aria-expanded', 'false')
     expect(picker()).toBeNull()
@@ -451,12 +469,12 @@ describe('Week month picker', () => {
   })
 
   it('highlights the shown week\'s month and marks today\'s month; focus starts on the shown month', async () => {
-    const { user, view, title } = await open()
-    await user.click(view.getByRole('button', { name: 'Next week' }))
-    await user.click(view.getByRole('button', { name: 'Next week' }))
-    await user.click(view.getByRole('button', { name: 'Next week' }))
-    await user.click(view.getByRole('button', { name: 'Next week' })) // 30 Nov – 6 Dec: contains 1 Dec
-    await user.click(view.getByRole('button', { name: 'Week of 30 Nov – 6 Dec 2026' }))
+    const { user, title } = await open()
+    await user.click(head().getByRole('button', { name: 'Next week' }))
+    await user.click(head().getByRole('button', { name: 'Next week' }))
+    await user.click(head().getByRole('button', { name: 'Next week' }))
+    await user.click(head().getByRole('button', { name: 'Next week' })) // 30 Nov – 6 Dec: contains 1 Dec
+    await user.click(head().getByRole('button', { name: 'Week of 30 Nov – 6 Dec 2026' }))
     const dlg = within(picker()!)
     const dec = dlg.getByRole('button', { name: 'December 2026' })
     expect(dec).toHaveAttribute('aria-current', 'true')
@@ -487,23 +505,23 @@ describe('Week month picker', () => {
     await user.click(within(picker()!).getByRole('button', { name: 'Next year' }))
     await user.click(within(picker()!).getByRole('button', { name: 'March 2027' }))
     expect(picker()).toBeNull()
-    const t = view.getByRole('button', { name: 'Week of 1 Mar – 7 Mar 2027' })
+    const t = head().getByRole('button', { name: 'Week of 1 Mar – 7 Mar 2027' })
     expect(t).toHaveFocus()
     expect(view.getByRole('region', { name: 'Mon 1 Mar' })).toBeInTheDocument()
     // Prev/next and This week still work from there.
-    await user.click(view.getByRole('button', { name: 'Previous week' }))
-    expect(view.getByRole('heading', { name: 'Week of 22 Feb – 28 Feb 2027' })).toBeInTheDocument()
-    await user.click(view.getByRole('button', { name: 'This week' }))
-    expect(view.getByRole('heading', { name: 'Week of 2 Nov – 8 Nov 2026' })).toBeInTheDocument()
+    await user.click(head().getByRole('button', { name: 'Previous week' }))
+    expect(head().getByRole('heading', { name: 'Week of 22 Feb – 28 Feb 2027' })).toBeInTheDocument()
+    await user.click(head().getByRole('button', { name: 'This week' }))
+    expect(head().getByRole('heading', { name: 'Week of 2 Nov – 8 Nov 2026' })).toBeInTheDocument()
   })
 
   it('a month whose 1st is a Sunday shows the week ending on it', async () => {
-    const { user, view, title } = await open()
+    const { user, title } = await open()
     await user.click(title)
     await user.click(within(picker()!).getByRole('button', { name: 'Previous year' })) // 2025
     await user.click(within(picker()!).getByRole('button', { name: 'June 2025' })) // Sun 1 Jun 2025
-    expect(view.getByRole('heading', { name: 'Week of 26 May – 1 Jun 2025' })).toBeInTheDocument()
-    await user.click(view.getByRole('button', { name: 'Week of 26 May – 1 Jun 2025' }))
+    expect(head().getByRole('heading', { name: 'Week of 26 May – 1 Jun 2025' })).toBeInTheDocument()
+    await user.click(head().getByRole('button', { name: 'Week of 26 May – 1 Jun 2025' }))
     expect(within(picker()!).getByRole('button', { name: 'June 2025' })).toHaveAttribute('aria-current', 'true')
   })
 
@@ -514,16 +532,16 @@ describe('Week month picker', () => {
     await user.keyboard('{Escape}')
     expect(picker()).toBeNull()
     expect(title).toHaveFocus()
-    expect(view.getByRole('heading', { name: 'Week of 2 Nov – 8 Nov 2026' })).toBeInTheDocument()
+    expect(head().getByRole('heading', { name: 'Week of 2 Nov – 8 Nov 2026' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Week' })).toBeInTheDocument()
     await user.click(title)
     await user.click(view.getByRole('region', { name: 'Mon 2 Nov' }))
     expect(picker()).toBeNull()
-    expect(view.getByRole('heading', { name: 'Week of 2 Nov – 8 Nov 2026' })).toBeInTheDocument()
+    expect(head().getByRole('heading', { name: 'Week of 2 Nov – 8 Nov 2026' })).toBeInTheDocument()
   })
 
   it('keyboard: arrows move between months (across years), Enter and Space choose', async () => {
-    const { user, view, title } = await open()
+    const { user, title } = await open()
     await user.click(title)
     const dlg = within(picker()!)
     expect(dlg.getByRole('button', { name: 'November 2026' })).toHaveFocus()
@@ -537,15 +555,15 @@ describe('Week month picker', () => {
     expect(dlg.getByRole('button', { name: 'March 2027' })).toHaveFocus()
     expect(dlg.getByText('2027')).toBeInTheDocument()
     await user.keyboard('{Enter}')
-    expect(view.getByRole('heading', { name: 'Week of 1 Mar – 7 Mar 2027' })).toBeInTheDocument()
-    const t2 = view.getByRole('button', { name: 'Week of 1 Mar – 7 Mar 2027' })
+    expect(head().getByRole('heading', { name: 'Week of 1 Mar – 7 Mar 2027' })).toBeInTheDocument()
+    const t2 = head().getByRole('button', { name: 'Week of 1 Mar – 7 Mar 2027' })
     expect(t2).toHaveFocus()
     await user.keyboard('{Enter}') // reopens from the title
     expect(within(picker()!).getByRole('button', { name: 'March 2027' })).toHaveFocus()
     await user.keyboard('{ArrowLeft}{ArrowLeft}{ArrowLeft}')
     expect(within(picker()!).getByRole('button', { name: 'December 2026' })).toHaveFocus()
     await user.keyboard(' ')
-    expect(view.getByRole('heading', { name: 'Week of 30 Nov – 6 Dec 2026' })).toBeInTheDocument()
+    expect(head().getByRole('heading', { name: 'Week of 30 Nov – 6 Dec 2026' })).toBeInTheDocument()
   })
 
   it('Tab cycles inside the picker', async () => {

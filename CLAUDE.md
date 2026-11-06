@@ -86,13 +86,18 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   then `FileStore.remove`s the original (never if the copy failed; failures → one log line, project
   stays); only then `deleteProject` (projects.ts) drops it from FlowData. Days/inbox untouched;
   focus filter and lastProject cleared. loadFlow never reads `deleted/`.
-- Week header (v0.2.9): the title is a button (aria-haspopup="dialog") inside the h2; its text shares a
+- Week header (v0.2.9): WeekView portals its header (group "Week navigation": h2 title + ‹ This week ›)
+  into the top bar's left `header-slot` (Board.tsx `headerSlot`), on the search box's row; other
+  views' top bar is unchanged. The title is a button (aria-haspopup="dialog") inside the h2; its text shares a
   grid cell with an invisible sizer (`TITLE_SIZER`, tabular digits) so ‹ This week › never move. It
   opens `MonthPicker` (dialog "Choose month": year with ↑ Previous year / ↓ Next year, 4×3 months,
   aria-label "November 2026"; aria-current = month of the shown week's Sunday, `.is-today` = today's
   month). Choosing a month shows the week containing its 1st (kept as the week `offset`). Arrows move
   (±1/±4, across years), Enter/Space choose, Escape/outside click close, Tab cycles; keys never reach
   app shortcuts while it is open; focus returns to the title.
+- Weekly review (v0.2.9): the card fills the main area (flex column; Back + Next together at its
+  bottom-right). Step 1's seven day boxes fill the card (each list scrolls inside its box); step 2's
+  rows are a responsive grid; steps 3–4 content is at most 900px wide.
 - Tomorrow column = no new state: it is `scheduled === today + 1`. Drops onto it schedule tomorrow
   (Done tasks reopen first); Tomorrow → To do clears the date.
 - Promoting a Parking lot item (v0.2.8): dropping it on To do / Today / Tomorrow / the Done bar

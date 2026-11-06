@@ -58,6 +58,19 @@ describe('WeeklyReview', () => {
     expect(view.getByText('25 min focused')).toBeInTheDocument()
   })
 
+  it('Back and Next sit together at the end of the card, after the step content', async () => {
+    const { user } = await setup()
+    const region = await open(user)
+    const navOf = (name: string) => screen.getByRole('button', { name }).parentElement!
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
+    expect(region.querySelector('.review-card')!.lastElementChild).toBe(navOf('Next'))
+    await next(user)
+    const nav = navOf('Next')
+    expect(navOf('Back')).toBe(nav)
+    expect([...nav.children].map((b) => b.textContent)).toEqual(['Back', 'Next'])
+    expect(region.querySelector('.review-card')!.lastElementChild).toBe(nav)
+  })
+
   it('step 2 lists Today and this week\'s scheduled tasks only; Back returns to step 1', async () => {
     const { user } = await setup()
     await open(user)

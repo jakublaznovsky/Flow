@@ -194,14 +194,14 @@ export default function WeeklyReview({ data, today, apply, onFinish, aiSlot }: P
             </li>
           ))}
         </ol>
-        <div className="review-body">
+        <div className={`review-body review-step-${step + 1}`}>
           {step === 0 && <YourWeek data={data} today={today} />}
           {step === 1 && <Unfinished data={data} today={today} apply={apply} />}
           {step === 2 && <NextWeek data={data} week={week} apply={apply} />}
           {step === 3 && <Reflect data={data} today={today} week={week} apply={apply} aiSlot={aiSlot} />}
         </div>
         <div className="review-nav">
-          {step > 0 ? <button type="button" className="btn" onClick={() => setStep(step - 1)}>Back</button> : <span />}
+          {step > 0 && <button type="button" className="btn" onClick={() => setStep(step - 1)}>Back</button>}
           {step < 3
             ? <button type="button" className="btn primary" onClick={() => setStep(step + 1)}>Next</button>
             : <button type="button" className="btn primary" onClick={onFinish}>Finish</button>}
