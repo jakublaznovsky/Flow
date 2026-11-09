@@ -252,7 +252,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 .tag {
   display: inline-flex; align-items: center; gap: 7px; margin-top: 6px; padding: 3px 10px 3px 8px;
   font-size: 13px; font-weight: 500; line-height: 1.35; color: var(--text);
-  background: color-mix(in srgb, var(--project) 15%, var(--surface));
+  background: color-mix(in srgb, var(--project) 17%, var(--surface));
   border-radius: 999px; max-width: 100%; min-width: 0; box-sizing: border-box;
 }
 .tag-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -594,7 +594,6 @@ input.quick-capture, input.quick-capture:focus {
 }
 .icon-btn:hover { background: var(--surface-hover); color: var(--text); }
 .week-board { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3); }
-.week-days { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-2); }
 .week-col {
   display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: var(--space-2) var(--space-1) var(--space-1);
   background: var(--surface-2); border: 1px solid transparent; border-radius: var(--radius-lg);
@@ -652,6 +651,94 @@ input.quick-capture, input.quick-capture:focus {
 .week-in-today.is-overlay, .week-done.is-overlay { cursor: grabbing; pointer-events: none; box-shadow: var(--shadow-lg); }
 .week-in-today.is-overlay { background: var(--surface); box-shadow: inset 3px 0 0 color-mix(in srgb, var(--project) 55%, transparent), var(--shadow-lg); }
 .week-done.is-overlay { background: var(--surface); border-radius: var(--radius-md); }
+
+/* ---------- Week calendar (time grid) ---------- */
+/*
+ * One scroller: the axis plus 7 day columns. Each column is a subgrid (row 1: header + untimed strip,
+ * sticky; row 2: the 07:00–24:00 grid), so every day's 07:00 line sits at the same height.
+ */
+.week-cal {
+  --hour-px: 48px;
+  --cal-line: color-mix(in srgb, var(--border-strong) 62%, transparent);
+  --col-bg: var(--surface-2);
+  flex: 1; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; position: relative;
+  display: grid; grid-template-columns: 26px repeat(7, minmax(0, 1fr)); grid-template-rows: auto auto;
+  align-content: start; column-gap: var(--space-2); scrollbar-width: thin;
+}
+.week-cal-corner { grid-column: 1; grid-row: 1; position: sticky; top: 0; z-index: 4; background: var(--bg); }
+.cal-axis { grid-column: 1; grid-row: 2; position: relative; height: calc(17 * var(--hour-px)); margin: 10px 0 14px; }
+.cal-hour {
+  position: absolute; right: 3px; transform: translateY(-50%); font-size: 11px; line-height: 1;
+  color: var(--text-muted); font-variant-numeric: tabular-nums;
+}
+.week-cal > .week-col {
+  grid-row: 1 / span 2; display: grid; grid-template-rows: subgrid; padding: 0 var(--space-1);
+  /* Rounds the (square) sticky top at rest; stuck, it stays square so nothing shows past its corners. */
+  overflow: clip; --col-bg: var(--surface-2);
+}
+.week-cal > .week-col.is-today { --col-bg: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--bg); }
+.week-col-top {
+  position: sticky; top: 0; z-index: 3; display: flex; flex-direction: column; min-width: 0;
+  margin: 0 calc(-1 * var(--space-1)); padding: var(--space-2) var(--space-1) 0;
+  background: var(--col-bg);
+  transition: box-shadow var(--dur) var(--ease);
+}
+.week-col-top.is-over { box-shadow: inset 0 0 0 2px var(--accent); }
+.week-strip { flex: 1 1 auto; min-height: 26px; max-height: 128px; padding: 2px 2px var(--space-2); gap: 4px; }
+.week-strip .card.week-card { padding: 5px 7px 5px 10px; font-size: 12.5px; }
+.cal-day {
+  position: relative; margin: 10px 0 14px; touch-action: none;
+  background-image: linear-gradient(to bottom, var(--cal-line) 1px, transparent 1px);
+  background-size: 100% var(--hour-px); box-shadow: 0 1px 0 var(--cal-line);
+}
+.cal-day.is-over { background-color: color-mix(in srgb, var(--accent) 6%, transparent); }
+
+.cal-block { position: absolute; z-index: 1; padding: 1px 2px 1px 1px; min-width: 0; }
+.cal-block-body {
+  height: 100%; overflow: hidden; padding: 3px 6px 3px 9px; border-radius: var(--radius-sm);
+  font-size: 12px; line-height: 1.3; font-weight: 500; color: var(--text); cursor: grab; user-select: none; touch-action: none;
+  background: color-mix(in srgb, var(--project) 17%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--project), var(--shadow-sm);
+  transition: box-shadow var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.cal-block.is-item .cal-block-body, .cal-block.is-item.is-editing::after, .cal-block.is-draft::after {
+  background: color-mix(in srgb, var(--success) 22%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--success), var(--shadow-sm);
+}
+.cal-block-body:hover { box-shadow: inset 3px 0 0 var(--project), var(--shadow-md); }
+.cal-block.is-item .cal-block-body:hover { box-shadow: inset 3px 0 0 var(--success), var(--shadow-md); }
+.cal-block-body:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cal-block-title { display: block; overflow-wrap: break-word; hyphens: auto; }
+.cal-block.is-short .cal-block-body { display: flex; align-items: center; padding-top: 0; padding-bottom: 0; font-size: 11px; line-height: 1.1; }
+.cal-block.is-short .cal-block-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-block-edge { position: absolute; left: 0; right: 0; height: 6px; z-index: 2; cursor: ns-resize; touch-action: none; }
+.cal-block-edge.is-top { top: 0; }
+.cal-block-edge.is-bottom { bottom: 0; }
+.cal-block.is-short .cal-block-edge { height: 3px; }
+.cal-block-delete {
+  position: absolute; top: 4px; right: 5px; z-index: 3; width: 18px; height: 18px; padding: 0;
+  display: grid; place-items: center; border: 0; border-radius: 50%; cursor: pointer;
+  background: color-mix(in srgb, var(--surface) 88%, transparent); color: var(--text-muted);
+  opacity: 0; transition: opacity var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.cal-block.is-short .cal-block-delete { top: 50%; width: 14px; height: 14px; transform: translateY(-50%); }
+.cal-block:hover .cal-block-delete, .cal-block:focus-within .cal-block-delete { opacity: 1; }
+.cal-block-delete:hover { color: var(--danger); }
+.cal-block.is-placeholder { opacity: 0.35; }
+.cal-block.is-ghost { z-index: 5; pointer-events: none; }
+.cal-block.is-ghost .cal-block-body { box-shadow: inset 3px 0 0 var(--project), var(--shadow-lg); cursor: grabbing; }
+.cal-block.is-ghost.is-item .cal-block-body { box-shadow: inset 3px 0 0 var(--success), var(--shadow-lg); }
+.cal-block.is-draft, .cal-block.is-editing { z-index: 4; }
+.cal-block.is-draft::after, .cal-block.is-editing::after {
+  content: ''; position: absolute; inset: 1px 2px 1px 1px; border-radius: var(--radius-sm); pointer-events: none;
+}
+.cal-block.is-draft::after { outline: 1.5px solid var(--success); }
+.cal-block-input {
+  position: relative; z-index: 1; display: block; width: 100%; min-width: 0; margin: 0; padding: 3px 6px 2px 9px;
+  border: 0; outline: none; background: transparent; color: var(--text); font-size: 12px; font-weight: 500; line-height: 1.3;
+}
+.cal-block-input::placeholder { color: var(--text-faint); }
+.week-view.is-gesture, .week-view.is-gesture * { user-select: none; }
 
 /* ---------- Weekly review ---------- */
 /* The card fills the main area (the view's padding around it); long steps scroll the view. */

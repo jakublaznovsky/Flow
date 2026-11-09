@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { boardColumns, searchCards, type Card as CardData, type ColumnId } from '../model/board'
 import { parkTask, promoteInboxItem } from '../model/inbox'
 import { addDays } from '../model/dates'
@@ -22,7 +22,6 @@ import FocusBar from './FocusBar'
 import { nextStep } from '../model/steps'
 import BoardView from './BoardView'
 import ProgressView from './ProgressView'
-import WeekView from './WeekView'
 import NotesPanel from './NotesPanel'
 import NotesView from './NotesView'
 import WeeklyReview from './WeeklyReview'
@@ -37,6 +36,9 @@ import { useFocus } from './useFocus'
 import { useStoredFlag } from './useStoredFlag'
 import './theme.css'
 import './board.css'
+
+// The Week calendar is its own chunk (loaded the first time the Week view opens).
+const WeekView = lazy(() => import('./WeekView'))
 
 /** Handle for host shells (Tauri) to push changes into the board. Returns an optional cleanup. */
 export interface BoardApi { apply: ReturnType<typeof useFlow>['apply']; today: () => string }
@@ -382,7 +384,7 @@ export default function Board({ store, settings, now, onReady, ai, shortcut }: P
               onToggleDone={toggleDone}
             />
           ) : view === 'week' ? (
-            <WeekView flow={flow} trayOpen={trayOpen} onToggleTray={toggleTray} headerSlot={headerSlot} />
+            <Suspense fallback={null}><WeekView flow={flow} trayOpen={trayOpen} onToggleTray={toggleTray} headerSlot={headerSlot} now={clock} /></Suspense>
           ) : view === 'notes' ? (
             <NotesView data={data} apply={apply} initial={filter} />
           ) : view === 'review' ? (

@@ -1,51 +1,48 @@
-import { useRef, useState, type CSSProperties } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors,
-  type DragEndEvent, type DragStartEvent,
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
+  type DragEndEvent, type DragMoveEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import type { Card as CardData } from '../model/board'
+import { itemsOn, splitByTime } from '../model/calendar'
 import { addDays, dayParts, daysBetween, weekStart } from '../model/dates'
-import { scheduleTask, weekPlan, type WeekDay } from '../model/schedule'
-import { completeOn, findTask, moveTask } from '../model/tasks'
-import type { Change, DoneEntry, FlowData, ISODate } from '../model/types'
+import { weekPlan, type WeekDay } from '../model/schedule'
+import { findTask } from '../model/tasks'
+import { GRID_START, minutesToY, parseTime, type TimeBlock } from '../model/timeblock'
+import type { CalendarItem, ISODate } from '../model/types'
+import { HOUR_PX, type BlockData } from './CalendarBlock'
+import { dropTask, stripDropBlock, type WeekTarget } from './calendarDrop'
 import MonthPicker from './MonthPicker'
+import { DayGrid, hitAt, minutesAt, TimeAxis, useGridGestures, type Gestures, type Over } from './TimeGrid'
 import type { useFlow } from './useFlow'
+import WeekStrip, { CardFace, DoneFace, InTodayFace, WeekCard, type DragItem } from './WeekStrip'
 
 type Flow = ReturnType<typeof useFlow>
 
+/** A drop target id (`unscheduled`, `strip-<date>`, `grid-<date>`; `day-<date>` = the strip) as a WeekTarget. */
+function parseTarget(target: string, start?: number): WeekTarget | null {
+  if (target === 'unscheduled') return { kind: 'unscheduled' }
+  const m = /^(day|strip|grid)-(\d{4}-\d{2}-\d{2})$/.exec(target)
+  if (!m) return null
+  if (m[1] === 'grid') return { kind: 'grid', date: m[2], block: stripDropBlock(start ?? GRID_START) }
+  return { kind: 'strip', date: m[2] }
+}
+
 /**
- * A card dropped in the Week view (any task: To do, Today or done):
+ * A card dropped in the Week view (any task: To do, Today or done), applied once (`dropTask`):
  * - a future day → planned for it (a done task is reopened first; a Today task leaves Today);
  * - today's column → straight to Today (a done task is reopened);
  * - a past day → done that day (`completeOn`; a task done elsewhere is re-dated);
  * - `unscheduled` → an undated To do task.
- * Other targets are ignored.
+ * On a day's strip (`strip-`/`day-<date>`) the task has no time; on its grid (`grid-<date>`) it
+ * gets a 1-hour block at `start` (minutes from 00:00). Other targets are ignored.
  */
-export function handleWeekDrop(args: { cardKey: string; target: string }, ctx: { flow: Flow; today: ISODate }): void {
-  const { cardKey: ref, target } = args
+export function handleWeekDrop(args: { cardKey: string; target: string; start?: number }, ctx: { flow: Flow; today: ISODate }): void {
   const { flow, today } = ctx
-  if (!flow.data) return
-  const toTodo = (d: FlowData) => (findTask(d, ref)?.task.status === 'todo' ? { data: d, changed: [] } : moveTask(d, ref, 'todo', today))
-  if (target === 'unscheduled') {
-    flow.apply((d) => chain(d, toTodo, (x) => scheduleTask(x, ref, null, today)))
-    return
-  }
-  const date = /^day-(\d{4}-\d{2}-\d{2})$/.exec(target)?.[1]
-  if (!date) return
-  if (date < today) flow.apply((d) => completeOn(d, ref, date, today))
-  else if (date === today) flow.apply((d) => moveTask(d, ref, 'today', today))
-  else {
-    const reopen = (d: FlowData) => (findTask(d, ref)?.task.status === 'done' ? moveTask(d, ref, 'todo', today) : { data: d, changed: [] })
-    flow.apply((d) => chain(d, reopen, (x) => scheduleTask(x, ref, date, today)))
-  }
-}
-
-/** Two changes in a row as one Change. */
-function chain(d: FlowData, a: (d: FlowData) => Change, b: (d: FlowData) => Change): Change {
-  const first = a(d)
-  const second = b(first.data)
-  return { data: second.data, changed: [...new Set([...first.changed, ...second.changed])] }
+  const target = parseTarget(args.target, args.start)
+  if (!flow.data || !target) return
+  flow.apply((d) => dropTask(d, args.cardKey, target, today))
 }
 
 function weekTitle(start: ISODate): string {
@@ -100,97 +97,47 @@ function WeekTitle({ start, today, onChooseMonth }: { start: ISODate; today: ISO
   )
 }
 
-function CardFace({ card }: { card: CardData }) {
-  return (
-    <>
-      <span className="week-card-title">{card.title}</span>
-      <span className="dot" aria-hidden="true" title={card.projectTitle} style={{ background: card.color }} />
-    </>
-  )
+/** Blocks for one day's grid: timed To do and Today tasks, and week-only items. */
+function dayBlocks(cards: CardData[], items: CalendarItem[], date: ISODate): BlockData[] {
+  const out: BlockData[] = []
+  for (const c of splitByTime(cards).timed) out.push({ kind: 'task', id: c.key, title: c.title, color: c.color, date, block: c.block })
+  for (const i of items) out.push({ kind: 'item', id: i.id, title: i.title, date, block: parseTime(i.time) })
+  return out
 }
 
-/** What is being dragged: the task ref and how the overlay shows it. */
-interface DragItem { ref: string; title: string; color?: string; kind: 'card' | 'today' | 'done' }
-
-function useWeekDrag(id: string, item: DragItem) {
-  return useDraggable({ id, data: item })
+interface DayProps {
+  day: WeekDay
+  today: ISODate
+  items: CalendarItem[]
+  movable: (ref: string, date: ISODate) => boolean
+  over: Over
+  g: Gestures
+  incoming: { title: string; color?: string; block: TimeBlock } | null
 }
 
-function WeekCard({ card }: { card: CardData }) {
-  const { setNodeRef, listeners, attributes, isDragging } = useWeekDrag(card.key, { ref: card.key, title: card.title, color: card.color, kind: 'card' })
-  const style = { '--project': card.color ?? 'var(--border-strong)' } as CSSProperties
-  return (
-    <li
-      ref={setNodeRef} style={style} {...listeners} {...attributes}
-      className={`card week-card${isDragging ? ' is-placeholder' : ''}`}
-    >
-      <CardFace card={card} />
-    </li>
-  )
-}
-
-function InTodayFace({ title }: { title: string }) {
-  return (
-    <>
-      <span className="week-in-today-title">{title}</span>
-      <span className="week-in-today-label">In Today</span>
-    </>
-  )
-}
-
-/** A task in the Today column, shown muted on today's day; it can be dragged to another day. */
-function InTodayItem({ card }: { card: CardData }) {
-  const { setNodeRef, listeners, attributes, isDragging } = useWeekDrag(card.key, { ref: card.key, title: card.title, color: card.color, kind: 'today' })
-  return (
-    <li
-      ref={setNodeRef} {...listeners} {...attributes}
-      className={`week-in-today is-draggable${isDragging ? ' is-placeholder' : ''}`}
-      style={{ '--project': card.color ?? 'var(--border-strong)' } as CSSProperties}
-    >
-      <InTodayFace title={card.title} />
-    </li>
-  )
-}
-
-function DoneFace({ title }: { title: string }) {
-  return (
-    <>
-      <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 6.2l2.3 2.3 4.7-4.9" /></svg>
-      <span>{title}</span>
-    </>
-  )
-}
-
-/** A completed entry whose task still exists in an active project: it can be dragged. */
-function DraggableDone({ entry, date }: { entry: DoneEntry; date: ISODate }) {
-  const { setNodeRef, listeners, attributes, isDragging } = useWeekDrag(`done:${date}:${entry.ref}`, { ref: entry.ref, title: entry.title, kind: 'done' })
-  return (
-    <li ref={setNodeRef} {...listeners} {...attributes} className={`week-done is-done is-draggable${isDragging ? ' is-placeholder' : ''}`}>
-      <DoneFace title={entry.title} />
-    </li>
-  )
-}
-
-function DayColumn({ day, today, movable }: { day: WeekDay; today: ISODate; movable: (ref: string, date: ISODate) => boolean }) {
+/** A day: header and untimed strip on top (they stay in view), its 07:00–24:00 grid below. */
+function DayColumn({ day, today, items, movable, over, g, incoming }: DayProps) {
   const past = day.date < today
   const isToday = day.date === today
-  const { setNodeRef, isOver } = useDroppable({ id: `day-${day.date}` })
   const p = dayParts(day.date)
+  const scheduled = splitByTime(day.scheduled)
+  const inToday = splitByTime(day.inToday)
+  const stripOver = over?.kind === 'strip' && over.date === day.date
+  const isOver = stripOver || (over?.kind === 'grid' && over.date === day.date)
   return (
     <section
-      ref={setNodeRef}
       aria-label={`${p.weekday} ${p.day} ${p.month}`}
       aria-current={isToday ? 'date' : undefined}
       className={`week-col${isToday ? ' is-today' : ''}${past ? ' is-past' : ''}${isOver ? ' is-over' : ''}`}
     >
-      <header><h3>{p.weekday} {p.day}</h3></header>
-      <ul className="week-cards">
-        {day.scheduled.map((c) => <WeekCard key={c.key} card={c} />)}
-        {day.inToday.map((c) => <InTodayItem key={`today-${c.key}`} card={c} />)}
-        {day.done.map((e, i) => movable(e.ref, day.date)
-          ? <DraggableDone key={`done-${e.ref}-${i}`} entry={e} date={day.date} />
-          : <li key={`done-${e.ref}-${i}`} className="week-done is-done"><DoneFace title={e.title} /></li>)}
-      </ul>
+      <WeekStrip
+        date={day.date} header={<header><h3>{p.weekday} {p.day}</h3></header>}
+        scheduled={scheduled.untimed} inToday={inToday.untimed} done={day.done} movable={movable} pointerOver={stripOver}
+      />
+      <DayGrid
+        date={day.date} g={g} incoming={incoming}
+        blocks={dayBlocks([...day.scheduled, ...day.inToday], items, day.date)}
+      />
     </section>
   )
 }
@@ -199,10 +146,9 @@ function DayColumn({ day, today, movable }: { day: WeekDay; today: ISODate; mova
  * The Unscheduled drawer above the days: one horizontally scrolling row of compact cards. Its
  * header button opens and closes it; open or closed, it is the `unscheduled` drop target.
  */
-function Tray({ cards, open, onToggle }: { cards: CardData[]; open: boolean; onToggle: () => void }) {
-  const { setNodeRef, isOver } = useDroppable({ id: 'unscheduled' })
+function Tray({ cards, open, onToggle, over }: { cards: CardData[]; open: boolean; onToggle: () => void; over: boolean }) {
   return (
-    <section ref={setNodeRef} aria-label="Unscheduled" className={`week-tray${open ? ' is-open' : ''}${isOver ? ' is-over' : ''}`}>
+    <section aria-label="Unscheduled" data-drop="unscheduled" className={`week-tray${open ? ' is-open' : ''}${over ? ' is-over' : ''}`}>
       <h3 className="week-tray-head">
         <button type="button" className="week-tray-toggle" aria-expanded={open} aria-controls={open ? 'week-tray-cards' : undefined} onClick={onToggle}>
           <svg className="week-tray-chevron" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 3l3 3-3 3" /></svg>
@@ -229,13 +175,39 @@ interface Props {
    * line. Without one (or before it mounts) the header renders at the top of the view.
    */
   headerSlot?: HTMLElement | null
+  /** The clock (the grid opens scrolled to the current hour). */
+  now?: () => Date
 }
 
-export default function WeekView({ flow, trayOpen = true, onToggleTray, headerSlot }: Props) {
+const sameOver = (a: Over, b: Over) => JSON.stringify(a) === JSON.stringify(b)
+
+export default function WeekView({ flow, trayOpen = true, onToggleTray, headerSlot, now = () => new Date() }: Props) {
   const { data, today, filter } = flow
   const [offset, setOffset] = useState(0)
   const [dragging, setDragging] = useState<DragItem | null>(null)
+  const [dndOver, setDndOver] = useState<Over>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const scroller = useRef<HTMLDivElement>(null)
+  const g = useGridGestures({ apply: flow.apply, today, scroller })
+
+  // On open: the current hour (one hour of context above it) this week, 07:00 otherwise. The
+  // strips stay on top (sticky), so the hour lands just below them.
+  const hasData = data !== null
+  const nowRef = useRef(now)
+  nowRef.current = now
+  useLayoutEffect(() => {
+    const el = scroller.current
+    if (!el) return
+    const t = nowRef.current()
+    const thisWeek = offset === 0
+    const minute = thisWeek ? Math.max(GRID_START, (t.getHours() - 1) * 60) : GRID_START
+    const firstGrid = el.querySelector<HTMLElement>('.cal-day')
+    const top = el.querySelector<HTMLElement>('.week-col-top')
+    const gridTop = firstGrid ? firstGrid.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop : 0
+    el.scrollTop = minute === GRID_START ? 0 : Math.max(0, gridTop - (top?.offsetHeight ?? 0) + minutesToY(minute, HOUR_PX))
+    // Only when the view opens: moving between weeks keeps the scroll position.
+  }, [hasData])
+
   if (!data) return null
 
   const start = addDays(weekStart(today), 7 * offset)
@@ -247,12 +219,33 @@ export default function WeekView({ flow, trayOpen = true, onToggleTray, headerSl
     return !!found && found.project.status === 'active' && found.task.status === 'done' && found.task.done === date
   }
 
+  /** Where a dnd-kit drag (strip, drawer, done entry) is now: the pointer, hit-tested. */
+  const dndTarget = (e: DragMoveEvent | DragEndEvent): Over => {
+    const start = e.activatorEvent as PointerEvent
+    if (typeof start?.clientX !== 'number') return null
+    const x = start.clientX + e.delta.x
+    const y = start.clientY + e.delta.y
+    const hit = hitAt(x, y)
+    if (hit?.kind === 'grid') return { kind: 'grid', date: hit.date, block: stripDropBlock(minutesAt(hit.date, y)) }
+    return hit as Exclude<typeof hit, { kind: 'grid' }>
+  }
   const onDragStart = (e: DragStartEvent) => setDragging((e.active.data.current as DragItem | undefined) ?? null)
+  const onDragMove = (e: DragMoveEvent) => {
+    const next = dndTarget(e)
+    setDndOver((cur) => (sameOver(cur, next) ? cur : next))
+  }
   const onDragEnd = (e: DragEndEvent) => {
     setDragging(null)
+    setDndOver(null)
     const ref = (e.active.data.current as DragItem | undefined)?.ref ?? String(e.active.id)
-    if (e.over) handleWeekDrop({ cardKey: ref, target: String(e.over.id) }, { flow, today })
+    const target = dndTarget(e)
+    if (target) flow.apply((d) => dropTask(d, ref, target, today))
   }
+  const onDragCancel = () => { setDragging(null); setDndOver(null) }
+
+  const over: Over = g.moving?.to ?? dndOver
+  const incoming = (date: ISODate) => (dragging && dndOver?.kind === 'grid' && dndOver.date === date
+    ? { title: dragging.title, color: dragging.color, block: dndOver.block } : null)
 
   const header = (
     <header className="week-head" role="group" aria-label="Week navigation">
@@ -270,29 +263,36 @@ export default function WeekView({ flow, trayOpen = true, onToggleTray, headerSl
   )
 
   return (
-    <section className="week-view" aria-label="Week">
+    <section className={`week-view${g.gesture ? ' is-gesture' : ''}`} aria-label="Week">
       {headerSlot ? createPortal(header, headerSlot) : header}
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
+      <DndContext sensors={sensors} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
         <div className="week-board">
-          <Tray cards={plan.unscheduled} open={trayOpen} onToggle={() => onToggleTray?.()} />
-          <div className="week-days">
-            {plan.days.map((day) => <DayColumn key={day.date} day={day} today={today} movable={movable} />)}
+          <Tray cards={plan.unscheduled} open={trayOpen} onToggle={() => onToggleTray?.()} over={over?.kind === 'unscheduled'} />
+          <div className="week-cal" ref={scroller}>
+            <div className="week-cal-corner" aria-hidden="true" />
+            <TimeAxis />
+            {plan.days.map((day) => (
+              <DayColumn
+                key={day.date} day={day} today={today} items={itemsOn(data, day.date)} movable={movable}
+                over={over} g={g} incoming={incoming(day.date)}
+              />
+            ))}
           </div>
         </div>
+        {/* Over a grid the drop ghost shows where it lands; the floating card would only cover it. */}
         <DragOverlay dropAnimation={null}>
-          {dragging?.kind === 'card' && (
+          {dndOver?.kind !== 'grid' && dragging?.kind === 'card' && (
             <div className="card week-card is-overlay" style={{ '--project': dragging.color ?? 'var(--border-strong)' } as CSSProperties}>
-              <span className="week-card-title">{dragging.title}</span>
-              <span className="dot" aria-hidden="true" style={{ background: dragging.color }} />
+              <CardFace card={dragging} />
             </div>
           )}
-          {dragging?.kind === 'today' && (
+          {dndOver?.kind !== 'grid' && dragging?.kind === 'today' && (
             <div className="week-in-today is-overlay" style={{ '--project': dragging.color ?? 'var(--border-strong)' } as CSSProperties}>
               <InTodayFace title={dragging.title} />
             </div>
           )}
-          {dragging?.kind === 'done' && (
-            <div className="week-done is-done is-overlay"><DoneFace title={dragging.title} /></div>
+          {dndOver?.kind !== 'grid' && dragging?.kind === 'done' && (
+            <div className="week-done is-overlay is-done"><DoneFace title={dragging.title} /></div>
           )}
         </DragOverlay>
       </DndContext>

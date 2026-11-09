@@ -161,6 +161,24 @@ describe('handleWeekDrop', () => {
     expect(taskOf(store, 'projects/flow-app.md', 't2')).toContain('status: todo')
   })
 
+  it('a grid target gives the task a 1-hour block at the drop position, in one save', async () => {
+    const { store, writes, ctx } = await harness()
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: 'grid-2026-11-07', start: 14 * 60 + 5 }, ctx()))
+    await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('time: "14:00-15:00"'))
+    expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('scheduled: 2026-11-07')
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+    expect(writes['projects/learn-spanish.md']).toBe(1)
+  })
+
+  it("a timed Today task dropped on today's strip loses its time", async () => {
+    const files = seed()
+    files['projects/learn-spanish.md'] = project('Learn Spanish', '#30a46c', task('t1', 'Buy a book', 'today', '    planned: 2026-11-04\n    time: "09:00-10:00"\n'))
+    const { store, ctx } = await harness(files)
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: `strip-${T}` }, ctx()))
+    await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't1')).not.toContain('time'))
+    expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('status: today')
+  })
+
   it('ignores unknown targets and unknown cards', async () => {
     const { store, writes, ctx } = await harness()
     const before = { ...store.files }
