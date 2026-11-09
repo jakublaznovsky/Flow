@@ -626,7 +626,7 @@ input.quick-capture, input.quick-capture:focus {
   overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
 }
 .card.week-card { align-items: center; gap: 6px; padding: 7px 8px 7px 11px; font-size: 13px; }
-.week-card-title { flex: 1; min-width: 0; font-weight: 500; line-height: 1.35; overflow-wrap: break-word; hyphens: auto; }
+.week-card-title { flex: 1; min-width: 0; font-weight: 500; line-height: 1.35; overflow-wrap: break-word; }
 .week-card .dot { background: var(--project); }
 .card.week-card.is-placeholder { opacity: 0.4; }
 .week-done {
@@ -708,7 +708,7 @@ input.quick-capture, input.quick-capture:focus {
 .cal-block-body:hover { box-shadow: inset 3px 0 0 var(--project), var(--shadow-md); }
 .cal-block.is-item .cal-block-body:hover { box-shadow: inset 3px 0 0 var(--success), var(--shadow-md); }
 .cal-block-body:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.cal-block-title { display: block; overflow-wrap: break-word; hyphens: auto; }
+.cal-block-title { display: block; overflow-wrap: break-word; }
 .cal-block.is-short .cal-block-body { display: flex; align-items: center; padding-top: 0; padding-bottom: 0; font-size: 11px; line-height: 1.1; }
 .cal-block.is-short .cal-block-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-block-edge { position: absolute; left: 0; right: 0; height: 6px; z-index: 2; cursor: ns-resize; touch-action: none; }

@@ -14,7 +14,11 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 - `node scripts/smoke.mjs` is a Playwright smoke test with real pointer drag-and-drop
   across Board, Week, Progress, Notes, Review, Settings (needs `npm run dev` running; writes
   `docs/screenshot*.png`: board, dark, progress, week). jsdom cannot drive dnd-kit. Board cards are
-  dragged by their title row (the always-open checklist keeps its own pointer events).
+  dragged by their title row (the always-open checklist keeps its own pointer events). Week steps
+  drop on a day's strip (`.week-col-top`) for a day without a time; calendar steps create items by
+  click and drag, resize both edges, move an item to another day, drag a task strip → grid → strip
+  (checked via block aria-labels) and check no time text is visible. `FLOW_NOW=2026-11-12T10:00`
+  pins the page clock to run the weekday-dependent steps.
 
 ## Structure
 
@@ -25,6 +29,8 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   `review-week` (weekly review files, focus project), `plan` (apply Claude's suggested tasks).
   v0.2.3: `moveStep` (steps.ts) reorders a task's checklist; `src/ui/stepDrop.ts` has the pure
   `handleStepDrop` and `stepIds` used by the Checklist in Card.tsx.
+  v0.3.0: `timeblock` (`HH:MM-HH:MM` parse/format, 15-min snap, 07:00–24:00 clamp, overlap
+  lanes), `calendar` (week-only items CRUD incl. cross-week move, `setTaskTime`, `splitByTime`).
   v0.2.1: `boardColumns` puts To do tasks scheduled for tomorrow in the Tomorrow column (not in
   To do); `parkTask` (inbox.ts) turns a task dropped on the Parking lot into an inbox item.
 - `src/storage/` Markdown/frontmatter parsing, `FileStore` interface (`MemoryFileStore`,
@@ -37,6 +43,10 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   local settings), `Sidebar`, `ProjectHeader`, `NotesPanel`, `PlanMenu` (calendar
   menu on To do/Tomorrow/Today cards: scheduleTask), `FocusBar` +
   `useFocus`, `SearchBox`, `AiPanel`; tokens and themes in `theme.css`, styles in `board.css`.
+  Week calendar (v0.3.0): `WeekStrip` (day header + untimed strip, dnd-kit), `TimeGrid` (axis, day
+  grids, pointer gestures: move/resize/create, keys, title inputs), `CalendarBlock` (one block,
+  `HOUR_PX`), pure `calendarDrop` (`dropTask`, `dropItem`, `createItem`, block math, `blockLabel`);
+  WeekView is lazy-loaded inside `QuietBoundary` (a failure → issue log, renders nothing).
 - `src/shortcut.ts` idempotent global-shortcut registration (injected plugin functions).
 - `tauri-plugin-persisted-scope` (lib.rs, after fs) persists folder access granted via the folder
   picker, so a Flow folder outside `$HOME` (e.g. on D:) is reopened after a restart without asking.
@@ -98,6 +108,23 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 - Weekly review (v0.2.9): the card fills the main area (flex column; Back + Next together at its
   bottom-right). Step 1's seven day boxes fill the card (each list scrolls inside its box); step 2's
   rows are a responsive grid; steps 3–4 content is at most 900px wide.
+- Week calendar (v0.3.0): the Week tab is a 07:00–24:00 grid (hour lines, axis 7…24) under each
+  day's untimed strip (tasks with a day but no time, In Today, done history). Task `time:
+  "HH:MM-HH:MM"` (quoted; 15-min multiples; 07:00 ≤ start < end ≤ 24:00) is strict (invalid → file
+  skipped) and omitted when absent; it applies to the task's Week day (`scheduled`, or today for a
+  Today task). Week-only items live in `calendar/YYYY-Www.md` (`week`, `items: [{id, title, date,
+  time}]`, strict, unknown fields kept; a date in another ISO week moves the item to that file in
+  one apply). Time is cleared when the task goes to a strip or Unscheduled (unscheduling always
+  clears it), changes day (except a grid drop with a new time) or is done. Board moves keep it:
+  Today → To do keeps the time, Tomorrow moves pass `keepTime`, a Today task keeps it at rollover.
+  Strip/drawer drops onto the grid start in the 15-min slot under the pointer (floor), 1 hour.
+  Click/drag on empty grid creates an item with an inline title: Enter or blur saves (blank = no
+  item), Escape cancels; double-click/Enter/F2 renames, × or Delete/Backspace deletes a week-only
+  item (task blocks only move/resize). Week-only items show under the project filter. The grid
+  scrolls to the current hour (this week) or 07:00 only when the view first opens. No time text
+  anywhere: a block shows its title; times exist only in its aria-label ("Swim, Thursday 18:00 to
+  19:30"). Times and items never reach Board, Progress, review, AI prompts or search. dnd-kit
+  drops read the real pointer position (its auto-scroll is off; the grid scrolls near its edges).
 - Tomorrow column = no new state: it is `scheduled === today + 1`. Drops onto it schedule tomorrow
   (Done tasks reopen first); Tomorrow → To do clears the date.
 - Promoting a Parking lot item (v0.2.8): dropping it on To do / Today / Tomorrow / the Done bar
