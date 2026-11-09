@@ -109,6 +109,7 @@ describe('Week calendar: layout', () => {
   it('scrolls the grid to the current hour this week, to 07:00 on other weeks', async () => {
     await open()
     const scroller = document.querySelector<HTMLElement>('.week-cal')!
+    expect(scroller.style.getPropertyValue('--hour-px')).toBe(`${HOUR_PX}px`)
     expect(scroller.scrollTop).toBe((14 - 7 - 1) * HOUR_PX)
   })
 })
@@ -140,6 +141,18 @@ describe('Week calendar: week-only items', () => {
     expect(screen.queryByRole('textbox', { name: 'New item title' })).toBeNull()
     await settle()
     expect(store.files['calendar/2026-W45.md']).toBe(before)
+  })
+
+  it('typing in a title input never fires app shortcuts', async () => {
+    const { user } = await open()
+    gesture(grid('Thu 5 Nov'), HOUR_PX)
+    const input = await screen.findByRole('textbox', { name: 'New item title' })
+    await user.type(input, 'bwp')
+    expect(input).toHaveValue('bwp')
+    expect(screen.getByRole('region', { name: 'Week' })).toBeInTheDocument()
+    await user.dblClick(within(grid('Thu 5 Nov')).getByRole('button', { name: /^Swim/ }))
+    await user.type(screen.getByRole('textbox', { name: 'Rename Swim' }), 'b')
+    expect(screen.getByRole('region', { name: 'Week' })).toBeInTheDocument()
   })
 
   it('a drag-created item is saved with the dragged span', async () => {
@@ -208,9 +221,12 @@ describe('Week calendar: project task blocks', () => {
     const spec = within(grid('Fri 6 Nov')).getByRole('button', { name: /^Write spec/ })
     gesture(spec, 2 * HOUR_PX + 10)
     expect(screen.queryByRole('textbox', { name: 'New item title' })).toBeNull()
+    const before = store.files['projects/flow-app.md']
     spec.focus()
     await user.keyboard('{Delete}')
-    expect(within(grid('Fri 6 Nov')).queryByRole('button', { name: 'Delete Write spec' })).toBeNull()
+    await settle()
+    expect(within(grid('Fri 6 Nov')).getByRole('button', { name: 'Write spec, Friday 09:00 to 10:30' })).toBeInTheDocument()
+    expect(store.files['projects/flow-app.md']).toBe(before)
     gesture(spec, 2 * HOUR_PX + 10, [3 * HOUR_PX + 10])
     await waitFor(() => expect(store.files['projects/flow-app.md']).toContain('time: "10:00-11:30"'))
     expect(store.files['projects/flow-app.md']).toContain('scheduled: 2026-11-06')

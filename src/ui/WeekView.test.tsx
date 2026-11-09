@@ -132,7 +132,7 @@ describe('promotion of scheduled tasks', () => {
 describe('handleWeekDrop', () => {
   it('a future day schedules the task and keeps it in To do', async () => {
     const { store, ctx } = await harness()
-    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: 'day-2026-11-07' }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: { kind: 'strip', date: '2026-11-07' } }, ctx()))
     await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('scheduled: 2026-11-07'))
     expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('status: todo')
   })
@@ -141,14 +141,14 @@ describe('handleWeekDrop', () => {
     const files = seed()
     files['projects/learn-spanish.md'] = project('Learn Spanish', '#30a46c', task('t1', 'Buy a book', 'today', '    planned: 2026-11-04\n    time: "09:00-10:00"\n'))
     const { store, ctx } = await harness(files)
-    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: 'unscheduled' }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: { kind: 'unscheduled' } }, ctx()))
     await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('status: todo'))
     expect(taskOf(store, 'projects/learn-spanish.md', 't1')).not.toContain('time')
   })
 
   it("today's column moves the task straight to Today", async () => {
     const { store, ctx } = await harness()
-    act(() => handleWeekDrop({ cardKey: 'flow-app/t2', target: `day-${T}` }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'flow-app/t2', target: { kind: 'strip', date: T } }, ctx()))
     await waitFor(() => expect(taskOf(store, 'projects/flow-app.md', 't2')).toContain('status: today'))
     expect(taskOf(store, 'projects/flow-app.md', 't2')).not.toContain('scheduled')
     expect(store.files[`days/${T}.md`]).toContain('flow-app/t2')
@@ -156,14 +156,14 @@ describe('handleWeekDrop', () => {
 
   it('Unscheduled clears the date', async () => {
     const { store, ctx } = await harness()
-    act(() => handleWeekDrop({ cardKey: 'flow-app/t2', target: 'unscheduled' }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'flow-app/t2', target: { kind: 'unscheduled' } }, ctx()))
     await waitFor(() => expect(taskOf(store, 'projects/flow-app.md', 't2')).not.toContain('scheduled'))
     expect(taskOf(store, 'projects/flow-app.md', 't2')).toContain('status: todo')
   })
 
-  it('a grid target gives the task a 1-hour block at the drop position, in one save', async () => {
+  it('a grid target gives the task its block and day, in one save', async () => {
     const { store, writes, ctx } = await harness()
-    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: 'grid-2026-11-07', start: 14 * 60 + 5 }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: { kind: 'grid', date: '2026-11-07', block: { start: 14 * 60, end: 15 * 60 } } }, ctx()))
     await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('time: "14:00-15:00"'))
     expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('scheduled: 2026-11-07')
     await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
@@ -174,16 +174,15 @@ describe('handleWeekDrop', () => {
     const files = seed()
     files['projects/learn-spanish.md'] = project('Learn Spanish', '#30a46c', task('t1', 'Buy a book', 'today', '    planned: 2026-11-04\n    time: "09:00-10:00"\n'))
     const { store, ctx } = await harness(files)
-    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: `strip-${T}` }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: { kind: 'strip', date: T } }, ctx()))
     await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't1')).not.toContain('time'))
     expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('status: today')
   })
 
-  it('ignores unknown targets and unknown cards', async () => {
+  it('ignores unknown cards', async () => {
     const { store, writes, ctx } = await harness()
     const before = { ...store.files }
-    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: 'somewhere' }, ctx()))
-    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t9', target: 'day-2026-11-03' }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t9', target: { kind: 'strip', date: '2026-11-03' } }, ctx()))
     await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
     expect(store.files).toEqual(before)
     expect(writes).toEqual({})
@@ -199,7 +198,7 @@ describe('handleWeekDrop', () => {
 
   it('a Today task dropped on a future day leaves Today and is planned for that day', async () => {
     const { store, hook, ctx } = await harness(withToday())
-    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t2', target: 'day-2026-11-06' }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t2', target: { kind: 'strip', date: '2026-11-06' } }, ctx()))
     await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't2')).toContain('scheduled: 2026-11-06'))
     expect(taskOf(store, 'projects/learn-spanish.md', 't2')).toContain('status: todo')
     expect(hook.result.current.data!.projects['learn-spanish'].tasks[1].status).toBe('todo')
@@ -207,7 +206,7 @@ describe('handleWeekDrop', () => {
 
   it('a Today task dropped on a past day is done that day', async () => {
     const { store, ctx } = await harness(withToday())
-    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t2', target: 'day-2026-11-03' }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t2', target: { kind: 'strip', date: '2026-11-03' } }, ctx()))
     await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't2')).toContain('status: done'))
     expect(taskOf(store, 'projects/learn-spanish.md', 't2')).toContain('done: 2026-11-03')
     expect(store.files['days/2026-11-03.md']).toContain('ref: learn-spanish/t2')
@@ -216,7 +215,7 @@ describe('handleWeekDrop', () => {
 
   it('a done entry dropped on today reopens the task in Today', async () => {
     const { store, ctx } = await harness()
-    act(() => handleWeekDrop({ cardKey: 'flow-app/t3', target: `day-${T}` }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'flow-app/t3', target: { kind: 'strip', date: T } }, ctx()))
     await waitFor(() => expect(taskOf(store, 'projects/flow-app.md', 't3')).toContain('status: today'))
     expect(taskOf(store, 'projects/flow-app.md', 't3')).not.toContain('done:')
     expect(store.files['days/2026-11-02.md']).not.toContain('flow-app/t3')
@@ -224,7 +223,7 @@ describe('handleWeekDrop', () => {
 
   it('a done entry dropped on a future day reopens it and plans it', async () => {
     const { store, ctx } = await harness()
-    act(() => handleWeekDrop({ cardKey: 'flow-app/t3', target: 'day-2026-11-07' }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'flow-app/t3', target: { kind: 'strip', date: '2026-11-07' } }, ctx()))
     await waitFor(() => expect(taskOf(store, 'projects/flow-app.md', 't3')).toContain('scheduled: 2026-11-07'))
     expect(taskOf(store, 'projects/flow-app.md', 't3')).toContain('status: todo')
     expect(store.files['days/2026-11-02.md']).not.toContain('flow-app/t3')
@@ -232,7 +231,7 @@ describe('handleWeekDrop', () => {
 
   it('a done entry dropped on another past day is re-dated', async () => {
     const { store, ctx } = await harness()
-    act(() => handleWeekDrop({ cardKey: 'flow-app/t3', target: 'day-2026-11-03' }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'flow-app/t3', target: { kind: 'strip', date: '2026-11-03' } }, ctx()))
     await waitFor(() => expect(taskOf(store, 'projects/flow-app.md', 't3')).toContain('done: 2026-11-03'))
     expect(store.files['days/2026-11-03.md']).toContain('ref: flow-app/t3')
     expect(store.files['days/2026-11-02.md']).not.toContain('flow-app/t3')
@@ -240,7 +239,7 @@ describe('handleWeekDrop', () => {
 
   it('an unscheduled task dropped on a past day is done that day', async () => {
     const { store, ctx } = await harness()
-    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: 'day-2026-11-02' }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: { kind: 'strip', date: '2026-11-02' } }, ctx()))
     await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('status: done'))
     expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('done: 2026-11-02')
     expect(store.files['days/2026-11-02.md']).toContain('ref: learn-spanish/t1')
@@ -249,8 +248,8 @@ describe('handleWeekDrop', () => {
 
   it('Unscheduled turns a done or Today task back into an undated To do task', async () => {
     const { store, ctx } = await harness(withToday())
-    act(() => handleWeekDrop({ cardKey: 'flow-app/t3', target: 'unscheduled' }, ctx()))
-    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t2', target: 'unscheduled' }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'flow-app/t3', target: { kind: 'unscheduled' } }, ctx()))
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t2', target: { kind: 'unscheduled' } }, ctx()))
     await waitFor(() => expect(taskOf(store, 'projects/flow-app.md', 't3')).toContain('status: todo'))
     await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't2')).toContain('status: todo'))
     expect(taskOf(store, 'projects/flow-app.md', 't3')).not.toContain('done:')

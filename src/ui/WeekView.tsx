@@ -20,29 +20,17 @@ import WeekStrip, { CardFace, DoneFace, InTodayFace, WeekCard, type DragItem } f
 
 type Flow = ReturnType<typeof useFlow>
 
-/** A drop target id (`unscheduled`, `strip-<date>`, `grid-<date>`; `day-<date>` = the strip) as a WeekTarget. */
-function parseTarget(target: string, start?: number): WeekTarget | null {
-  if (target === 'unscheduled') return { kind: 'unscheduled' }
-  const m = /^(day|strip|grid)-(\d{4}-\d{2}-\d{2})$/.exec(target)
-  if (!m) return null
-  if (m[1] === 'grid') return { kind: 'grid', date: m[2], block: stripDropBlock(start ?? GRID_START) }
-  return { kind: 'strip', date: m[2] }
-}
-
 /**
  * A card dropped in the Week view (any task: To do, Today or done), applied once (`dropTask`):
  * - a future day → planned for it (a done task is reopened first; a Today task leaves Today);
  * - today's column → straight to Today (a done task is reopened);
  * - a past day → done that day (`completeOn`; a task done elsewhere is re-dated);
  * - `unscheduled` → an undated To do task.
- * On a day's strip (`strip-`/`day-<date>`) the task has no time; on its grid (`grid-<date>`) it
- * gets a 1-hour block at `start` (minutes from 00:00). Other targets are ignored.
+ * On a day's strip the task has no time; on its grid it gets the target's block.
  */
-export function handleWeekDrop(args: { cardKey: string; target: string; start?: number }, ctx: { flow: Flow; today: ISODate }): void {
+export function handleWeekDrop(args: { cardKey: string; target: WeekTarget }, ctx: { flow: Flow; today: ISODate }): void {
   const { flow, today } = ctx
-  const target = parseTarget(args.target, args.start)
-  if (!flow.data || !target) return
-  flow.apply((d) => dropTask(d, args.cardKey, target, today))
+  if (flow.data) flow.apply((d) => dropTask(d, args.cardKey, args.target, today))
 }
 
 function weekTitle(start: ISODate): string {
@@ -239,7 +227,7 @@ export default function WeekView({ flow, trayOpen = true, onToggleTray, headerSl
     setDndOver(null)
     const ref = (e.active.data.current as DragItem | undefined)?.ref ?? String(e.active.id)
     const target = dndTarget(e)
-    if (target) flow.apply((d) => dropTask(d, ref, target, today))
+    if (target) handleWeekDrop({ cardKey: ref, target }, { flow, today })
   }
   const onDragCancel = () => { setDragging(null); setDndOver(null) }
 
@@ -268,7 +256,7 @@ export default function WeekView({ flow, trayOpen = true, onToggleTray, headerSl
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
         <div className="week-board">
           <Tray cards={plan.unscheduled} open={trayOpen} onToggle={() => onToggleTray?.()} over={over?.kind === 'unscheduled'} />
-          <div className="week-cal" ref={scroller}>
+          <div className="week-cal" ref={scroller} style={{ '--hour-px': `${HOUR_PX}px` } as CSSProperties}>
             <div className="week-cal-corner" aria-hidden="true" />
             <TimeAxis />
             {plan.days.map((day) => (

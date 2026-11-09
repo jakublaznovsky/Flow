@@ -252,7 +252,7 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 .tag {
   display: inline-flex; align-items: center; gap: 7px; margin-top: 6px; padding: 3px 10px 3px 8px;
   font-size: 13px; font-weight: 500; line-height: 1.35; color: var(--text);
-  background: color-mix(in srgb, var(--project) 17%, var(--surface));
+  background: color-mix(in srgb, var(--project) 15%, var(--surface));
   border-radius: 999px; max-width: 100%; min-width: 0; box-sizing: border-box;
 }
 .tag-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -656,9 +656,9 @@ input.quick-capture, input.quick-capture:focus {
 /*
  * One scroller: the axis plus 7 day columns. Each column is a subgrid (row 1: header + untimed strip,
  * sticky; row 2: the 07:00–24:00 grid), so every day's 07:00 line sits at the same height.
+ * --hour-px is set inline from HOUR_PX (CalendarBlock.tsx).
  */
 .week-cal {
-  --hour-px: 48px;
   --cal-line: color-mix(in srgb, var(--border-strong) 62%, transparent);
   --col-bg: var(--surface-2);
   flex: 1; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; position: relative;

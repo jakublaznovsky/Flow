@@ -3,7 +3,7 @@ import { minutesToY, type TimeBlock } from '../model/timeblock'
 import type { ISODate } from '../model/types'
 import { blockLabel } from './calendarDrop'
 
-/** Height of one hour in the Week grid, in px (also `--hour-px` in board.css). */
+/** Height of one hour in the Week grid, in px (set as `--hour-px` on .week-cal, used by board.css). */
 export const HOUR_PX = 48
 
 /** A block in the Week grid: a timed project task or a week-only item. */

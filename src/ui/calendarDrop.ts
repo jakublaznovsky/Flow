@@ -33,9 +33,9 @@ export function spanBlock(a: number, b: number): TimeBlock {
   return { start, end: Math.max(start + SNAP, ceilSlot(hi)) }
 }
 
-/** An untimed task dropped into the grid: one hour at the (snapped) drop position. */
+/** A task dropped into the grid from a strip or the drawer: one hour from the slot under the pointer (as a click). */
 export function stripDropBlock(min: number): TimeBlock {
-  return placeAt(min)
+  return clickBlock(min)
 }
 
 /** A block dragged to start at `start`: same length, snapped and kept inside the grid. */

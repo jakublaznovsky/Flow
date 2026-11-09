@@ -52,8 +52,10 @@ describe('block math', () => {
     expect(spanBlock(300, 450)).toEqual({ start: 420, end: 450 })
   })
 
-  it('a strip drop gives a 1-hour block at the snapped drop position, shifted up before 24:00', () => {
+  it('a strip drop gives a 1-hour block from the 15-minute slot under the pointer, shifted up before 24:00', () => {
     expect(stripDropBlock(14 * 60 + 5)).toEqual({ start: 840, end: 900 })
+    expect(stripDropBlock(14 * 60 + 14)).toEqual({ start: 840, end: 900 })
+    expect(stripDropBlock(6 * 60)).toEqual({ start: 420, end: 480 })
     expect(stripDropBlock(23 * 60 + 30)).toEqual({ start: 1380, end: 1440 })
   })
 
@@ -142,12 +144,11 @@ describe('dropTask', () => {
     expect(t(today.data, 't3').time).toBeUndefined()
   })
 
-  it('a timed task moved to Today by a drop on today\'s strip loses its old time', () => {
-    const d = sample()
-    const timed = { ...d, projects: { a: { ...d.projects.a, tasks: d.projects.a.tasks.map((x) => (x.id === 't1' ? { ...x, scheduled: '2026-11-13' } : x)) } } }
-    const c = dropTask(timed, 'a/t1', { kind: 'strip', date: T }, T)
+  it("a timed To do task dropped on today's strip goes to Today without its time", () => {
+    const c = dropTask(sample(), 'a/t1', { kind: 'strip', date: T }, T)
     expect(t(c.data, 't1')).toMatchObject({ status: 'today' })
     expect(t(c.data, 't1').time).toBeUndefined()
+    expect(t(c.data, 't1').scheduled).toBeUndefined()
   })
 
   it('Unscheduled → strip sets the day only; Unscheduled → grid sets day and time', () => {

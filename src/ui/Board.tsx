@@ -35,6 +35,7 @@ import { useFlow } from './useFlow'
 import { useFocus } from './useFocus'
 import { useStoredFlag } from './useStoredFlag'
 import './theme.css'
+import QuietBoundary from './QuietBoundary'
 import './board.css'
 
 // The Week calendar is its own chunk (loaded the first time the Week view opens).
@@ -384,7 +385,9 @@ export default function Board({ store, settings, now, onReady, ai, shortcut }: P
               onToggleDone={toggleDone}
             />
           ) : view === 'week' ? (
-            <Suspense fallback={null}><WeekView flow={flow} trayOpen={trayOpen} onToggleTray={toggleTray} headerSlot={headerSlot} now={clock} /></Suspense>
+            <QuietBoundary onError={(e) => void logIssue(store, 'week view', `could not be shown: ${e instanceof Error ? e.message : String(e)}`)}>
+              <Suspense fallback={null}><WeekView flow={flow} trayOpen={trayOpen} onToggleTray={toggleTray} headerSlot={headerSlot} now={clock} /></Suspense>
+            </QuietBoundary>
           ) : view === 'notes' ? (
             <NotesView data={data} apply={apply} initial={filter} />
           ) : view === 'review' ? (
