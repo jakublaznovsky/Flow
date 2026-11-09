@@ -56,11 +56,11 @@ export type PromoteTo = 'todo' | 'today' | 'tomorrow' | 'done'
 
 const mergeChanges = (a: Change, b: Change): Change => ({ data: b.data, changed: [...new Set([...a.changed, ...b.changed])] })
 
-/** Plan a task for tomorrow (a Done task is first reopened in To do); one Change. */
+/** Plan a task for tomorrow (a Done task is first reopened in To do); one Change. Board moves keep a Week time. */
 function planTomorrow(d: FlowData, ref: string, today: string): Change {
   const found = findTask(d, ref)
   const reopened = found?.task.status === 'done' ? moveTask(d, ref, 'todo', today) : { data: d, changed: [] }
-  return mergeChanges(reopened, scheduleTask(reopened.data, ref, addDays(today, 1), today))
+  return mergeChanges(reopened, scheduleTask(reopened.data, ref, addDays(today, 1), today, { keepTime: true }))
 }
 
 export interface DropContext {
@@ -110,7 +110,7 @@ export function handleDrop(
     return
   }
   if (to === 'tomorrow' && from !== 'tomorrow') flow.apply((d) => planTomorrow(d, cardKey, flow.today))
-  else if (from === 'tomorrow' && to === 'todo') flow.apply((d) => scheduleTask(d, cardKey, null, flow.today))
+  else if (from === 'tomorrow' && to === 'todo') flow.apply((d) => scheduleTask(d, cardKey, null, flow.today, { keepTime: true }))
   else if (to !== from) flow.apply((d) => moveTask(d, cardKey, to === 'tomorrow' ? 'todo' : to, flow.today))
   reorder(flow, cardKey, from, to, index, cardKey, query)
 }

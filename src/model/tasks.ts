@@ -103,6 +103,8 @@ export function moveTask(d: FlowData, ref: string, to: TaskStatus, today: ISODat
     planOn(touch(today), ref)
   } else if (to === 'done') {
     task.done = today
+    // A Week-grid time belongs to an open task; completing it removes the time.
+    delete task.time
     const day = touch(today)
     if (!day.done.some((e) => e.ref === ref)) day.done.push({ ref, title: task.title, project: project.title, extra: {} })
   }
@@ -133,7 +135,7 @@ export function changeTaskProject(d: FlowData, ref: string, toSlug: string): Cha
 
 /**
  * Mark a task done on `date` (today or earlier; a later date changes nothing): status done,
- * `done: date`, `scheduled` cleared, a snapshot on that day's done list (no duplicate). A task
+ * `done: date`, `scheduled` and `time` cleared, a snapshot on that day's done list (no duplicate). A task
  * already done on another day is re-dated: its snapshot leaves that day. Planned lists are history
  * and stay as they are. No change when a file it would write was skipped.
  */
@@ -144,7 +146,7 @@ export function completeOn(d: FlowData, ref: string, date: ISODate, today: ISODa
   const slug = found.project.slug
   const target = d.days[date]
   const snapshotThere = !!target?.done.some((e) => e.ref === ref)
-  if (src.status === 'done' && src.done === date && src.scheduled === undefined && snapshotThere) return noChange(d)
+  if (src.status === 'done' && src.done === date && src.scheduled === undefined && src.time === undefined && snapshotThere) return noChange(d)
   const oldDate = src.status === 'done' && src.done && src.done !== date ? src.done : undefined
   const oldDay = oldDate && d.days[oldDate]?.done.some((e) => e.ref === ref) ? oldDate : undefined
   const paths = [projectPath(slug), dayPath(date), ...(oldDay ? [dayPath(oldDay)] : [])]
@@ -155,6 +157,7 @@ export function completeOn(d: FlowData, ref: string, date: ISODate, today: ISODa
   task.status = 'done'
   task.done = date
   delete task.scheduled
+  delete task.time
   const days: Record<ISODate, Day> = {}
   const changed = [projectPath(slug)]
   if (!snapshotThere) {

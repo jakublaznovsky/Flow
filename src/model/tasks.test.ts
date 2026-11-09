@@ -343,3 +343,28 @@ describe('completeOn guards', () => {
     expect(c).toEqual({ data: d, changed: [] })
   })
 })
+
+describe('task time (Week grid) clearing rules', () => {
+  const timed = (status: Task['status'], more: Partial<Task> = {}): FlowData => {
+    const d = structuredClone(sample())
+    Object.assign(d.projects['flow-app'].tasks[0], { status, time: '09:00-10:00', ...more })
+    return deepFreeze(d)
+  }
+  const t1 = (d: FlowData) => d.projects['flow-app'].tasks[0]
+  it('Board moves between To do and Today keep the time', () => {
+    expect(t1(moveTask(timed('todo'), 'flow-app/t1', 'today', T).data).time).toBe('09:00-10:00')
+    expect(t1(moveTask(timed('today', { planned: T }), 'flow-app/t1', 'todo', T).data).time).toBe('09:00-10:00')
+  })
+  it('completing a task removes its time', () => {
+    expect('time' in t1(moveTask(timed('today', { planned: T }), 'flow-app/t1', 'done', T).data)).toBe(false)
+    expect('time' in t1(moveTask(timed('todo', { scheduled: '2026-11-06' }), 'flow-app/t1', 'done', T).data)).toBe(false)
+  })
+  it('completeOn removes the time, also on a task already done that day', () => {
+    expect('time' in t1(completeOn(timed('todo', { scheduled: '2026-11-03' }), 'flow-app/t1', '2026-11-02', T).data)).toBe(false)
+    const d = structuredClone(timed('done', { done: '2026-11-02' }))
+    d.days['2026-11-02'] = { date: '2026-11-02', planned: [], focus: [], body: '', extra: {}, done: [{ ref: 'flow-app/t1', title: 'Write spec', project: 'Flow app', extra: {} }] }
+    const c = completeOn(deepFreeze(d), 'flow-app/t1', '2026-11-02', T)
+    expect(c.changed).toEqual(['projects/flow-app.md'])
+    expect('time' in t1(c.data)).toBe(false)
+  })
+})

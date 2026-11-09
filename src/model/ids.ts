@@ -54,6 +54,11 @@ export function nextInboxId(items: { id: string }[]): string {
   return nextNumericId('i', items)
 }
 
+/** Next week-only calendar item id (`c1`, `c2`, …) past the given ones. */
+export function nextCalendarItemId(items: { id: string }[]): string {
+  return nextNumericId('c', items)
+}
+
 export const PROJECT_COLORS: string[] = [
   '#e5484d', '#f76b15', '#f5a524', '#30a46c',
   '#0091ff', '#8e4ec6', '#d6409f', '#12a594',

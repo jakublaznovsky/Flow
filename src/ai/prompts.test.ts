@@ -81,3 +81,21 @@ describe('buildPlanPrompt', () => {
     expect(q).toContain('## Active projects\n\nNone.')
   })
 })
+
+describe('Week calendar data stays out of AI prompts', () => {
+  it('neither prompt contains a calendar item title or a time string', () => {
+    const d = sample()
+    d.projects.alpha.tasks[1].time = '09:00-10:30'
+    d.projects.alpha.tasks[3].time = '14:15-15:45'
+    d.calendar['2026-W45'] = { week: '2026-W45', body: '', extra: {}, items: [
+      { id: 'c1', title: 'Swimming lesson', date: '2026-11-04', time: '18:00-19:30', extra: {} },
+      { id: 'c2', title: 'Dentist visit', date: '2026-11-05', time: '08:00-08:30', extra: {} },
+    ] }
+    for (const prompt of [buildReviewPrompt(d, TODAY), buildPlanPrompt(d, TODAY)]) {
+      for (const text of ['Swimming lesson', 'Dentist visit', '09:00-10:30', '14:15-15:45', '18:00-19:30', '08:00-08:30']) {
+        expect(prompt).not.toContain(text)
+      }
+      expect(prompt).not.toMatch(/\d{2}:\d{2}-\d{2}:\d{2}/)
+    }
+  })
+})

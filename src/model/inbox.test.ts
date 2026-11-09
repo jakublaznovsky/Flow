@@ -145,6 +145,15 @@ describe('parkTask', () => {
     expect(done.data.days).toEqual(d.days)
     expect(done.changed).toEqual(['projects/flow-app.md', 'inbox.md'])
   })
+  it('drops the task time: not in the text, not in the item', () => {
+    const d = structuredClone(withTasks())
+    d.projects['flow-app'].tasks[1].time = '09:00-10:30'
+    const r = parkTask(deepFreeze(d), 'flow-app/t2', T)
+    const item = r.data.inbox.items.at(-1)!
+    expect(item.text).toBe('Rich — first step: open doc; steps: a ✓, b; planned: 2026-11-09')
+    expect(item.extra).toEqual({ keep: 1 })
+    expect(JSON.stringify(r.data)).not.toContain('09:00-10:30')
+  })
   it('is a no-op for an unknown ref', () => {
     const d = withTasks()
     const r = parkTask(d, 'flow-app/t9', T)

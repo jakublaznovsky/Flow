@@ -94,3 +94,19 @@ describe('useFlow removeProject', () => {
     expect(hook.result.current.lastProject).toBeNull()
   })
 })
+
+describe('useFlow external calendar changes', () => {
+  it('merges an edited, added or removed calendar week file', async () => {
+    const CAL = (title: string) => `---\nweek: "2026-W45"\nitems:\n  - id: c1\n    title: ${title}\n    date: 2026-11-05\n    time: "18:00-19:00"\n---\n`
+    const store = new MemoryFileStore({ ...seed(), 'calendar/2026-W45.md': CAL('Swim') })
+    const hook = await harness(store)
+    expect(hook.result.current.data!.calendar['2026-W45'].items[0].title).toBe('Swim')
+    act(() => store.externalWrite('calendar/2026-W45.md', CAL('Run')))
+    await waitFor(() => expect(hook.result.current.data!.calendar['2026-W45'].items[0].title).toBe('Run'))
+    act(() => store.externalWrite('calendar/2026-W46.md', CAL('Yoga').replace('2026-W45', '2026-W46').replace('c1', 'c7')))
+    await waitFor(() => expect(hook.result.current.data!.calendar['2026-W46']?.items[0].id).toBe('c7'))
+    // A null entry reads as a missing file (the file was deleted outside Flow).
+    act(() => store.externalWrite('calendar/2026-W45.md', null as unknown as string))
+    await waitFor(() => expect(hook.result.current.data!.calendar['2026-W45']).toBeUndefined())
+  })
+})
