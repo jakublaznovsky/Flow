@@ -69,6 +69,10 @@ They work when you are not typing in a text field.
 | `r` | Weekly review |
 | Ctrl+Shift+Space | Quick capture into the Parking lot, from any app (Cmd+Shift+Space on Mac) |
 
+To speak a thought instead of typing it on Windows, open quick capture, press **Win+H** (Windows
+voice typing), talk, then press Enter. The dictation language follows your keyboard language
+(switch with Win+Space).
+
 ## Claude built in
 
 Flow can ask Claude (made by Anthropic) to **review your week** and to **plan tomorrow**. It is

@@ -1,12 +1,13 @@
 import { useState } from 'react'
 
-export default function QuickCapture({ onSubmit }: { onSubmit(text: string): void }) {
+/** `dictateHint`: on Windows, the placeholder mentions Win+H (Windows voice typing works in this field). */
+export default function QuickCapture({ onSubmit, dictateHint = false }: { onSubmit(text: string): void; dictateHint?: boolean }) {
   const [text, setText] = useState('')
   return (
     <input
       className="quick-capture"
       autoFocus
-      placeholder="Capture a thought…"
+      placeholder={dictateHint ? 'Capture a thought… (Win+H to dictate)' : 'Capture a thought…'}
       value={text}
       onChange={(e) => setText(e.target.value)}
       onKeyDown={(e) => {

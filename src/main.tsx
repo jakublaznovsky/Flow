@@ -124,7 +124,7 @@ async function renderTauri() {
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape') void win.hide() })
     createRoot(rootEl).render(
       <StrictMode>
-        <QuickCapture onSubmit={(text) => { void emit('flow:capture', text).then(() => win.hide()) }} />
+        <QuickCapture dictateHint={navigator.userAgent.includes('Windows')} onSubmit={(text) => { void emit('flow:capture', text).then(() => win.hide()) }} />
       </StrictMode>,
     )
     return

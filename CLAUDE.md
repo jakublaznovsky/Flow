@@ -157,6 +157,8 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 - Dev-only `?fakeAi=1` (browser dev) swaps in a canned Claude client; never in production builds.
 - Shortcuts (`/ n b w p o r`) fire only when no input, textarea or select has focus. `n` is a
   no-op while To do is hidden.
+- Quick capture on Windows (v0.3.2): the placeholder reads "Capture a thought… (Win+H to dictate)"
+  (`dictateHint`, from the user agent); dictation is Windows voice typing, Flow records no audio.
 - The global quick-capture shortcut is registered once per app run in `renderTauri` (main.tsx),
   never from a React effect (StrictMode would register → unregister → register), via
   `registerShortcut` (`src/shortcut.ts`): unregister first, then register, serialized. Failures go
