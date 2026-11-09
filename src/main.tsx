@@ -117,6 +117,7 @@ async function renderBrowser() {
 async function renderTauri() {
   const { getCurrentWindow } = await import('@tauri-apps/api/window')
   const { emit, listen } = await import('@tauri-apps/api/event')
+  const { invoke } = await import('@tauri-apps/api/core')
   const label = getCurrentWindow().label
 
   if (label === 'capture') {
@@ -124,7 +125,7 @@ async function renderTauri() {
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape') void win.hide() })
     createRoot(rootEl).render(
       <StrictMode>
-        <QuickCapture dictateHint={navigator.userAgent.includes('Windows')} onSubmit={(text) => { void emit('flow:capture', text).then(() => win.hide()) }} />
+        <QuickCapture onSubmit={(text) => { void emit('flow:capture', text).then(() => win.hide()) }} />
       </StrictMode>,
     )
     return
@@ -179,13 +180,16 @@ async function renderTauri() {
     await (await Window.getByLabel('capture'))?.destroy()
   })
 
+  // Mic next to the search box: Windows voice typing only (Rust `start_dictation` presses Win+H).
+  const dictate = /Windows/.test(navigator.userAgent) ? () => invoke<void>('start_dictation') : undefined
+
   const folder = await settings.get<string>('folder')
   const showApp = (dir: string) => {
     const store = new TauriFileStore(dir)
     const root = createRoot(rootEl)
     const renderApp = (shortcut?: ShortcutStatus) => root.render(
       <StrictMode>
-        <App store={store} settings={settings} onReady={onReady} shortcut={shortcut} />
+        <App store={store} settings={settings} onReady={onReady} shortcut={shortcut} dictate={dictate} />
       </StrictMode>,
     )
     renderApp()

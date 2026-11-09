@@ -80,6 +80,26 @@ describe('Board', () => {
     expect(screen.queryByText('Set up Rust')).not.toBeInTheDocument()
   })
 
+  it('mic next to the search box (only with dictation): a dictated thought lands in the Parking lot', async () => {
+    const dictate = vi.fn(async () => {})
+    const store = new MemoryFileStore(seed())
+    const user = userEvent.setup()
+    const { unmount } = render(<App store={store} settings={new MemorySettings()} now={() => NOW} dictate={dictate} />)
+    await screen.findByText('Look into podcasts')
+    await user.click(screen.getByRole('button', { name: 'Dictate a thought' }))
+    expect(screen.queryByRole('searchbox', { name: 'Search' })).toBeNull()
+    await waitFor(() => expect(dictate).toHaveBeenCalledTimes(1))
+    await user.type(screen.getByRole('textbox', { name: 'Speak a thought' }), 'Book the car service{Enter}')
+    expect(await col('Parking lot').findByText('Book the car service')).toBeInTheDocument()
+    await waitFor(() => expect(store.files['inbox.md']).toContain('Book the car service'))
+    expect(dictate).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toBeInTheDocument()
+    unmount()
+    setup()
+    await screen.findByText('Look into podcasts')
+    expect(screen.queryByRole('button', { name: 'Dictate a thought' })).toBeNull()
+  })
+
   it('captures a thought in the Parking lot and deletes it', async () => {
     const { store, user } = setup()
     await screen.findByText('Look into podcasts')

@@ -69,9 +69,10 @@ They work when you are not typing in a text field.
 | `r` | Weekly review |
 | Ctrl+Shift+Space | Quick capture into the Parking lot, from any app (Cmd+Shift+Space on Mac) |
 
-To speak a thought instead of typing it on Windows, open quick capture, press **Win+H** (Windows
-voice typing), talk, then press Enter. The dictation language follows your keyboard language
-(switch with Win+Space).
+**Speak a thought (Windows).** The microphone button next to the search box opens a small field
+and starts Windows voice typing. Talk, then press Enter: the text lands in the Parking lot
+(Escape cancels). Flow records no audio itself; the dictation language follows your keyboard
+language (switch with Win+Space). If voice typing does not start, press Win+H yourself.
 
 ## Claude built in
 

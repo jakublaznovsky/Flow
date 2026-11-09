@@ -13,8 +13,10 @@ interface Props {
   ai?: (apiKey: string) => AiClient
   /** Quick-capture shortcut state (Tauri only); omitted in the browser, so Settings shows no line. */
   shortcut?: ShortcutStatus
+  /** Starts Windows voice typing (Tauri on Windows only); shows the mic next to the search box. */
+  dictate?: () => Promise<void>
 }
 
-export default function App({ store, settings, now, onReady, ai, shortcut }: Props) {
-  return <Board store={store} settings={settings} now={now} onReady={onReady} ai={ai} shortcut={shortcut} />
+export default function App({ store, settings, now, onReady, ai, shortcut, dictate }: Props) {
+  return <Board store={store} settings={settings} now={now} onReady={onReady} ai={ai} shortcut={shortcut} dictate={dictate} />
 }

@@ -19,12 +19,4 @@ describe('QuickCapture', () => {
     await userEvent.type(screen.getByRole('textbox'), '{Enter}')
     expect(onSubmit).not.toHaveBeenCalled()
   })
-
-  it('shows the Windows dictation hint in the placeholder only when asked', () => {
-    const { unmount } = render(<QuickCapture onSubmit={vi.fn()} dictateHint />)
-    expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'Capture a thought… (Win+H to dictate)')
-    unmount()
-    render(<QuickCapture onSubmit={vi.fn()} />)
-    expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'Capture a thought…')
-  })
 })

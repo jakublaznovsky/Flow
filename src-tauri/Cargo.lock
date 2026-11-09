@@ -806,6 +806,7 @@ dependencies = [
  "tauri-plugin-global-shortcut",
  "tauri-plugin-persisted-scope",
  "tauri-plugin-store",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

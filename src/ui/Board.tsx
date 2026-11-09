@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { boardColumns, searchCards, type Card as CardData, type ColumnId } from '../model/board'
-import { parkTask, promoteInboxItem } from '../model/inbox'
+import { addInboxItem, parkTask, promoteInboxItem } from '../model/inbox'
 import { addDays } from '../model/dates'
 import { scheduleTask } from '../model/schedule'
 import type { Change, FlowData } from '../model/types'
@@ -29,6 +29,7 @@ import { focusProjectThisWeek } from '../model/review-week'
 import ProjectHeader from './ProjectHeader'
 import ProjectPicker from './ProjectPicker'
 import SearchBox from './SearchBox'
+import DictateBox from './DictateBox'
 import Sidebar, { type View } from './Sidebar'
 import type { Settings } from './settings'
 import { useFlow } from './useFlow'
@@ -52,6 +53,8 @@ interface Props {
   ai?: (apiKey: string) => AiClient
   /** Quick-capture shortcut state for the Settings status line (Tauri only). */
   shortcut?: ShortcutStatus
+  /** Starts Windows voice typing (Tauri on Windows only); shows the mic next to the search box. */
+  dictate?: () => Promise<void>
 }
 
 /** Columns an inbox item can be promoted into (Tomorrow = To do planned for tomorrow; Done = done today). */
@@ -227,7 +230,7 @@ function useHiddenColumns(settings: Settings) {
   return { hidden, setVisible }
 }
 
-export default function Board({ store, settings, now, onReady, ai, shortcut }: Props) {
+export default function Board({ store, settings, now, onReady, ai, shortcut, dictate }: Props) {
   const flow = useFlow(store, settings, now)
   const { data, today, filter, setFilter, remember, apply } = flow
   const todayRef = useRef(today)
@@ -242,6 +245,7 @@ export default function Board({ store, settings, now, onReady, ai, shortcut }: P
   const [addRequest, setAddRequest] = useState(false)
   const clearAddRequest = useCallback(() => setAddRequest(false), [])
   const searchRef = useRef<HTMLInputElement>(null)
+  const [dictating, setDictating] = useState(false)
   const viewChosen = useRef(false)
   const aiSettings = useAiSettings(settings)
   const columns = useHiddenColumns(settings)
@@ -357,7 +361,17 @@ export default function Board({ store, settings, now, onReady, ai, shortcut }: P
               />
             )}
           </div>
-          <SearchBox ref={searchRef} value={query} onChange={onSearch} />
+          <div className="topbar-tools">
+            {dictate && (
+              <DictateBox
+                dictate={dictate}
+                onOpenChange={setDictating}
+                onSubmit={(text) => apply((d) => addInboxItem(d, text, today))}
+                onError={(reason) => { void logIssue(store, 'dictation', reason) }}
+              />
+            )}
+            {!dictating && <SearchBox ref={searchRef} value={query} onChange={onSearch} />}
+          </div>
         </div>
         <div className="focus-slot">
           <FocusBar

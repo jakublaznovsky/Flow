@@ -159,7 +159,23 @@ input:not([type]):focus, input[type='text']:focus, input[type='search']:focus, i
 .sidebar-hint kbd { color: var(--text-muted); }
 
 /* ---------- Search ---------- */
+.topbar-tools { display: flex; align-items: center; gap: var(--space-2); flex: none; margin-left: auto; }
 .search { position: relative; width: 280px; flex: none; margin-left: auto; }
+/* Dictation (Windows): mic button left of the search box; while open, its field takes the search box's place. */
+.dictate-btn {
+  display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: var(--radius-md);
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); cursor: pointer;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.dictate-btn:hover { color: var(--accent-text); border-color: var(--accent); }
+.dictate { position: relative; width: calc(280px + 34px + var(--space-2)); flex: none; }
+.dictate input { height: 34px; padding-left: 30px; background: var(--surface); border-color: var(--accent); }
+.dictate-dot {
+  position: absolute; left: 12px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
+  background: var(--accent); animation: dictate-pulse 1.6s var(--ease) infinite;
+}
+@keyframes dictate-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .dictate-dot { animation: none; } }
 .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); z-index: 1; color: var(--text-faint); pointer-events: none; }
 .search input[type='search'] { height: 34px; padding-left: 32px; padding-right: 30px; background: var(--surface); border-color: var(--border); }
 .search kbd { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); pointer-events: none; }

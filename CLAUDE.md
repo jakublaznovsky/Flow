@@ -52,7 +52,8 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 - `tauri-plugin-persisted-scope` (lib.rs, after fs) persists folder access granted via the folder
   picker, so a Flow folder outside `$HOME` (e.g. on D:) is reopened after a restart without asking.
 - `src/main.tsx` picks the shell: browser or Tauri (main window / capture window).
-- All app logic is TypeScript; Rust (`src-tauri`) only registers plugins.
+- All app logic is TypeScript; Rust (`src-tauri`) only registers plugins, plus one command:
+  `start_dictation` (v0.3.2, Windows only via `windows-sys` SendInput: presses Win+H; elsewhere an error).
 
 ## Rules
 
@@ -157,8 +158,12 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
 - Dev-only `?fakeAi=1` (browser dev) swaps in a canned Claude client; never in production builds.
 - Shortcuts (`/ n b w p o r`) fire only when no input, textarea or select has focus. `n` is a
   no-op while To do is hidden.
-- Quick capture on Windows (v0.3.2): the placeholder reads "Capture a thought… (Win+H to dictate)"
-  (`dictateHint`, from the user agent); dictation is Windows voice typing, Flow records no audio.
+- Dictation (v0.3.2): `DictateBox` (mic "Dictate a thought" left of the search box, in `.topbar-tools`)
+  exists only when `dictate` is passed (main.tsx: Tauri on Windows → `invoke('start_dictation')`).
+  Click → field "Speak a thought" replaces the search box, focused; Win+H is pressed 150 ms later.
+  Enter (non-blank) → `addInboxItem`; Escape cancels; an outside pointer-down closes it only while
+  empty (window blur, e.g. the voice typing bar, never closes it). A failed start → issue log only
+  (`dictation`), the field stays open. Flow never records audio.
 - The global quick-capture shortcut is registered once per app run in `renderTauri` (main.tsx),
   never from a React effect (StrictMode would register → unregister → register), via
   `registerShortcut` (`src/shortcut.ts`): unregister first, then register, serialized. Failures go
