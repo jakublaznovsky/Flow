@@ -10,7 +10,11 @@ import {
 const noChange = (d: FlowData): Change => ({ data: d, changed: [] })
 const emptyWeek = (week: string): CalendarWeek => ({ week, items: [], body: '', extra: {} })
 
-/** Next week-only item id, past every id in every week file (`c1`, `c2`, …). */
+/**
+ * Next week-only item id, past every id in every loaded week file (`c1`, `c2`, …). Skipped
+ * (unreadable) files are not considered; if one later loads with a colliding id, the load-time
+ * `dedupeCalendarIds` gives the duplicate a fresh id.
+ */
 export function nextCalendarId(d: FlowData): string {
   return nextCalendarItemId(Object.values(d.calendar).flatMap((w) => w.items))
 }
@@ -58,7 +62,8 @@ export function updateCalendarItem(
   if (!title || !isISODate(date) || !isTime(time)) return noChange(d)
   if (title === found.item.title && date === found.item.date && time === found.item.time) return noChange(d)
   const target = date === found.item.date ? found.week : isoWeek(date)
-  const paths = [...new Set([calendarPath(found.week), calendarPath(target)])]
+  // Target file first: if the second write fails, the item exists twice (deduped on load), never zero times.
+  const paths = [...new Set([calendarPath(target), calendarPath(found.week)])]
   if (paths.some((p) => d.skipped.includes(p))) return noChange(d)
 
   const from = structuredClone(d.calendar[found.week])

@@ -42,7 +42,8 @@ export function scheduleTask(
   const found = findTask(d, ref)
   if (!found || found.task.status === 'done') return { data: d, changed: [] }
   const newDay = date === null ? undefined : date <= today ? today : date
-  const timeGoes = !opts.keepTime && found.task.time !== undefined && weekDayOf(found.task, today) !== newDay
+  // Unscheduling always removes the time (even from a task already without a Week day).
+  const timeGoes = !opts.keepTime && found.task.time !== undefined && (date === null || weekDayOf(found.task, today) !== newDay)
   const cleared = timeGoes ? dropTime(d, ref) : { data: d, changed: [] }
   if (date === null) {
     const set = setScheduled(cleared.data, ref, undefined)

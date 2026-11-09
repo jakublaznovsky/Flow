@@ -89,7 +89,8 @@ describe('updateCalendarItem', () => {
   })
   it('a day in another ISO week moves the item between files in one change', () => {
     const c = updateCalendarItem(sample(), 'c1', { date: '2026-11-17', time: '19:00-20:00' })
-    expect(c.changed.sort()).toEqual(['calendar/2026-W46.md', 'calendar/2026-W47.md'])
+    // Target first: a failed second write leaves a duplicate (deduped on load), never a lost item.
+    expect(c.changed).toEqual(['calendar/2026-W47.md', 'calendar/2026-W46.md'])
     expect(c.data.calendar['2026-W46'].items.map((i) => i.id)).toEqual(['c3'])
     expect(c.data.calendar['2026-W47'].items).toEqual([
       item('c2', 'Run', '2026-11-16', '07:00-08:00'), item('c1', 'Swimming', '2026-11-17', '19:00-20:00', { place: 'pool' }),
@@ -97,7 +98,7 @@ describe('updateCalendarItem', () => {
   })
   it('moving into a week without a file creates it; the emptied file stays with no items', () => {
     const c = updateCalendarItem(sample(), 'c2', { date: '2026-11-25' })
-    expect(c.changed.sort()).toEqual(['calendar/2026-W47.md', 'calendar/2026-W48.md'])
+    expect(c.changed).toEqual(['calendar/2026-W48.md', 'calendar/2026-W47.md'])
     expect(c.data.calendar['2026-W47'].items).toEqual([])
     expect(c.data.calendar['2026-W48'].items.map((i) => i.id)).toEqual(['c2'])
   })

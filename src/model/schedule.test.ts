@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { promoteScheduled, scheduleTask, weekPlan } from './schedule'
+import { moveTask } from './tasks'
 import { emptyFlow, type FlowData, type Task } from './types'
 
 function deepFreeze<T>(o: T): T {
@@ -159,6 +160,13 @@ describe('scheduleTask and task time', () => {
     const c = scheduleTask(timed('a/t2'), 'a/t2', null, T)
     expect(get(c.data, 'a/t2')).not.toHaveProperty('time')
     expect(get(c.data, 'a/t2')).not.toHaveProperty('scheduled')
+  })
+  it('clearing the date always removes the time, also for a task with no Week day', () => {
+    const moved = moveTask(timed('a/t3'), 'a/t3', 'todo', T)
+    expect(get(moved.data, 'a/t3').time).toBe('09:00-10:00')
+    const c = scheduleTask(moved.data, 'a/t3', null, T)
+    expect(get(c.data, 'a/t3')).not.toHaveProperty('time')
+    expect(c.changed).toEqual(['projects/a.md'])
   })
   it('the same day keeps the time', () => {
     expect(get(scheduleTask(timed('a/t2'), 'a/t2', '2026-11-06', T).data, 'a/t2').time).toBe('09:00-10:00')

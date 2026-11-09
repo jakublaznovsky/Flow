@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { addInboxItem } from '../model/inbox'
+import { addCalendarItem } from '../model/calendar'
 import { addTask, editTask } from '../model/tasks'
 import { MemoryFileStore } from '../storage/fileStore'
 import { MemorySettings } from './settings'
@@ -108,5 +109,24 @@ describe('useFlow external calendar changes', () => {
     // A null entry reads as a missing file (the file was deleted outside Flow).
     act(() => store.externalWrite('calendar/2026-W45.md', null as unknown as string))
     await waitFor(() => expect(hook.result.current.data!.calendar['2026-W45']).toBeUndefined())
+  })
+})
+
+describe('useFlow calendar ids after a reload in flight', () => {
+  it('an id added locally during a reload never collides with the reloaded file', async () => {
+    const store = new MemoryFileStore(seed())
+    const hook = await harness(store)
+    const realRead = store.read.bind(store)
+    let release!: () => void
+    const gate = new Promise<void>((r) => { release = r })
+    store.read = async (p) => { if (p === 'calendar/2026-W47.md') await gate; return realRead(p) }
+    act(() => store.externalWrite('calendar/2026-W47.md', '---\nweek: "2026-W47"\nitems:\n  - id: c1\n    title: Run\n    date: 2026-11-16\n    time: "07:00-08:00"\n---\n'))
+    act(() => hook.result.current.apply((d) => addCalendarItem(d, { title: 'Swim', date: '2026-11-05', time: '18:00-19:00' })))
+    expect(hook.result.current.data!.calendar['2026-W45'].items[0].id).toBe('c1')
+    await act(async () => { release() })
+    await waitFor(() => expect(hook.result.current.data!.calendar['2026-W47']).toBeDefined())
+    const d = hook.result.current.data!
+    expect(d.calendar['2026-W45'].items[0].id).toBe('c1')
+    expect(d.calendar['2026-W47'].items[0].id).not.toBe('c1')
   })
 })

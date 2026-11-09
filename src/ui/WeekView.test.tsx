@@ -137,6 +137,15 @@ describe('handleWeekDrop', () => {
     expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('status: todo')
   })
 
+  it('a Today task with a time dropped on Unscheduled loses the time', async () => {
+    const files = seed()
+    files['projects/learn-spanish.md'] = project('Learn Spanish', '#30a46c', task('t1', 'Buy a book', 'today', '    planned: 2026-11-04\n    time: "09:00-10:00"\n'))
+    const { store, ctx } = await harness(files)
+    act(() => handleWeekDrop({ cardKey: 'learn-spanish/t1', target: 'unscheduled' }, ctx()))
+    await waitFor(() => expect(taskOf(store, 'projects/learn-spanish.md', 't1')).toContain('status: todo'))
+    expect(taskOf(store, 'projects/learn-spanish.md', 't1')).not.toContain('time')
+  })
+
   it("today's column moves the task straight to Today", async () => {
     const { store, ctx } = await harness()
     act(() => handleWeekDrop({ cardKey: 'flow-app/t2', target: `day-${T}` }, ctx()))

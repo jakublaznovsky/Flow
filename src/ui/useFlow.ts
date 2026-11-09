@@ -6,6 +6,7 @@ import { promoteScheduled } from '../model/schedule'
 import type { FileStore } from '../storage/fileStore'
 import { ensureFolder, loadFlow, moveToDeleted, reloadPaths, saveFlow } from '../storage/flowRepo'
 import { deleteProject } from '../model/projects'
+import { dedupeCalendarIds } from '../model/calendar'
 import type { Settings } from './settings'
 
 /** Copy one reloaded path from `from` into `into` (a fresh copy of the current data). */
@@ -66,6 +67,10 @@ export function useFlow(store: FileStore, settings: Settings, now: () => Date = 
           const dirty = new Set(applyLog.current.filter((e) => e.n > start).flatMap((e) => e.paths))
           let merged = dataRef.current ?? next
           for (const path of paths) if (!dirty.has(path)) merged = mergePath(merged, next, path)
+          // Items added locally while the reload was in flight may share an id with a reloaded
+          // week: the reloaded weeks' items yield (in memory only).
+          const reloadedWeeks = paths.filter((p) => !dirty.has(p)).map((p) => /^calendar\/(.+)\.md$/.exec(p)?.[1]).filter((w): w is string => w !== undefined)
+          merged = dedupeCalendarIds(merged, reloadedWeeks)
           dataRef.current = merged
           setData(merged)
         })
