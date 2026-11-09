@@ -83,8 +83,11 @@ Free notes about the project.
   done or archived projects keep waiting with their date.
 - time is the task's slot in the Week view's time grid, written "HH:MM-HH:MM" (quoted, in
   15-minute steps, from 07:00 to 24:00, start before end), on the task's day (its scheduled
-  day, or today for a task in Today). Flow removes it when the task is completed, moved to
-  another day or unscheduled. It is only used by the Week view.
+  day, or today for a task in Today). Moves on the Board (To do, Today, Tomorrow) keep it.
+  Flow removes it when the task is completed or parked, unscheduled or moved to another day in
+  the Week view (unless it is dropped on that day's hours, which gives it a new time), or planned
+  for another day or unplanned from the task's plan menu or the weekly review. It is only used by
+  the Week view.
 - The body (notes and ## Decisions) is free text. Flow preserves it unchanged.
 
 ## Parking lot: inbox.md

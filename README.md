@@ -32,10 +32,12 @@ of the Claude buttons (see below).
   down the side, with a thin line at every hour. An Unscheduled drawer sits across the top (it
   folds away). At the top of each day is a strip for tasks that have a day but no hour, and what
   you finished that day. Drag a task into the hours to give it a time; stretch it from its top or
-  bottom edge to make it longer or shorter; drag it back to the strip to drop the time. Click or
-  drag on an empty spot to add your own item, like a swim or a dentist visit. It lives only in the
-  Week view: double-click to rename it, × to delete it. No times are written anywhere; where a
-  block sits shows its time. When a planned day comes, the task moves to Today by itself. Dropping
+  bottom edge to make it longer or shorter; drag it back to the strip to drop the time. Moving the
+  task around the Board keeps its time. Moving it to another day in the Week view or its plan
+  menu, unscheduling, parking or finishing it removes the time. Click or drag on an empty spot
+  to add your own item, like a swim or a dentist visit. It lives only in the Week view:
+  double-click to rename it, × to delete it. No times are written anywhere; where a block sits
+  shows its time. When a planned day comes, the task moves to Today by itself. Dropping
   a task on a past day marks it done that day. Click the week title to jump to any month and year.
 - **Weekly review.** A short guided review: what you finished, what is unfinished (keep, push to
   next week, send back or delete), a project to focus on next week, and a few words of reflection.

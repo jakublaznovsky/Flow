@@ -2,9 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Keyboar
 import { deleteCalendarItem, updateCalendarItem } from '../model/calendar'
 import { GRID_END, GRID_START, layoutLanes, minutesToY, yToMinutes, type TimeBlock } from '../model/timeblock'
 import type { Change, FlowData, ISODate } from '../model/types'
+import { useEdgeScroll } from './edgeScroll'
 import CalendarBlock, { blockStyle, GhostBlock, HOUR_PX, TitleInput, type BlockData, type Edge } from './CalendarBlock'
 import {
-  clickBlock, createItem, dropItem, dropTask, moveBlock, nudgeBlock, resizeBlock, spanBlock, type WeekTarget,
+  clickBlock, createItem, dropItem, dropTask, moveBlock, nudgeBlock, placeTask, resizeBlock, spanBlock, type WeekTarget,
 } from './calendarDrop'
 
 type Apply = (fn: (d: FlowData) => Change) => void
@@ -84,22 +85,19 @@ export function useGridGestures({ apply, today, scroller }: { apply: Apply; toda
   })
   useEffect(() => () => cleanup.current?.(), [])
 
-  /** A block's new time on a day: tasks via the Week drop rules, items moved/retimed. */
+  /** A block's new time on a day: a task only retimed on its own day (else the Week drop rules), items moved/retimed. */
   const place = useCallback((src: BlockData, date: ISODate, block: TimeBlock) => {
-    if (src.kind === 'task') apply((d) => dropTask(d, src.id, { kind: 'grid', date, block }, today))
+    if (src.kind === 'task') apply((d) => placeTask(d, src.id, src.date, date, block, today))
     else apply((d) => dropItem(d, src.id, date, block))
   }, [apply, today])
 
-  const autoScroll = (y: number) => {
-    const el = scroller.current
-    if (!el) return
-    const r = el.getBoundingClientRect()
-    if (r.height === 0) return
-    if (y > r.bottom - 32) el.scrollTop += 12
-    else if (y < r.top + 32) el.scrollTop -= 12
-  }
+  // Edge auto-scroll (also while the pointer is held still in a band); each scroll re-tracks the
+  // last pointer position, so the gesture follows the grid under it.
+  const last = useRef<{ clientX: number; clientY: number } | null>(null)
+  const edgeScroll = useEdgeScroll(scroller, () => { if (last.current) track(last.current) })
 
-  const track = (e: globalThis.PointerEvent) => {
+  const track = (e: { clientX: number; clientY: number }) => {
+    last.current = { clientX: e.clientX, clientY: e.clientY }
     const g = gRef.current
     if (!g) return
     if (g.kind === 'move') {
@@ -116,7 +114,7 @@ export function useGridGestures({ apply, today, scroller }: { apply: Apply; toda
       const active = g.active || Math.abs(e.clientX - g.x0) + Math.abs(e.clientY - g.y0) > MOVE_THRESHOLD
       setGesture({ ...g, active, block: active ? spanBlock(g.anchor, minutesAt(g.date, e.clientY)) : clickBlock(g.anchor) })
     }
-    autoScroll(e.clientY)
+    edgeScroll.update(e.clientX, e.clientY)
   }
 
   const finish = (commit: boolean) => {
@@ -151,6 +149,8 @@ export function useGridGestures({ apply, today, scroller }: { apply: Apply; toda
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', cancel)
       window.removeEventListener('keydown', key, true)
+      edgeScroll.stop()
+      last.current = null
       cleanup.current = null
     }
   }

@@ -46,7 +46,8 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   Week calendar (v0.3.0): `WeekStrip` (day header + untimed strip, dnd-kit), `TimeGrid` (axis, day
   grids, pointer gestures: move/resize/create, keys, title inputs), `CalendarBlock` (one block,
   `HOUR_PX`), pure `calendarDrop` (`dropTask`, `dropItem`, `createItem`, block math, `blockLabel`);
-  WeekView is lazy-loaded inside `QuietBoundary` (a failure → issue log, renders nothing).
+  `edgeScroll` (grid auto-scroll only inside `.week-cal`, top band below the sticky strips, rAF loop
+  while held in a band); WeekView is lazy-loaded inside `QuietBoundary` (a failure → issue log, renders nothing).
 - `src/shortcut.ts` idempotent global-shortcut registration (injected plugin functions).
 - `tauri-plugin-persisted-scope` (lib.rs, after fs) persists folder access granted via the folder
   picker, so a Flow folder outside `$HOME` (e.g. on D:) is reopened after a restart without asking.
@@ -114,9 +115,13 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   skipped) and omitted when absent; it applies to the task's Week day (`scheduled`, or today for a
   Today task). Week-only items live in `calendar/YYYY-Www.md` (`week`, `items: [{id, title, date,
   time}]`, strict, unknown fields kept; a date in another ISO week moves the item to that file in
-  one apply). Time is cleared when the task goes to a strip or Unscheduled (unscheduling always
-  clears it), changes day (except a grid drop with a new time) or is done. Board moves keep it:
-  Today → To do keeps the time, Tomorrow moves pass `keepTime`, a Today task keeps it at rollover.
+  one apply; repeated item ids get new ids in memory only (`dedupeCalendarIds` on load/reload), and the
+  new id is written when that file is next saved). Board moves keep the time (To do / Today /
+  Tomorrow in any direction; Tomorrow moves pass `keepTime`; a Today task keeps it at rollover).
+  Only these remove it: in the Week view, unscheduling, a strip drop or a day change (except a
+  grid drop, which sets a new time); Plan menu / WeeklyReview rescheduling to another day or
+  unscheduling; completing; parking. A block moved/resized on its own day (pointer or Alt+arrows)
+  only changes its time (`placeTask` → `setTaskTime`, never the day-drop rules).
   Strip/drawer drops onto the grid start in the 15-min slot under the pointer (floor), 1 hour.
   Click/drag on empty grid creates an item with an inline title: Enter or blur saves (blank = no
   item), Escape cancels; double-click/Enter/F2 renames, × or Delete/Backspace deletes a week-only

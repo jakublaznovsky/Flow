@@ -16,6 +16,7 @@ import { dropTask, stripDropBlock, type WeekTarget } from './calendarDrop'
 import MonthPicker from './MonthPicker'
 import { DayGrid, hitAt, minutesAt, TimeAxis, useGridGestures, type Gestures, type Over } from './TimeGrid'
 import type { useFlow } from './useFlow'
+import { useEdgeScroll } from './edgeScroll'
 import WeekStrip, { CardFace, DoneFace, InTodayFace, WeekCard, type DragItem } from './WeekStrip'
 
 type Flow = ReturnType<typeof useFlow>
@@ -169,6 +170,13 @@ interface Props {
 
 const sameOver = (a: Over, b: Over) => JSON.stringify(a) === JSON.stringify(b)
 
+/** Where a strip/drawer card would land with the pointer at (x, y). */
+function targetAt(x: number, y: number): Over {
+  const hit = hitAt(x, y)
+  if (hit?.kind === 'grid') return { kind: 'grid', date: hit.date, block: stripDropBlock(minutesAt(hit.date, y)) }
+  return hit as Exclude<typeof hit, { kind: 'grid' }>
+}
+
 export default function WeekView({ flow, trayOpen = true, onToggleTray, headerSlot, now = () => new Date() }: Props) {
   const { data, today, filter } = flow
   const [offset, setOffset] = useState(0)
@@ -180,22 +188,27 @@ export default function WeekView({ flow, trayOpen = true, onToggleTray, headerSl
   // The pointer during a dnd-kit drag, read from the pointer events themselves: dnd-kit's delta also
   // counts scrolling, which would put the drop off the pointer. dnd-kit's own auto-scroll is off (it
   // scrolled the grid while the pointer was nowhere near its edges); like a block drag, the grid
-  // scrolls only while the pointer is within 32px of its top or bottom.
+  // scrolls only in its edge bands (`useEdgeScroll`), also while the pointer is held still there.
   const pointer = useRef<{ x: number; y: number } | null>(null)
+  const edge = useEdgeScroll(scroller, () => {
+    const p = pointer.current
+    if (!p) return
+    const next = targetAt(p.x, p.y)
+    setDndOver((cur) => (sameOver(cur, next) ? cur : next))
+  })
   const isDragging = dragging !== null
   useEffect(() => {
     if (!isDragging) return
     const onMove = (e: PointerEvent) => {
       pointer.current = { x: e.clientX, y: e.clientY }
-      const el = scroller.current
-      const r = el?.getBoundingClientRect()
-      if (!el || !r || r.height === 0) return
-      if (e.clientY > r.bottom - 32) el.scrollTop += 12
-      else if (e.clientY < r.top + 32) el.scrollTop -= 12
+      edge.update(e.clientX, e.clientY)
     }
     window.addEventListener('pointermove', onMove, true)
-    return () => window.removeEventListener('pointermove', onMove, true)
-  }, [isDragging])
+    return () => {
+      window.removeEventListener('pointermove', onMove, true)
+      edge.stop()
+    }
+  }, [isDragging, edge.update, edge.stop])
 
   // On open: the current hour (one hour of context above it) this week, 07:00 otherwise. The
   // strips stay on top (sticky), so the hour lands just below them.
@@ -231,9 +244,7 @@ export default function WeekView({ flow, trayOpen = true, onToggleTray, headerSl
     const start = e.activatorEvent as PointerEvent
     if (typeof start?.clientX !== 'number') return null
     const { x, y } = pointer.current ?? { x: start.clientX + e.delta.x, y: start.clientY + e.delta.y }
-    const hit = hitAt(x, y)
-    if (hit?.kind === 'grid') return { kind: 'grid', date: hit.date, block: stripDropBlock(minutesAt(hit.date, y)) }
-    return hit as Exclude<typeof hit, { kind: 'grid' }>
+    return targetAt(x, y)
   }
   const onDragStart = (e: DragStartEvent) => {
     pointer.current = null

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  blockLabel, clickBlock, createItem, dropItem, dropTask, moveBlock, nudgeBlock, resizeBlock, spanBlock, stripDropBlock,
+  blockLabel, clickBlock, createItem, dropItem, dropTask, moveBlock, nudgeBlock, placeTask, resizeBlock, spanBlock, stripDropBlock,
 } from './calendarDrop'
 import { emptyFlow, type CalendarItem, type FlowData, type Task } from '../model/types'
 
@@ -179,6 +179,32 @@ describe('dropTask', () => {
     expect(dropTask(sample(), 'a/t9', { kind: 'strip', date: '2026-11-13' }, T).changed).toEqual([])
     expect(dropTask(sample(), 'a/t2', { kind: 'strip', date: '2026-11-13' }, T).changed).toEqual([])
     expect(dropTask(sample(), 'a/t1', { kind: 'grid', date: '2026-11-13', block: { start: 600, end: 660 } }, T).changed).toEqual([])
+  })
+})
+
+describe('placeTask (a block moved or resized in the grid)', () => {
+  it('same day, even a past one: only the time changes (never done)', () => {
+    const d = deepFreeze({ ...sample(), projects: { a: { ...sample().projects.a, tasks: [task('t1', 'Old', { scheduled: '2026-11-09', time: '10:00-11:00' })] } } })
+    const c = placeTask(d, 'a/t1', '2026-11-09', '2026-11-09', { start: 660, end: 720 }, T)
+    expect(t(c.data, 't1')).toMatchObject({ status: 'todo', scheduled: '2026-11-09', time: '11:00-12:00' })
+    expect(c.data.days['2026-11-09']).toBeUndefined()
+    expect(c.changed).toEqual(['projects/a.md'])
+  })
+
+  it("same day for a Today task: only the time changes", () => {
+    const c = placeTask(sample(), 'a/t3', T, T, { start: 600, end: 690 }, T)
+    expect(t(c.data, 't3')).toMatchObject({ status: 'today', time: '10:00-11:30' })
+    expect(c.changed).toEqual(['projects/a.md'])
+  })
+
+  it('another day: the Week drop rules (a past day = done that day)', () => {
+    const c = placeTask(sample(), 'a/t1', '2026-11-13', '2026-11-10', { start: 600, end: 660 }, T)
+    expect(t(c.data, 't1')).toMatchObject({ status: 'done', done: '2026-11-10' })
+  })
+
+  it('a skipped project file: no change', () => {
+    const d = skip(sample(), 'projects/a.md')
+    expect(placeTask(d, 'a/t1', '2026-11-13', '2026-11-13', { start: 600, end: 720 }, T).changed).toEqual([])
   })
 })
 

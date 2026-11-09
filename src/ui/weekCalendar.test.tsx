@@ -241,4 +241,14 @@ describe('Week calendar: project task blocks', () => {
     await user.keyboard('{Alt>}{ArrowDown}{/Alt}')
     await waitFor(() => expect(store.files['projects/flow-app.md']).toContain('time: "15:15-16:15"'))
   })
+  it('Alt+↓ and a same-day resize only change a task block\'s time (no day rules)', async () => {
+    const { store, user } = await open()
+    const dayFile = store.files['days/2026-11-04.md']
+    const body = within(grid('Wed 4 Nov')).getByRole('button', { name: /^Fix bug/ })
+    body.focus()
+    await user.keyboard('{Alt>}{Shift>}{ArrowDown}{/Shift}{/Alt}')
+    await waitFor(() => expect(store.files['projects/flow-app.md']).toContain('time: "15:00-16:15"'))
+    expect(store.files['projects/flow-app.md']).toMatch(/title: Fix bug\n\s+status: today/)
+    expect(store.files['days/2026-11-04.md']).toBe(dayFile)
+  })
 })

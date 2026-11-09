@@ -246,6 +246,26 @@ try {
     if (!(t && head && t.y + t.height <= head.y && t.width >= head.width - 1)) fail('Unscheduled drawer is not a full-width row above the days')
     else console.log('ok: Unscheduled drawer sits above the seven days, full width')
   }
+  // A card dragged around inside the drawer (above the grid) never scrolls the grid, also held still.
+  {
+    const cal = week.locator('.week-cal')
+    await cal.evaluate((el) => { el.scrollTop = 200 })
+    const c = await tray.locator('li.week-card').first().boundingBox()
+    const t = await tray.boundingBox()
+    const before = await cal.evaluate((el) => el.scrollTop)
+    await page.mouse.move(c.x + c.width / 2, c.y + c.height / 2)
+    await page.mouse.down()
+    for (const [fx, fy] of [[0.5, 0.9], [0.8, 0.95], [0.3, 0.6], [0.6, 0.98]]) {
+      await page.mouse.move(t.x + t.width * fx, t.y + t.height * fy, { steps: 6 })
+      await page.waitForTimeout(150)
+    }
+    const during = await cal.evaluate((el) => el.scrollTop)
+    await page.keyboard.press('Escape')
+    await page.mouse.up()
+    await page.waitForTimeout(150)
+    if (during !== before) fail(`dragging inside the drawer scrolled the grid (${before} -> ${during})`)
+    else console.log(`ok: dragging a card inside the drawer leaves the grid scroll alone (${before}px)`)
+  }
   const weekCard = tray.locator('li.week-card').first()
   const weekTitle = (await weekCard.locator('.week-card-title').innerText()).trim()
   await drag(page, weekCard, strip(dayCol)) // the strip: the day without a time

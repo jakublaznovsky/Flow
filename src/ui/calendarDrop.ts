@@ -107,6 +107,16 @@ export function dropTask(d: FlowData, ref: string, target: WeekTarget, today: IS
   return c.changed.some((p) => d.skipped.includes(p)) ? none(d) : c
 }
 
+/**
+ * A task block moved or resized in the grid (pointer or Alt+arrows), from day `from` to `to`. On
+ * the same day only its time changes (`setTaskTime`, never the day-drop rules: on a past day those
+ * would complete it); on another day the Week drop rules apply (`dropTask`).
+ */
+export function placeTask(d: FlowData, ref: string, from: ISODate, to: ISODate, block: TimeBlock, today: ISODate): Change {
+  if (from !== to) return dropTask(d, ref, { kind: 'grid', date: to, block }, today)
+  return setTaskTime(d, ref, formatTime(clampBlock(block)))
+}
+
 /** A week-only item moved or resized to `date` and `block` (another ISO week moves it to that file). */
 export function dropItem(d: FlowData, id: string, date: ISODate, block: TimeBlock): Change {
   return updateCalendarItem(d, id, { date, time: formatTime(clampBlock(block)) })
