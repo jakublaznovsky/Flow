@@ -2,7 +2,7 @@ import { taskCard, sortCards, type Card } from './board'
 import { addDays } from './dates'
 import { doneOn } from './stats'
 import { findTask, moveTask } from './tasks'
-import { projectPath, type Change, type DoneEntry, type FlowData, type ISODate } from './types'
+import { projectPath, type Change, type DoneEntry, type FlowData, type ISODate, type Task } from './types'
 
 const merge = (a: string[], b: string[]) => [...new Set([...a, ...b])]
 
@@ -17,18 +17,41 @@ function setScheduled(d: FlowData, ref: string, date: ISODate | undefined): Chan
   return { data: { ...d, projects: { ...d.projects, [project.slug]: project } }, changed: [projectPath(project.slug)] }
 }
 
+/** Remove a task's Week-grid time (no other bookkeeping). */
+function dropTime(d: FlowData, ref: string): Change {
+  const found = findTask(d, ref)
+  if (!found || found.task.time === undefined) return { data: d, changed: [] }
+  const project = structuredClone(found.project)
+  delete project.tasks.find((t) => t.id === found.task.id)!.time
+  return { data: { ...d, projects: { ...d.projects, [project.slug]: project } }, changed: [projectPath(project.slug)] }
+}
+
+/** The day a task is on in the Week view: its scheduled day, or today for a Today task. */
+const weekDayOf = (t: Task, today: ISODate): ISODate | undefined => (t.status === 'today' ? today : t.scheduled)
+
 /**
  * Plan a task for a day. A future date keeps (or puts) it in To do with `scheduled` set;
  * today or earlier moves it to Today now and clears the date; null clears the date only.
- * Done tasks are left alone.
+ * Done tasks are left alone. When the task's Week day changes (or it becomes unscheduled), its
+ * `time` is removed, unless `keepTime` (Board moves between To do / Today / Tomorrow keep it).
+ * A caller that gives it a new time calls `setTaskTime` afterwards.
  */
-export function scheduleTask(d: FlowData, ref: string, date: ISODate | null, today: ISODate): Change {
+export function scheduleTask(
+  d: FlowData, ref: string, date: ISODate | null, today: ISODate, opts: { keepTime?: boolean } = {},
+): Change {
   const found = findTask(d, ref)
   if (!found || found.task.status === 'done') return { data: d, changed: [] }
-  if (date === null) return setScheduled(d, ref, undefined)
-  const moved = moveTask(d, ref, date <= today ? 'today' : 'todo', today)
+  const newDay = date === null ? undefined : date <= today ? today : date
+  // Unscheduling always removes the time (even from a task already without a Week day).
+  const timeGoes = !opts.keepTime && found.task.time !== undefined && (date === null || weekDayOf(found.task, today) !== newDay)
+  const cleared = timeGoes ? dropTime(d, ref) : { data: d, changed: [] }
+  if (date === null) {
+    const set = setScheduled(cleared.data, ref, undefined)
+    return { data: set.data, changed: merge(cleared.changed, set.changed) }
+  }
+  const moved = moveTask(cleared.data, ref, date <= today ? 'today' : 'todo', today)
   const set = setScheduled(moved.data, ref, date <= today ? undefined : date)
-  return { data: set.data, changed: merge(moved.changed, set.changed) }
+  return { data: set.data, changed: merge(merge(cleared.changed, moved.changed), set.changed) }
 }
 
 /**

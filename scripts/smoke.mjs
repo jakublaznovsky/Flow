@@ -1,6 +1,7 @@
 // Real-browser smoke test: run `npm run dev` first, then `node scripts/smoke.mjs`.
 // Uses Playwright (installed globally); drives real pointer drag-and-drop.
 // Writes docs/screenshot.png, screenshot-dark.png, screenshot-progress.png, screenshot-week.png.
+// Week: strip drops (no time), past-day drop = done, calendar items by click/drag, resize, move, strip <-> grid.
 import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 const { chromium } = require('playwright')
@@ -32,6 +33,8 @@ async function key(page, k) {
 const browser = await chromium.launch()
 try {
   const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 2, colorScheme: 'light' })
+  // FLOW_NOW (e.g. 2026-11-12T10:00) pins the page's clock, to run the day-dependent Week steps.
+  if (process.env.FLOW_NOW) await page.clock.setFixedTime(new Date(process.env.FLOW_NOW))
   await page.goto(url)
   const col = (name) => page.getByRole('region', { name, exact: true })
 
@@ -223,9 +226,13 @@ try {
   // --- Week: drag from Unscheduled to a future day (key w) ---
   await key(page, 'w')
   const week = page.getByRole('region', { name: 'Week', exact: true })
+  /** A day's untimed strip (header + list): a drop there gives the day without a time. */
+  const strip = (day) => day.locator('.week-col-top')
   await week.waitFor({ timeout: 3000 })
   const isSunday = await page.evaluate(() => new Date().getDay() === 0)
-  if (isSunday) await page.getByRole('button', { name: 'Next week' }).click()
+  // The day after tomorrow is in next week on Saturday; on Sunday the target is tomorrow (Monday).
+  const nextWeek = isSunday || (await page.evaluate(() => new Date().getDay() === 6))
+  if (nextWeek) await page.getByRole('button', { name: 'Next week' }).click()
   const target = await page.evaluate((sunday) => {
     const d = new Date()
     d.setDate(d.getDate() + (sunday ? 1 : 2)) // day after tomorrow (Monday of next week when it is Sunday)
@@ -235,18 +242,39 @@ try {
   const dayCol = week.getByRole('region', { name: target, exact: true })
   {
     const t = await tray.boundingBox()
-    const d = await week.getByRole('region', { name: /^Mon \d+ / }).boundingBox()
-    const head = await week.locator('.week-days').boundingBox()
-    if (!(t && d && t.y + t.height <= d.y && t.width >= head.width - 1)) fail('Unscheduled drawer is not a full-width row above the days')
+    const head = await week.locator('.week-cal').boundingBox()
+    if (!(t && head && t.y + t.height <= head.y && t.width >= head.width - 1)) fail('Unscheduled drawer is not a full-width row above the days')
     else console.log('ok: Unscheduled drawer sits above the seven days, full width')
+  }
+  // A card dragged around inside the drawer (above the grid) never scrolls the grid, also held still.
+  {
+    const cal = week.locator('.week-cal')
+    await cal.evaluate((el) => { el.scrollTop = 200 })
+    const c = await tray.locator('li.week-card').first().boundingBox()
+    const t = await tray.boundingBox()
+    const before = await cal.evaluate((el) => el.scrollTop)
+    await page.mouse.move(c.x + c.width / 2, c.y + c.height / 2)
+    await page.mouse.down()
+    for (const [fx, fy] of [[0.5, 0.9], [0.8, 0.95], [0.3, 0.6], [0.6, 0.98]]) {
+      await page.mouse.move(t.x + t.width * fx, t.y + t.height * fy, { steps: 6 })
+      await page.waitForTimeout(150)
+    }
+    const during = await cal.evaluate((el) => el.scrollTop)
+    await page.keyboard.press('Escape')
+    await page.mouse.up()
+    await page.waitForTimeout(150)
+    if (during !== before) fail(`dragging inside the drawer scrolled the grid (${before} -> ${during})`)
+    else console.log(`ok: dragging a card inside the drawer leaves the grid scroll alone (${before}px)`)
   }
   const weekCard = tray.locator('li.week-card').first()
   const weekTitle = (await weekCard.locator('.week-card-title').innerText()).trim()
-  await drag(page, weekCard, dayCol)
-  await dayCol.getByText(weekTitle).waitFor({ timeout: 3000 })
+  await drag(page, weekCard, strip(dayCol)) // the strip: the day without a time
+  await strip(dayCol).getByText(weekTitle).waitFor({ timeout: 3000 })
+  // Screenshot from 08:00 down, so the seed's timed tasks and week-only items show.
+  await week.locator('.week-cal').evaluate((el) => { el.scrollTop = 48 })
   await page.waitForTimeout(800)
   await shot(page, 'screenshot-week.png')
-  console.log(`ok: "${weekTitle}" scheduled for ${target}${isSunday ? ' (next week, today is Sunday)' : ''}`)
+  console.log(`ok: "${weekTitle}" scheduled for ${target}${nextWeek ? ' (next week)' : ''}`)
   {
     await page.waitForTimeout(100)
     const toggle = tray.getByRole('button', { name: /^Unscheduled/ })
@@ -259,7 +287,7 @@ try {
 
   // --- Week: a Today item onto a future day, a card onto a past day (done that day) ---
   {
-    if (isSunday) await page.getByRole('button', { name: 'This week' }).click()
+    if (nextWeek) await page.getByRole('button', { name: 'This week', exact: true }).click()
     const label = (n) => page.evaluate((n) => {
       const d = new Date()
       d.setDate(d.getDate() + n)
@@ -271,7 +299,7 @@ try {
       const item = todayCol.locator('li.week-in-today').first()
       const itemTitle = (await item.locator('.week-in-today-title').innerText()).trim()
       const future = week.getByRole('region', { name: await label(1), exact: true })
-      await drag(page, item, future)
+      await drag(page, item, strip(future))
       await future.locator('li.week-card', { hasText: itemTitle }).waitFor({ timeout: 3000 })
       if (await todayCol.locator('li.week-in-today', { hasText: itemTitle }).count()) fail(`"${itemTitle}" is still In Today after the drop`)
       await key(page, 'b')
@@ -286,13 +314,142 @@ try {
     else {
       const pastName = await label(-1)
       const past = week.getByRole('region', { name: pastName, exact: true })
-      const c = week.locator('li.week-card').first() // any To do card (the seed's tray may be empty by now)
-      const t = (await c.locator('.week-card-title').innerText()).trim()
-      await drag(page, c, past)
+      // Any To do card or In Today item (the seed's tray may be empty by now).
+      const c = week.locator('li.week-card, li.week-in-today').first()
+      const t = (await c.locator('.week-card-title, .week-in-today-title').innerText()).trim()
+      await drag(page, c, strip(past))
       await past.locator('li.week-done.is-done', { hasText: t }).waitFor({ timeout: 3000 })
       if (await week.locator('li.week-card', { hasText: t }).count()) fail(`"${t}" is still a To do card after the past-day drop`)
       else console.log(`ok: "${t}" dropped on ${pastName} shows as done there`)
     }
+  }
+
+  // --- Week calendar: create items (click, drag), resize, move, a task strip -> grid -> strip ---
+  {
+    const cal = week.locator('.week-cal')
+    const cols = week.locator('section.week-col')
+    const dateOf = (i) => cols.nth(i).locator('.cal-day').getAttribute('data-grid-date')
+    const weekday = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long' }) }
+    const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`
+    /** Scrolls the grid so `min` is in view below the sticky strips; the pointer point there in column i. */
+    const at = async (i, min, dx = 0.5) => {
+      await cal.evaluate((el, [date, min]) => {
+        const grid = el.querySelector(`[data-grid-date="${date}"]`)
+        const strip = grid.closest('.week-col').querySelector('.week-col-top')
+        const y = grid.getBoundingClientRect().top + ((min - 420) / 60) * 48
+        el.scrollTop += y - (strip.getBoundingClientRect().bottom + 120)
+      }, [await dateOf(i), min])
+      const g = await cols.nth(i).locator('.cal-day').boundingBox()
+      return { x: g.x + g.width * dx, y: g.y + ((min - 420) / 60) * 48 }
+    }
+    const block = (title) => week.locator('.cal-block').filter({ has: page.locator(`.cal-block-body[aria-label^="${title}, "]`) })
+    const label = async (title) => block(title).locator('.cal-block-body').getAttribute('aria-label')
+    const expectLabel = async (title, want, what) => {
+      await page.waitForFunction(([t, w]) => [...document.querySelectorAll('.cal-block-body')].some((e) => e.getAttribute('aria-label') === `${t}, ${w}`), [title, want], { timeout: 3000 }).catch(() => {})
+      const got = await label(title)
+      if (got !== `${title}, ${want}`) fail(`${what}: aria-label "${got}", wanted "${title}, ${want}"`)
+      else console.log(`ok: ${what} ("${got}")`)
+    }
+    const typeTitle = async (title) => {
+      const input = page.getByRole('textbox', { name: 'New item title' })
+      await input.waitFor({ timeout: 3000 })
+      await input.fill(title)
+      await page.keyboard.press('Enter')
+    }
+    const [fri, sat] = [await dateOf(4), await dateOf(5)]
+
+    // Click on empty grid: a one-hour item from the 15-minute slot clicked.
+    let p = await at(4, 11 * 60 + 10)
+    await page.mouse.click(p.x, p.y)
+    await typeTitle('Smoke run')
+    await expectLabel('Smoke run', `${weekday(fri)} 11:00 to 12:00`, 'item created by a click on Friday')
+
+    // Drag on empty grid: an item spanning the drag.
+    p = await at(5, 19 * 60 + 5, 0.3)
+    await page.mouse.move(p.x, p.y)
+    await page.mouse.down()
+    await page.mouse.move(p.x, p.y + 1.33 * 48, { steps: 10 })
+    await page.mouse.up()
+    await typeTitle('Smoke dinner')
+    await expectLabel('Smoke dinner', `${weekday(sat)} 19:00 to 20:30`, 'item created by a drag on Saturday')
+
+    // Resize: bottom edge down 30 minutes, then top edge down 30 minutes.
+    const edgeDrag = async (title, edge, dy) => {
+      const e = await block(title).locator(`.cal-block-edge.is-${edge}`).boundingBox()
+      const x = e.x + e.width / 2, y = e.y + e.height / 2
+      await page.mouse.move(x, y)
+      await page.mouse.down()
+      await page.mouse.move(x, y + dy, { steps: 8 })
+      await page.mouse.up()
+    }
+    await at(4, 11 * 60 + 30)
+    await edgeDrag('Smoke run', 'bottom', 24)
+    await expectLabel('Smoke run', `${weekday(fri)} 11:00 to 12:30`, 'bottom edge stretched by 30 minutes')
+    await edgeDrag('Smoke run', 'top', 24)
+    await expectLabel('Smoke run', `${weekday(fri)} 11:30 to 12:30`, 'top edge moved down 30 minutes')
+
+    // Move: the body dragged one day to the right keeps its time.
+    {
+      const b = await block('Smoke run').locator('.cal-block-body').boundingBox()
+      const target = await cols.nth(5).locator('.cal-day').boundingBox()
+      const x = b.x + b.width / 2, y = b.y + b.height / 2
+      await page.mouse.move(x, y)
+      await page.mouse.down()
+      await page.mouse.move(target.x + target.width * 0.7, y, { steps: 12 })
+      await page.mouse.up()
+      await expectLabel('Smoke run', `${weekday(sat)} 11:30 to 12:30`, 'item moved from Friday to Saturday')
+      if (!(await cols.nth(5).locator('.cal-block', { has: page.locator('[aria-label^="Smoke run, "]') }).count())) fail('moved item is not in the Saturday column')
+    }
+
+    // No time is written anywhere: positions show the time (aria-labels only).
+    {
+      const times = await page.evaluate(() => document.body.innerText.match(/\d{1,2}:\d{2}/g))
+      if (times) fail(`time text in the Week view: ${times.join(', ')}`)
+      else console.log('ok: no time text in the Week view (only aria-labels)')
+    }
+
+    // Clean up: × deletes the week-only items.
+    for (const title of ['Smoke run', 'Smoke dinner']) {
+      await block(title).hover()
+      await page.getByRole('button', { name: `Delete ${title}` }).click()
+      await block(title).waitFor({ state: 'detached', timeout: 3000 })
+    }
+    console.log('ok: × deleted both items')
+
+    // A task: from its strip into the grid (a one-hour block), then back to the strip (no time).
+    {
+      const cards = week.locator('section.week-col:not(.is-past) .week-strip').locator('li.week-card, li.week-in-today')
+      // Late in the week this week's open days may have no task left: use next week's.
+      const later = !(await cards.count())
+      if (later) await page.getByRole('button', { name: 'Next week' }).click()
+      const card = cards.first()
+      const t = (await card.locator('.week-card-title, .week-in-today-title').innerText()).trim()
+      const col = week.locator('section.week-col', { has: page.locator('.week-strip li', { hasText: t }) })
+      const i = await col.evaluate((el) => [...el.parentElement.querySelectorAll('section.week-col')].indexOf(el))
+      const date = await dateOf(i)
+      await cal.evaluate((el) => { el.scrollTop = 0 })
+      const c = await card.boundingBox()
+      p = await at(i, 7 * 60 + 20)
+      await page.mouse.move(c.x + c.width / 2, c.y + c.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(p.x, p.y, { steps: 14 })
+      await page.waitForTimeout(100)
+      await page.mouse.up()
+      await expectLabel(t, `${weekday(date)} 07:15 to 08:15`, `task "${t}" dragged from its strip into the grid`)
+      if (await cols.nth(i).locator('.week-strip li', { hasText: t }).count()) fail(`"${t}" is still in the strip after the grid drop`)
+      await page.waitForTimeout(100)
+      const b = await block(t).locator('.cal-block-body').boundingBox()
+      const s = await strip(cols.nth(i)).boundingBox()
+      await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(s.x + s.width / 2, s.y + 12, { steps: 12 })
+      await page.mouse.up()
+      await cols.nth(i).locator('.week-strip li', { hasText: t }).waitFor({ timeout: 3000 })
+      if (await block(t).count()) fail(`"${t}" still has a block after the drop on its strip`)
+      else console.log(`ok: "${t}" dragged back to its strip (no time)`)
+      if (later) await page.getByRole('button', { name: 'This week', exact: true }).click()
+    }
+
   }
 
   // --- Week header: the ‹ button stays put for short and long titles; the month/year picker ---
@@ -306,7 +463,7 @@ try {
     const prev = weekHead.getByRole('button', { name: 'Previous week' })
     const next = weekHead.getByRole('button', { name: 'Next week' })
     const titleBtn = weekHead.locator('.week-title-btn')
-    await weekHead.getByRole('button', { name: 'This week' }).click()
+    await weekHead.getByRole('button', { name: 'This week', exact: true }).click()
     const xs = new Map()
     for (let i = 0; i < 60; i++) { // more than a year ahead: every month, one Dec–Jan week with two years
       const t = (await titleBtn.innerText()).trim()
@@ -321,7 +478,7 @@ try {
     else if (distinct.length !== 1) fail(`‹ moves with the title: ${distinct.join(', ')} px`)
     else console.log(`ok: ‹ at x=${distinct[0]} for all ${titles.length} titles ("${shortT}" … "${longT}")`)
 
-    await weekHead.getByRole('button', { name: 'This week' }).click()
+    await weekHead.getByRole('button', { name: 'This week', exact: true }).click()
     const before = (await titleBtn.innerText()).trim()
     await titleBtn.click()
     const dialog = page.getByRole('dialog', { name: 'Choose month' })
@@ -335,7 +492,7 @@ try {
     await dialog.getByRole('button', { name: nm.label }).click()
     await dialog.waitFor({ state: 'detached', timeout: 3000 })
     const after = (await titleBtn.innerText()).trim()
-    await weekHead.getByRole('button', { name: 'This week' }).click()
+    await weekHead.getByRole('button', { name: 'This week', exact: true }).click()
     const back = (await titleBtn.innerText()).trim()
     if (after === before || back !== before) fail(`month picker: "${before}" → "${after}" → "${back}"`)
     else console.log(`ok: picked ${nm.label} → "${after}"; This week → "${back}"`)

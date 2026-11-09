@@ -13,7 +13,7 @@ import { registerShortcut, type ShortcutStatus } from './shortcut'
 
 // Browser dev: in-memory store seeded with example data, relative to today's local date.
 const q = (v: string) => JSON.stringify(v)
-interface SeedTask { id: string; title: string; status: 'todo' | 'today' | 'done'; first?: string; created: string; planned?: string; done?: string; scheduled?: string; steps?: [string, boolean][] }
+interface SeedTask { id: string; title: string; status: 'todo' | 'today' | 'done'; first?: string; created: string; planned?: string; done?: string; scheduled?: string; time?: string; steps?: [string, boolean][] }
 const taskYaml = (t: SeedTask) => [
   `  - id: ${t.id}`,
   `    title: ${q(t.title)}`,
@@ -23,6 +23,7 @@ const taskYaml = (t: SeedTask) => [
   ...(t.planned ? [`    planned: ${t.planned}`] : []),
   ...(t.done ? [`    done: ${t.done}`] : []),
   ...(t.scheduled ? [`    scheduled: ${t.scheduled}`] : []),
+  ...(t.time ? [`    time: ${q(t.time)}`] : []),
   ...(t.steps ? ['    steps:', ...t.steps.flatMap(([text, done]) => [`      - text: ${q(text)}`, `        done: ${done}`])] : []),
 ].join('\n')
 const projectFile = (title: string, color: string, goal: string, created: string, tasks: SeedTask[], body: string) =>
@@ -36,7 +37,7 @@ function seedFiles(today: string): Record<string, string> {
     { id: 't2', title: 'Set up Tauri project', status: 'done', created, planned: ago(5), done: ago(5) },
     { id: 't3', title: 'Build the week view', status: 'today', first: 'Draw seven columns on paper', created, planned: today,
       steps: [['Sketch the layout', true], ['Day columns', true], ['Unscheduled tray', false], ['Drag and drop', false]] },
-    { id: 't4', title: 'Write the README', status: 'todo', created, scheduled: addDays(today, 1) },
+    { id: 't4', title: 'Write the README', status: 'todo', created, scheduled: addDays(today, 1), time: '09:30-11:00' },
     { id: 't5', title: 'Try the weekly review', status: 'todo', first: 'Open it on Sunday', created },
   ]
   const spanishTasks: SeedTask[] = [
@@ -44,7 +45,7 @@ function seedFiles(today: string): Record<string, string> {
     { id: 't2', title: 'Learn the 50 most common verbs', status: 'today', first: 'Make a list of ten', created, planned: today,
       steps: [['Ten verbs', true], ['Next ten', false], ['Next ten', false]] },
     { id: 't3', title: 'Find a language partner', status: 'todo', created },
-    { id: 't4', title: 'Listen to one podcast episode', status: 'todo', created, scheduled: addDays(today, 2) },
+    { id: 't4', title: 'Listen to one podcast episode', status: 'todo', created, scheduled: addDays(today, 2), time: '08:00-08:45' },
   ]
   const shedTasks: SeedTask[] = [
     { id: 't1', title: 'Measure the corner of the garden', status: 'done', created, planned: ago(2), done: ago(2) },
@@ -79,6 +80,16 @@ function seedFiles(today: string): Record<string, string> {
   }
   files[`reviews/${isoWeek(ago(7))}.md`] =
     `---\nweek: ${isoWeek(ago(7))}\nfocus_project: learn-spanish\nintention: Twenty minutes of Spanish every day\n---\nGood momentum on the app. Spanish slipped midweek; short sessions work better for me.\n`
+  // A few week-only calendar items (Week view only), each in its ISO week's file.
+  const items: [string, string, string][] = [
+    ['Lunch with Sam', today, '12:30-13:30'], ['Dentist', addDays(today, 1), '14:00-14:45'], ['Swim', addDays(today, 3), '15:30-17:00'],
+  ]
+  items.forEach(([title, date, time], k) => {
+    const path = `calendar/${isoWeek(date)}.md`
+    files[path] ??= `---\nweek: ${q(isoWeek(date))}\nitems:\n`
+    files[path] += `  - id: c${k + 1}\n    title: ${q(title)}\n    date: ${date}\n    time: ${q(time)}\n`
+  })
+  for (const path of Object.keys(files)) if (path.startsWith('calendar/')) files[path] += '---\n'
   return files
 }
 

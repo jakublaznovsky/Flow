@@ -256,3 +256,69 @@ describe('MemoryFileStore.remove', () => {
     expect(s.files).toEqual({})
   })
 })
+
+describe('calendar/', () => {
+  const CAL = (id: string, title: string) =>
+    `---\nweek: "2026-W46"\nitems:\n  - id: ${id}\n    title: ${title}\n    date: 2026-11-12\n    time: "18:00-19:30"\n---\n`
+  it('loads only calendar/YYYY-Www.md and never creates calendar files', async () => {
+    const s = new MemoryFileStore({ 'calendar/2026-W46.md': CAL('c1', 'Swim'), 'calendar/notes.md': 'x', 'calendar/2026-W5.md': 'x' })
+    await ensureFolder(s)
+    const d = await loadFlow(s, T)
+    expect(Object.keys(d.calendar)).toEqual(['2026-W46'])
+    expect(d.calendar['2026-W46'].items[0]).toMatchObject({ id: 'c1', title: 'Swim', time: '18:00-19:30' })
+    expect(Object.keys(s.files).filter((p) => p.startsWith('calendar/')).sort()).toEqual(['calendar/2026-W46.md', 'calendar/2026-W5.md', 'calendar/notes.md'])
+  })
+  it('skips and logs a broken calendar file and never writes it', async () => {
+    const bad = '---\nitems:\n  - id: c1\n    title: Swim\n    date: 2026-11-12\n    time: "18:00-18:10"\n---\nmine'
+    const s = new MemoryFileStore({ 'calendar/2026-W46.md': bad })
+    const d = await loadFlow(s, T)
+    expect(d.skipped).toEqual(['calendar/2026-W46.md'])
+    expect(s.files['flow-issues.log']).toContain('calendar/2026-W46.md')
+    await saveFlow(s, { ...d, calendar: { '2026-W46': { week: '2026-W46', items: [], body: '', extra: {} } } }, ['calendar/2026-W46.md'])
+    expect(s.files['calendar/2026-W46.md']).toBe(bad)
+  })
+  it('saves a week to calendar/<week>.md, also with no items', async () => {
+    const s = new MemoryFileStore()
+    const d = await loadFlow(s, T)
+    const items = [{ id: 'c1', title: 'Swim', date: '2026-11-12', time: '18:00-19:30', extra: {} }]
+    await saveFlow(s, { ...d, calendar: { '2026-W46': { week: '2026-W46', items, body: '', extra: {} } } }, ['calendar/2026-W46.md'])
+    expect(s.files['calendar/2026-W46.md']).toBe(CAL('c1', 'Swim'))
+    await saveFlow(s, { ...d, calendar: { '2026-W46': { week: '2026-W46', items: [], body: '', extra: {} } } }, ['calendar/2026-W46.md'])
+    expect(s.files['calendar/2026-W46.md']).toBe('---\nweek: "2026-W46"\nitems: []\n---\n')
+  })
+  it('reloadPaths picks up edits and removal', async () => {
+    const s = new MemoryFileStore({ 'calendar/2026-W46.md': CAL('c1', 'Swim') })
+    const d = await loadFlow(s, T)
+    await s.write('calendar/2026-W46.md', CAL('c1', 'Run'))
+    const r = await reloadPaths(s, d, ['calendar/2026-W46.md'], T)
+    expect(r.calendar['2026-W46'].items[0].title).toBe('Run')
+    expect(d.calendar['2026-W46'].items[0].title).toBe('Swim')
+    delete s.files['calendar/2026-W46.md']
+    expect((await reloadPaths(s, r, ['calendar/2026-W46.md'], T)).calendar['2026-W46']).toBeUndefined()
+  })
+  it('ids repeated across week files are made unique in memory; a reloaded file yields', async () => {
+    const W47 = CAL('c1', 'Run').replace('2026-W46', '2026-W47').replace('2026-11-12', '2026-11-19')
+    const s = new MemoryFileStore({ 'calendar/2026-W46.md': CAL('c1', 'Swim'), 'calendar/2026-W47.md': W47 })
+    const d = await loadFlow(s, T)
+    expect([d.calendar['2026-W46'].items[0].id, d.calendar['2026-W47'].items[0].id]).toEqual(['c1', 'c2'])
+    await s.write('calendar/2026-W46.md', CAL('c1', 'Swim more'))
+    const r = await reloadPaths(s, d, ['calendar/2026-W46.md'], T)
+    expect(r.calendar['2026-W47'].items[0].id).toBe('c2')
+    expect(r.calendar['2026-W46'].items[0]).toMatchObject({ id: 'c1', title: 'Swim more' })
+    expect(s.files['calendar/2026-W47.md']).toBe(W47)
+  })
+  it('a task time round-trips through save and load', async () => {
+    const s = new MemoryFileStore({ 'projects/good.md': GOOD })
+    const d = await loadFlow(s, T)
+    d.projects.good.tasks[0].time = '09:00-10:30'
+    await saveFlow(s, d, ['projects/good.md'])
+    expect(s.files['projects/good.md']).toContain('    time: "09:00-10:30"\n')
+    expect((await loadFlow(s, T)).projects.good.tasks[0].time).toBe('09:00-10:30')
+  })
+  it('README documents task time and calendar/', () => {
+    expect(README_TEXT).toContain('calendar/')
+    expect(README_TEXT).toContain('calendar/YYYY-Www.md')
+    expect(README_TEXT).toContain('time: "18:00-19:30"')
+    expect(README_TEXT).toMatch(/time is .*HH:MM-HH:MM/)
+  })
+})

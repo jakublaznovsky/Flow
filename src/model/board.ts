@@ -7,6 +7,8 @@ export interface Card {
   projectSlug?: string; projectTitle?: string; color?: string; created: ISODate
   /** Task cards only: the day it is planned for (Week view). */
   scheduled?: ISODate
+  /** Task cards only: "HH:MM-HH:MM" on its Week day (never shown as text). */
+  time?: string
 }
 export type ColumnOrder = Partial<Record<ColumnId, string[]>>   // card keys
 
@@ -19,6 +21,7 @@ export function taskCard(project: Project, t: Task): Card {
   if (t.firstStep !== undefined) card.firstStep = t.firstStep
   if (t.steps && t.steps.length > 0) card.steps = t.steps
   if (t.scheduled !== undefined) card.scheduled = t.scheduled
+  if (t.time !== undefined) card.time = t.time
   return card
 }
 

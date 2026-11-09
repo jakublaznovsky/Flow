@@ -28,10 +28,17 @@ of the Claude buttons (see below).
 - **Checklists.** Break a task into steps, right on the card: its steps are always visible, with a
   small "Add step" line and `2/5` next to the title. Drag a step by its grip to reorder it (or
   focus the grip and press Alt+Up / Alt+Down).
-- **Plan your week.** The **Week** view has an Unscheduled drawer across the top (it folds away)
-  and seven day columns under it. Drag a task onto a day. When that day comes, the task moves to Today by itself.
-  You can move any task freely, Today tasks too; dropping one on a past day marks it done that day.
-  Click the week title to jump to any month and year.
+- **Plan your week.** The **Week** view is a calendar: seven days side by side, hours 7 to 24
+  down the side, with a thin line at every hour. An Unscheduled drawer sits across the top (it
+  folds away). At the top of each day is a strip for tasks that have a day but no hour, and what
+  you finished that day. Drag a task into the hours to give it a time; stretch it from its top or
+  bottom edge to make it longer or shorter; drag it back to the strip to drop the time. Moving the
+  task around the Board keeps its time. Moving it to another day in the Week view or its plan
+  menu, unscheduling, parking or finishing it removes the time. Click or drag on an empty spot
+  to add your own item, like a swim or a dentist visit. It lives only in the Week view:
+  double-click to rename it, × to delete it. No times are written anywhere; where a block sits
+  shows its time. When a planned day comes, the task moves to Today by itself. Dropping
+  a task on a past day marks it done that day. Click the week title to jump to any month and year.
 - **Weekly review.** A short guided review: what you finished, what is unfinished (keep, push to
   next week, send back or delete), a project to focus on next week, and a few words of reflection.
   It is saved in your folder and the chosen project gets a star in the sidebar next week.
@@ -160,6 +167,7 @@ Flow/
                      YAML header, project notes and decisions below
   days/YYYY-MM-DD.md what you planned and finished each day, plus focus sessions
   reviews/YYYY-Www.md one file per weekly review
+  calendar/YYYY-Www.md your own Week items (swim, dentist…), one file per week
   deleted/           deleted projects (move a file back to projects/ to restore it)
   flow-issues.log    files Flow could not read (Flow never overwrites them)
 ```

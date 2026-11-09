@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { promoteScheduled, scheduleTask, weekPlan } from './schedule'
+import { moveTask } from './tasks'
 import { emptyFlow, type FlowData, type Task } from './types'
 
 function deepFreeze<T>(o: T): T {
@@ -141,5 +142,48 @@ describe('weekPlan', () => {
     expect(w.days[4].scheduled.map((c) => c.key)).toEqual(['b/t1'])
     expect(w.days[1].done.map((e) => e.ref)).toEqual(['b/t9'])
     expect(w.unscheduled.map((c) => c.key)).toEqual(['b/t2'])
+  })
+})
+
+describe('scheduleTask and task time', () => {
+  const timed = (ref: string, more: Partial<Task> = {}): FlowData => {
+    const d = structuredClone(sample())
+    Object.assign(get(d, ref), { time: '09:00-10:00', ...more })
+    return deepFreeze(d)
+  }
+  it('a different day removes the time', () => {
+    expect(get(scheduleTask(timed('a/t2'), 'a/t2', '2026-11-07', T).data, 'a/t2').time).toBeUndefined()
+    expect(get(scheduleTask(timed('a/t3'), 'a/t3', '2026-11-07', T).data, 'a/t3').time).toBeUndefined()
+    expect(get(scheduleTask(timed('a/t2'), 'a/t2', T, T).data, 'a/t2').time).toBeUndefined()
+  })
+  it('clearing the date (Unscheduled) removes the time', () => {
+    const c = scheduleTask(timed('a/t2'), 'a/t2', null, T)
+    expect(get(c.data, 'a/t2')).not.toHaveProperty('time')
+    expect(get(c.data, 'a/t2')).not.toHaveProperty('scheduled')
+  })
+  it('clearing the date always removes the time, also for a task with no Week day', () => {
+    const moved = moveTask(timed('a/t3'), 'a/t3', 'todo', T)
+    expect(get(moved.data, 'a/t3').time).toBe('09:00-10:00')
+    const c = scheduleTask(moved.data, 'a/t3', null, T)
+    expect(get(c.data, 'a/t3')).not.toHaveProperty('time')
+    expect(c.changed).toEqual(['projects/a.md'])
+  })
+  it('the same day keeps the time', () => {
+    expect(get(scheduleTask(timed('a/t2'), 'a/t2', '2026-11-06', T).data, 'a/t2').time).toBe('09:00-10:00')
+    expect(get(scheduleTask(timed('a/t3'), 'a/t3', T, T).data, 'a/t3').time).toBe('09:00-10:00')
+  })
+  it('keepTime (Board Tomorrow moves) keeps the time on a day change', () => {
+    const c = scheduleTask(timed('a/t3'), 'a/t3', '2026-11-05', T, { keepTime: true })
+    expect(get(c.data, 'a/t3')).toMatchObject({ status: 'todo', scheduled: '2026-11-05', time: '09:00-10:00' })
+    expect(get(scheduleTask(timed('a/t2'), 'a/t2', null, T, { keepTime: true }).data, 'a/t2').time).toBe('09:00-10:00')
+  })
+  it('promotion keeps the time of a task due today and drops it for an overdue one', () => {
+    const d = structuredClone(sample())
+    Object.assign(get(d, 'a/t1'), { scheduled: T, time: '09:00-10:00' })
+    Object.assign(get(d, 'a/t5'), { time: '11:00-12:00' }) // scheduled 2026-11-03, yesterday
+    const c = promoteScheduled(deepFreeze(d), T)
+    expect(get(c.data, 'a/t1')).toMatchObject({ status: 'today', time: '09:00-10:00' })
+    expect(get(c.data, 'a/t5').status).toBe('today')
+    expect(get(c.data, 'a/t5').time).toBeUndefined()
   })
 })

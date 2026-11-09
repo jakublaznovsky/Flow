@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { boardColumns, searchCards, type Card as CardData, type ColumnId } from '../model/board'
 import { parkTask, promoteInboxItem } from '../model/inbox'
 import { addDays } from '../model/dates'
@@ -22,7 +22,6 @@ import FocusBar from './FocusBar'
 import { nextStep } from '../model/steps'
 import BoardView from './BoardView'
 import ProgressView from './ProgressView'
-import WeekView from './WeekView'
 import NotesPanel from './NotesPanel'
 import NotesView from './NotesView'
 import WeeklyReview from './WeeklyReview'
@@ -36,7 +35,11 @@ import { useFlow } from './useFlow'
 import { useFocus } from './useFocus'
 import { useStoredFlag } from './useStoredFlag'
 import './theme.css'
+import QuietBoundary from './QuietBoundary'
 import './board.css'
+
+// The Week calendar is its own chunk (loaded the first time the Week view opens).
+const WeekView = lazy(() => import('./WeekView'))
 
 /** Handle for host shells (Tauri) to push changes into the board. Returns an optional cleanup. */
 export interface BoardApi { apply: ReturnType<typeof useFlow>['apply']; today: () => string }
@@ -56,11 +59,11 @@ export type PromoteTo = 'todo' | 'today' | 'tomorrow' | 'done'
 
 const mergeChanges = (a: Change, b: Change): Change => ({ data: b.data, changed: [...new Set([...a.changed, ...b.changed])] })
 
-/** Plan a task for tomorrow (a Done task is first reopened in To do); one Change. */
+/** Plan a task for tomorrow (a Done task is first reopened in To do); one Change. Board moves keep a Week time. */
 function planTomorrow(d: FlowData, ref: string, today: string): Change {
   const found = findTask(d, ref)
   const reopened = found?.task.status === 'done' ? moveTask(d, ref, 'todo', today) : { data: d, changed: [] }
-  return mergeChanges(reopened, scheduleTask(reopened.data, ref, addDays(today, 1), today))
+  return mergeChanges(reopened, scheduleTask(reopened.data, ref, addDays(today, 1), today, { keepTime: true }))
 }
 
 export interface DropContext {
@@ -110,7 +113,7 @@ export function handleDrop(
     return
   }
   if (to === 'tomorrow' && from !== 'tomorrow') flow.apply((d) => planTomorrow(d, cardKey, flow.today))
-  else if (from === 'tomorrow' && to === 'todo') flow.apply((d) => scheduleTask(d, cardKey, null, flow.today))
+  else if (from === 'tomorrow' && to === 'todo') flow.apply((d) => scheduleTask(d, cardKey, null, flow.today, { keepTime: true }))
   else if (to !== from) flow.apply((d) => moveTask(d, cardKey, to === 'tomorrow' ? 'todo' : to, flow.today))
   reorder(flow, cardKey, from, to, index, cardKey, query)
 }
@@ -382,7 +385,9 @@ export default function Board({ store, settings, now, onReady, ai, shortcut }: P
               onToggleDone={toggleDone}
             />
           ) : view === 'week' ? (
-            <WeekView flow={flow} trayOpen={trayOpen} onToggleTray={toggleTray} headerSlot={headerSlot} />
+            <QuietBoundary onError={(e) => void logIssue(store, 'week view', `could not be shown: ${e instanceof Error ? e.message : String(e)}`)}>
+              <Suspense fallback={null}><WeekView flow={flow} trayOpen={trayOpen} onToggleTray={toggleTray} headerSlot={headerSlot} now={clock} /></Suspense>
+            </QuietBoundary>
           ) : view === 'notes' ? (
             <NotesView data={data} apply={apply} initial={filter} />
           ) : view === 'review' ? (

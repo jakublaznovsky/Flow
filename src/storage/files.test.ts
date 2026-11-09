@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseDay, parseInbox, parseNotes, parseProject, parseReview, serializeReview, serializeDay, serializeInbox, serializeNotes, serializeProject } from './files'
+import { parseCalendarWeek, parseDay, parseInbox, parseNotes, parseProject, parseReview, serializeCalendarWeek, serializeReview, serializeDay, serializeInbox, serializeNotes, serializeProject } from './files'
 import { pickColor } from '../model/ids'
 
 const today = '2026-11-05'
@@ -321,5 +321,73 @@ describe('reviews/YYYY-Www.md', () => {
   })
   it('throws on broken frontmatter', () => {
     expect(() => parseReview('2026-W45', '---\nweek: [oops\n---\n')).toThrow()
+  })
+})
+
+describe('task time', () => {
+  const withTask = (lines: string) =>
+    `---\ntitle: P\nstatus: active\ncolor: "#000"\ncreated: 2026-11-01\ntasks:\n  - id: t1\n    title: A\n    status: todo\n    created: 2026-11-01\n${lines}---\n`
+  it('parses a quoted or plain time and writes it quoted after scheduled', () => {
+    const p = parseProject('p', withTask('    scheduled: 2026-11-06\n    time: "09:00-10:30"\n'), today)
+    expect(p.tasks[0].time).toBe('09:00-10:30')
+    expect(p.tasks[0].extra).toEqual({})
+    expect(serializeProject(p)).toContain('    scheduled: 2026-11-06\n    time: "09:00-10:30"\n')
+    expect(parseProject('p', withTask('    time: 23:00-24:00\n'), today).tasks[0].time).toBe('23:00-24:00')
+  })
+  it('omits time when absent', () => {
+    const p = parseProject('p', withTask(''), today)
+    expect(p.tasks[0].time).toBeUndefined()
+    expect(serializeProject(p)).not.toContain('time')
+  })
+  it.each(['"9:00-10:00"', '"09:05-10:00"', '"06:00-08:00"', '"10:00-09:00"', '"10:00-10:00"', '"23:00-24:15"', '540', '[a]', '"09:00"', '""'])(
+    'rejects a bad time (%s)', (bad) => {
+      expect(() => parseProject('p', withTask(`    time: ${bad}\n`), today)).toThrow()
+    })
+})
+
+describe('calendar/YYYY-Www.md', () => {
+  const FILE = `---
+week: "2026-W46"
+items:
+  - id: c1
+    title: Swimming
+    date: 2026-11-12
+    time: "18:00-19:30"
+    place: pool
+---
+Notes
+`
+  it('parses week, items (with unknown fields) and body; round-trips exactly', () => {
+    const w = parseCalendarWeek('2026-W46', FILE)
+    expect(w).toEqual({
+      week: '2026-W46', body: 'Notes\n', extra: {},
+      items: [{ id: 'c1', title: 'Swimming', date: '2026-11-12', time: '18:00-19:30', extra: { place: 'pool' } }],
+    })
+    expect(serializeCalendarWeek(w)).toBe(FILE)
+  })
+  it('keeps unknown top-level keys, writes an empty list and takes the week from the file name', () => {
+    const w = parseCalendarWeek('2026-W46', '---\nmood: calm\n---\n')
+    expect(w).toEqual({ week: '2026-W46', items: [], body: '', extra: { mood: 'calm' } })
+    expect(serializeCalendarWeek(w)).toBe('---\nweek: "2026-W46"\nitems: []\nmood: calm\n---\n')
+  })
+  it('gives items without an id (or a repeated one) a fresh c<n> id', () => {
+    const w = parseCalendarWeek('2026-W46', '---\nitems:\n  - title: A\n    date: 2026-11-12\n    time: "09:00-10:00"\n  - id: c4\n    title: B\n    date: 2026-11-12\n    time: "10:00-11:00"\n  - id: c4\n    title: C\n    date: 2026-11-12\n    time: "11:00-12:00"\n---\n')
+    expect(w.items.map((i) => i.id)).toEqual(['c5', 'c4', 'c6'])
+  })
+  const item = (lines: string) => `---\nitems:\n  - ${lines.trimStart()}---\n`
+  it.each([
+    ['missing title', '    id: c1\n    date: 2026-11-12\n    time: "09:00-10:00"\n'],
+    ['blank title', '    title: "  "\n    date: 2026-11-12\n    time: "09:00-10:00"\n'],
+    ['title not text', '    title: [a]\n    date: 2026-11-12\n    time: "09:00-10:00"\n'],
+    ['missing date', '    title: A\n    time: "09:00-10:00"\n'],
+    ['bad date', '    title: A\n    date: 2026-02-30\n    time: "09:00-10:00"\n'],
+    ['missing time', '    title: A\n    date: 2026-11-12\n'],
+    ['bad time', '    title: A\n    date: 2026-11-12\n    time: "09:00-09:10"\n'],
+    ['id not text', '    id: [x]\n    title: A\n    date: 2026-11-12\n    time: "09:00-10:00"\n'],
+  ])('rejects an item with %s', (_, lines) => {
+    expect(() => parseCalendarWeek('2026-W46', item(lines))).toThrow()
+  })
+  it.each(['week: 46', 'week: [a]', 'items: oops', 'items:\n  - just text'])('rejects %s', (line) => {
+    expect(() => parseCalendarWeek('2026-W46', `---\n${line}\n---\n`)).toThrow()
   })
 })

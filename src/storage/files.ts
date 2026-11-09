@@ -1,6 +1,8 @@
-import type { Day, DoneEntry, Extra, FocusEntry, ISODate, Inbox, InboxItem, Notes, Project, Review, ProjectStatus, Step, Task, TaskStatus } from '../model/types'
-import { localDate } from '../model/dates'
-import { nextInboxId, nextTaskId, pickColor } from '../model/ids'
+import { Scalar } from 'yaml'
+import type { CalendarItem, CalendarWeek, Day, DoneEntry, Extra, FocusEntry, ISODate, Inbox, InboxItem, Notes, Project, Review, ProjectStatus, Step, Task, TaskStatus } from '../model/types'
+import { isISODate } from '../model/dates'
+import { nextCalendarItemId, nextInboxId, nextTaskId, pickColor } from '../model/ids'
+import { parseTime } from '../model/timeblock'
 import { joinFrontmatter, splitFrontmatter } from './frontmatter'
 
 type Obj = Record<string, unknown>
@@ -54,17 +56,29 @@ function assignIds<T extends { id: string }>(items: (Omit<T, 'id'> & { id?: stri
   return items as T[]
 }
 
-const TASK_KNOWN = ['id', 'title', 'status', 'first_step', 'created', 'planned', 'done', 'scheduled', 'steps']
+const TASK_KNOWN = ['id', 'title', 'status', 'first_step', 'created', 'planned', 'done', 'scheduled', 'time', 'steps']
 
 /** Optional strict date: absent → undefined; anything but a YYYY-MM-DD string fails the file. */
 function optDate(v: unknown, what: string): ISODate | undefined {
   if (v === undefined || v === null) return undefined
-  const bad = () => new Error(`${what} must be a date like 2026-11-06`)
-  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw bad()
-  // Reject impossible calendar dates (2026-02-30, 2026-13-45): they must survive a local round trip.
-  const [y, m, d] = v.split('-').map(Number)
-  if (localDate(new Date(y, m - 1, d)) !== v) throw bad()
+  // Rejects impossible calendar dates too (2026-02-30, 2026-13-45).
+  if (!isISODate(v)) throw new Error(`${what} must be a date like 2026-11-06`)
   return v
+}
+
+/** Strict "HH:MM-HH:MM" (15-minute steps, 07:00-24:00): anything else fails the file. */
+function strictTime(v: unknown, what: string): string {
+  if (typeof v !== 'string') throw new Error(`${what} must be text like "09:00-10:30"`)
+  parseTime(v)
+  return v
+}
+const optTime = (v: unknown, what: string): string | undefined => (v === undefined || v === null ? undefined : strictTime(v, what))
+
+/** A double-quoted YAML string (so `09:00-10:30` and `2026-W46` read the same in every YAML tool). */
+const quoted = (s: string): Scalar => {
+  const node = new Scalar(s)
+  node.type = 'QUOTE_DOUBLE'
+  return node
 }
 
 function parseSteps(v: unknown): Step[] | undefined {
@@ -89,6 +103,7 @@ function parseTask(raw: unknown, today: ISODate): Omit<Task, 'id'> & { id?: stri
     planned: optStr(raw.planned),
     done: optStr(raw.done),
     scheduled: optDate(raw.scheduled, 'scheduled'),
+    time: optTime(raw.time, 'time'),
     steps: parseSteps(raw.steps),
     extra: pickExtra(raw, TASK_KNOWN),
   }
@@ -101,6 +116,7 @@ function taskToObj(t: Task): Obj {
   if (t.planned !== undefined) o.planned = t.planned
   if (t.done !== undefined) o.done = t.done
   if (t.scheduled !== undefined) o.scheduled = t.scheduled
+  if (t.time !== undefined) o.time = quoted(t.time)
   if (t.steps && t.steps.length > 0) o.steps = t.steps.map((s) => ({ text: s.text, done: s.done, ...s.extra }))
   return { ...o, ...t.extra }
 }
@@ -226,4 +242,38 @@ export function serializeReview(r: Review): string {
   if (r.focusProject !== undefined) o.focus_project = r.focusProject
   if (r.intention !== undefined) o.intention = r.intention
   return joinFrontmatter({ ...o, ...r.extra }, r.body)
+}
+
+const CAL_ITEM_KNOWN = ['id', 'title', 'date', 'time']
+
+/**
+ * calendar/YYYY-Www.md: `week` (text; the file name when missing) and `items` of week-only entries
+ * `{ id, title, date, time }`, all strict; missing/repeated ids get a fresh `c<n>`; body kept.
+ */
+export function parseCalendarWeek(week: string, text: string): CalendarWeek {
+  const { data, body } = splitFrontmatter(text)
+  if (data.week !== undefined && data.week !== null && typeof data.week !== 'string') throw new Error('week must be text')
+  const rawItems = list(data.items, 'items').map((raw) => {
+    if (!isObj(raw)) throw new Error('calendar item must be a mapping')
+    if (raw.id !== undefined && raw.id !== null && typeof raw.id !== 'string') throw new Error('calendar item id must be text')
+    if (typeof raw.title !== 'string' || !raw.title.trim()) throw new Error('calendar item title must be non-empty text')
+    const date = optDate(raw.date, 'calendar item date')
+    if (date === undefined) throw new Error('calendar item is missing date')
+    return {
+      id: raw.id || undefined, title: raw.title, date,
+      time: strictTime(raw.time, 'calendar item time'),
+      extra: pickExtra(raw, CAL_ITEM_KNOWN),
+    }
+  })
+  return {
+    week: typeof data.week === 'string' && data.week !== '' ? data.week : week,
+    items: assignIds<CalendarItem>(rawItems, nextCalendarItemId),
+    body,
+    extra: pickExtra(data, ['week', 'items']),
+  }
+}
+
+export function serializeCalendarWeek(w: CalendarWeek): string {
+  const items = w.items.map((i) => ({ id: i.id, title: i.title, date: i.date, time: quoted(i.time), ...i.extra }))
+  return joinFrontmatter({ week: quoted(w.week), items, ...w.extra }, w.body)
 }

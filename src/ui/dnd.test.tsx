@@ -114,6 +114,19 @@ describe('handleDrop', () => {
     expect(hook.result.current.flow.order.done).toEqual([])
   })
 
+  it('Board moves to and from Tomorrow keep a Week-grid time', async () => {
+    const files = tomorrowSeed()
+    files['projects/learn-spanish.md'] = project('Learn Spanish',
+      t('t1', 'Buy a book', 'today') + '    time: "09:00-10:00"\n' + t('t2', 'Read', 'todo') + '    scheduled: 2026-11-04\n    time: "11:00-12:00"\n')
+    const { ctx, hook } = await harness(files)
+    act(() => handleDrop({ cardKey: 'learn-spanish/t1', from: 'today', to: 'tomorrow', index: 0 }, ctx()))
+    act(() => handleDrop({ cardKey: 'learn-spanish/t2', from: 'tomorrow', to: 'todo', index: 0 }, ctx()))
+    const tasks = hook.result.current.flow.data!.projects['learn-spanish'].tasks
+    expect(tasks[0]).toMatchObject({ status: 'todo', scheduled: '2026-11-04', time: '09:00-10:00' })
+    expect(tasks[1]).toMatchObject({ status: 'todo', time: '11:00-12:00' })
+    expect(tasks[1].scheduled).toBeUndefined()
+  })
+
   it('Tomorrow -> To do clears the date; Tomorrow -> Today moves it to Today', async () => {
     const files = tomorrowSeed()
     files['projects/learn-spanish.md'] = project('Learn Spanish', t('t1', 'Buy a book', 'todo') + '    scheduled: 2026-11-04\n')

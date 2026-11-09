@@ -6,19 +6,22 @@ import { promoteScheduled } from '../model/schedule'
 import type { FileStore } from '../storage/fileStore'
 import { ensureFolder, loadFlow, moveToDeleted, reloadPaths, saveFlow } from '../storage/flowRepo'
 import { deleteProject } from '../model/projects'
+import { dedupeCalendarIds } from '../model/calendar'
 import type { Settings } from './settings'
 
 /** Copy one reloaded path from `from` into `into` (a fresh copy of the current data). */
 function mergePath(into: FlowData, from: FlowData, path: string): FlowData {
-  const out: FlowData = { ...into, projects: { ...into.projects }, days: { ...into.days }, reviews: { ...into.reviews }, skipped: into.skipped.filter((s) => s !== path) }
+  const out: FlowData = { ...into, projects: { ...into.projects }, days: { ...into.days }, reviews: { ...into.reviews }, calendar: { ...into.calendar }, skipped: into.skipped.filter((s) => s !== path) }
   if (from.skipped.includes(path)) out.skipped.push(path)
   const proj = /^projects\/(.+)\.md$/.exec(path)?.[1]
   const day = /^days\/(.+)\.md$/.exec(path)?.[1]
   const review = /^reviews\/(.+)\.md$/.exec(path)?.[1]
+  const week = /^calendar\/(.+)\.md$/.exec(path)?.[1]
   if (path === 'inbox.md') out.inbox = from.inbox
   else if (path === 'notes.md') out.notes = from.notes
   else if (proj) { if (from.projects[proj]) out.projects[proj] = from.projects[proj]; else delete out.projects[proj] }
   else if (review) { if (from.reviews[review]) out.reviews[review] = from.reviews[review]; else delete out.reviews[review] }
+  else if (week) { if (from.calendar[week]) out.calendar[week] = from.calendar[week]; else delete out.calendar[week] }
   else if (day) { if (from.days[day]) out.days[day] = from.days[day]; else delete out.days[day] }
   return out
 }
@@ -64,6 +67,10 @@ export function useFlow(store: FileStore, settings: Settings, now: () => Date = 
           const dirty = new Set(applyLog.current.filter((e) => e.n > start).flatMap((e) => e.paths))
           let merged = dataRef.current ?? next
           for (const path of paths) if (!dirty.has(path)) merged = mergePath(merged, next, path)
+          // Items added locally while the reload was in flight may share an id with a reloaded
+          // week: the reloaded weeks' items yield (in memory only).
+          const reloadedWeeks = paths.filter((p) => !dirty.has(p)).map((p) => /^calendar\/(.+)\.md$/.exec(p)?.[1]).filter((w): w is string => w !== undefined)
+          merged = dedupeCalendarIds(merged, reloadedWeeks)
           dataRef.current = merged
           setData(merged)
         })
