@@ -75,6 +75,11 @@ export function useGridGestures({ apply, today, scroller }: { apply: Apply; toda
   const setGesture = (g: Gesture | null) => {
     gRef.current = g
     setGestureState(g)
+    // One cursor for the whole gesture, wherever the pointer is (board.css `html[data-cal-gesture]`).
+    const mode = g?.kind === 'resize' ? 'resize' : g?.kind === 'move' && g.active ? 'move' : undefined
+    const root = document.documentElement
+    if (mode) root.dataset.calGesture = mode
+    else delete root.dataset.calGesture
   }
 
   // Keyboard moves and closed title inputs give focus back to the block (it may have re-rendered).
@@ -150,6 +155,7 @@ export function useGridGestures({ apply, today, scroller }: { apply: Apply; toda
       window.removeEventListener('pointercancel', cancel)
       window.removeEventListener('keydown', key, true)
       edgeScroll.stop()
+      delete document.documentElement.dataset.calGesture
       last.current = null
       cleanup.current = null
     }

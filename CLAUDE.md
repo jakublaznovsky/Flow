@@ -130,6 +130,8 @@ Data is Markdown files with YAML frontmatter in a user-chosen folder. See
   anywhere: a block shows its title; times exist only in its aria-label ("Swim, Thursday 18:00 to
   19:30"). Times and items never reach Board, Progress, review, AI prompts or search. dnd-kit
   drops read the real pointer position (its auto-scroll is off; the grid scrolls near its edges).
+  While a block is resized or moved, `html[data-cal-gesture=resize|move]` forces one cursor
+  (ns-resize / grabbing) everywhere until release or Escape (v0.3.1).
 - Tomorrow column = no new state: it is `scheduled === today + 1`. Drops onto it schedule tomorrow
   (Done tasks reopen first); Tomorrow → To do clears the date.
 - Promoting a Parking lot item (v0.2.8): dropping it on To do / Today / Tomorrow / the Done bar

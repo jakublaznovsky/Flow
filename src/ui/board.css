@@ -714,6 +714,9 @@ input.quick-capture, input.quick-capture:focus {
 .cal-block-edge { position: absolute; left: 0; right: 0; height: 6px; z-index: 2; cursor: ns-resize; touch-action: none; }
 .cal-block-edge.is-top { top: 0; }
 .cal-block-edge.is-bottom { bottom: 0; }
+/* While a block is resized or moved the cursor stays the same everywhere (no flicker off the 6px edge). */
+html[data-cal-gesture='resize'], html[data-cal-gesture='resize'] * { cursor: ns-resize !important; user-select: none; }
+html[data-cal-gesture='move'], html[data-cal-gesture='move'] * { cursor: grabbing !important; user-select: none; }
 .cal-block.is-short .cal-block-edge { height: 3px; }
 .cal-block-delete {
   position: absolute; top: 4px; right: 5px; z-index: 3; width: 18px; height: 18px; padding: 0;

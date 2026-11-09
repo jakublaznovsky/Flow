@@ -213,6 +213,24 @@ describe('Week calendar: week-only items', () => {
     gesture(top, 12 * HOUR_PX, [17 * HOUR_PX])
     await waitFor(() => expect(store.files['calendar/2026-W45.md']).toContain('time: "20:45-21:00"'))
   })
+
+  it('keeps one cursor for the whole gesture (resize: ns-resize, move: grabbing), cleared on release', async () => {
+    await open()
+    const swim = within(grid('Thu 5 Nov')).getByRole('button', { name: /^Swim/ })
+    const bottom = blockOf(swim).querySelector<HTMLElement>('.cal-block-edge.is-bottom')!
+    fireEvent.pointerDown(bottom, { clientX: 10, clientY: 12 * HOUR_PX, button: 0, pointerId: 1 })
+    fireEvent.pointerMove(window, { clientX: 10, clientY: 13 * HOUR_PX, pointerId: 1 })
+    expect(document.documentElement.dataset.calGesture).toBe('resize')
+    fireEvent.pointerUp(window, { clientX: 10, clientY: 13 * HOUR_PX, pointerId: 1 })
+    expect(document.documentElement.dataset.calGesture).toBeUndefined()
+    await settle()
+    const body = within(grid('Thu 5 Nov')).getByRole('button', { name: /^Swim/ })
+    fireEvent.pointerDown(body, { clientX: 10, clientY: 11 * HOUR_PX + 12, button: 0, pointerId: 1 })
+    fireEvent.pointerMove(window, { clientX: 10, clientY: 12 * HOUR_PX, pointerId: 1 })
+    expect(document.documentElement.dataset.calGesture).toBe('move')
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(document.documentElement.dataset.calGesture).toBeUndefined()
+  })
 })
 
 describe('Week calendar: project task blocks', () => {
